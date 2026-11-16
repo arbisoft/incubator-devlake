@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/dal"
+	coremigrations "github.com/apache/incubator-devlake/core/models/migrationscripts"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/e2ehelper"
 	contextimpl "github.com/apache/incubator-devlake/impls/context"
@@ -106,5 +107,25 @@ func TestHourlyAttributionMigrationIsRerunnableAndMatchesModels(t *testing.T) {
 			"SELECT COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = 'PRIMARY' ORDER BY ORDINAL_POSITION",
 			table).Scan(&got).Error)
 		require.Equal(t, want, got, table)
+	}
+}
+
+func TestPromptToolsAndSessionHooksMigrationIsRerunnable(t *testing.T) {
+	tester := e2ehelper.NewDataFlowTester(t, "claude_otel", impl.ClaudeOtel{})
+	basicRes := contextimpl.NewDefaultBasicRes(tester.Cfg, tester.Log, tester.Dal)
+	var script plugin.MigrationScript
+	for _, candidate := range coremigrations.All() {
+		if candidate.Version() == 20261111120000 {
+			script = candidate
+		}
+	}
+	require.NotNil(t, script, "core migration 20261111120000 is not registered")
+	require.NoError(t, script.Up(basicRes))
+	require.NoError(t, script.Up(basicRes), "a rerun must succeed")
+	for _, table := range []string{"ai_prompt_tools", "ai_session_hooks"} {
+		require.True(t, tester.Dal.HasTable(table), table)
+	}
+	for _, column := range []string{"hook_count", "hook_block_count", "hook_error_count", "hook_duration_ms", "idle_before_seconds", "first_request_context_tokens", "first_request_cost_usd"} {
+		require.True(t, tester.Dal.HasColumn("ai_prompts", column), column)
 	}
 }

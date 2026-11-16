@@ -89,6 +89,18 @@ type AiPrompt struct {
 	// It is nil when no request reported one: prompts that made no model request, clients
 	// that do not send effort, and prompts converted before it was recorded.
 	Effort *string `gorm:"type:varchar(64);index" json:"effort,omitempty"`
+
+	// HookCount, HookBlockCount, HookErrorCount and HookDurationMs sum the prompt's hook_execution_complete events.
+	HookCount      int64 `json:"hookCount"`
+	HookBlockCount int64 `json:"hookBlockCount"`
+	HookErrorCount int64 `json:"hookErrorCount"`
+	HookDurationMs int64 `json:"hookDurationMs"`
+	// IdleBeforeSeconds is the time from the session's previous main-thread request to this prompt's first; nil when there is none.
+	IdleBeforeSeconds *int64 `json:"idleBeforeSeconds,omitempty"`
+	// FirstRequestContextTokens is the input, cache read and cache creation tokens of the prompt's first main-thread request.
+	FirstRequestContextTokens int64 `json:"firstRequestContextTokens"`
+	// FirstRequestCostUsd is the cost of that first main-thread request.
+	FirstRequestCostUsd *string `gorm:"type:decimal(20,8)" json:"firstRequestCostUsd,omitempty"`
 }
 
 func (AiPrompt) TableName() string { return "ai_prompts" }
@@ -165,3 +177,52 @@ type AiPermissionModeChange struct {
 }
 
 func (AiPermissionModeChange) TableName() string { return "ai_permission_mode_changes" }
+
+// AiPromptTool is one tool's calls and permission decisions while handling a prompt, one row per tool and MCP server.
+type AiPromptTool struct {
+	domainlayer.DomainEntity
+	Provider string `gorm:"type:varchar(100);index" json:"provider"`
+	// WorkspaceKey and PromptId also share idx_ai_prompt_tools_workspace_prompt, the key the prompt rollup deletes a prompt's tools by.
+	WorkspaceKey string `gorm:"type:varchar(255);index;index:idx_ai_prompt_tools_workspace_prompt,priority:1" json:"workspaceKey"`
+	UserKey      string `gorm:"type:varchar(255);index" json:"userKey"`
+	UserEmail    string `gorm:"type:varchar(255);index" json:"userEmail"`
+	SessionId    string `gorm:"type:varchar(128);index" json:"sessionId"`
+	PromptId     string `gorm:"type:varchar(128);index;index:idx_ai_prompt_tools_workspace_prompt,priority:2" json:"promptId"`
+	// AiPromptId is the id of the ai_prompts row this tool row belongs to.
+	AiPromptId string `gorm:"type:varchar(255);index" json:"aiPromptId"`
+	// StartedAt is the start of the prompt.
+	StartedAt     time.Time `gorm:"type:datetime(3);index" json:"startedAt"`
+	ToolName      string    `gorm:"type:varchar(255);index" json:"toolName"`
+	McpServerName string    `gorm:"type:varchar(255);index" json:"mcpServerName"`
+	// CallCount, FailureCount and DurationMs come from tool_result events.
+	CallCount    int64 `json:"callCount"`
+	FailureCount int64 `json:"failureCount"`
+	DurationMs   int64 `json:"durationMs"`
+	// The accept and reject counts come from tool_decision events; a source starting with user is a user decision, any other a config one.
+	ConfigAcceptCount int64 `json:"configAcceptCount"`
+	ConfigRejectCount int64 `json:"configRejectCount"`
+	UserAcceptCount   int64 `json:"userAcceptCount"`
+	UserRejectCount   int64 `json:"userRejectCount"`
+}
+
+func (AiPromptTool) TableName() string { return "ai_prompt_tools" }
+
+// AiSessionHook is one hook registered in a Claude Code session, from its hook_registered events.
+type AiSessionHook struct {
+	domainlayer.DomainEntity
+	Provider           string  `gorm:"type:varchar(100);index" json:"provider"`
+	WorkspaceKey       string  `gorm:"type:varchar(255);index" json:"workspaceKey"`
+	SourceConnectionId uint64  `gorm:"index" json:"sourceConnectionId"`
+	UserKey            string  `gorm:"type:varchar(255);index" json:"userKey"`
+	UserEmail          string  `gorm:"type:varchar(255);index" json:"userEmail"`
+	SessionId          string  `gorm:"type:varchar(128);index" json:"sessionId"`
+	RepositoryUrl      *string `gorm:"type:varchar(255);index" json:"repositoryUrl,omitempty"`
+	HookSource         string  `gorm:"type:varchar(64)" json:"hookSource"`
+	HookEvent          string  `gorm:"type:varchar(64)" json:"hookEvent"`
+	HookName           string  `gorm:"type:varchar(255)" json:"hookName"`
+	HookType           string  `gorm:"type:varchar(64)" json:"hookType"`
+	// FirstRegisteredAt is the earliest registration of the hook in the session.
+	FirstRegisteredAt time.Time `gorm:"type:datetime(3);index" json:"firstRegisteredAt"`
+}
+
+func (AiSessionHook) TableName() string { return "ai_session_hooks" }

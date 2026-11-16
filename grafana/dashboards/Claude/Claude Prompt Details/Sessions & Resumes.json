@@ -1,0 +1,979 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Returns to long Claude Code sessions after the prompt cache has expired, what they cost, and how often people resume sessions explicitly.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "type": "link",
+      "title": "Claude Session Timeline",
+      "tooltip": "One engineer's sessions and prompts on a timeline",
+      "url": "/d/claude_session_timeline_mysql"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "**How to read this dashboard**\n\n- **Cold return:** a prompt whose first main-thread model request comes more than an hour after the session's previous main-thread request. By then the prompt cache has expired, so the request re-sends the whole conversation and writes it to the cache again.\n- **Explicit resume:** the session logged a `--resume`, `--continue` or `/resume` start in the prompt's hour or the hour before. Other cold returns are people coming back to a session left open. The match is by hour, so it is approximate.\n- **Sources:** cold returns come from prompts built from Claude Code's log events (`ai_prompts`), so users whose clients send no logs are left out, and log history starts on 2026-10-27. Resume counts come from the hourly session-start metric, which covers every user.\n- **Weeks** start on Monday (UTC). Weekly charts show only weeks that have ended and fall fully inside the time range.\n- **Filters:** Project, Claude Code OTel teams and User narrow every panel. Repository narrows the cold-return figures only; session starts carry no repository.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.0.0",
+      "title": "About this dashboard",
+      "type": "text"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Prompts in the range whose first main-thread request came after more than an hour of idle time in their session.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Cold returns$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH cold AS (\n  -- A cold return is a prompt whose first main-thread request came more than an hour after the session's previous one; it counts as an explicit resume when the session logged a resume start in the prompt's hour or the hour before.\n  SELECT p.started_at, COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    p.first_request_context_tokens AS context, p.first_request_cost_usd AS cost,\n    EXISTS (\n      SELECT 1 FROM _tool_claude_code_otel_hourly_session_starts ss\n      WHERE ss.connection_id = p.source_connection_id\n        AND ss.session_id = p.session_id\n        AND ss.start_type = 'resume'\n        AND ss.hour_start BETWEEN TIMESTAMP(DATE_FORMAT(p.started_at, '%Y-%m-%d %H:00:00')) - INTERVAL 1 HOUR AND TIMESTAMP(DATE_FORMAT(p.started_at, '%Y-%m-%d %H:00:00'))\n    ) AS resumed\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.idle_before_seconds > 3600\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n),\ntotal AS (\n  SELECT SUM(p.estimated_cost_usd) AS cost\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n)\nSELECT COUNT(cold.started_at) AS \"Cold returns\",\n  COALESCE(SUM(cold.cost), 0) AS \"Cold-return cost\",\n  SUM(cold.cost) / NULLIF(MAX(total.cost), 0) AS \"Share of cost\"\nFROM total\nLEFT JOIN cold ON 1 = 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cold Returns",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Estimated cost of those prompts' first main-thread requests.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Cold-return cost$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH cold AS (\n  -- A cold return is a prompt whose first main-thread request came more than an hour after the session's previous one; it counts as an explicit resume when the session logged a resume start in the prompt's hour or the hour before.\n  SELECT p.started_at, COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    p.first_request_context_tokens AS context, p.first_request_cost_usd AS cost,\n    EXISTS (\n      SELECT 1 FROM _tool_claude_code_otel_hourly_session_starts ss\n      WHERE ss.connection_id = p.source_connection_id\n        AND ss.session_id = p.session_id\n        AND ss.start_type = 'resume'\n        AND ss.hour_start BETWEEN TIMESTAMP(DATE_FORMAT(p.started_at, '%Y-%m-%d %H:00:00')) - INTERVAL 1 HOUR AND TIMESTAMP(DATE_FORMAT(p.started_at, '%Y-%m-%d %H:00:00'))\n    ) AS resumed\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.idle_before_seconds > 3600\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n),\ntotal AS (\n  SELECT SUM(p.estimated_cost_usd) AS cost\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n)\nSELECT COUNT(cold.started_at) AS \"Cold returns\",\n  COALESCE(SUM(cold.cost), 0) AS \"Cold-return cost\",\n  SUM(cold.cost) / NULLIF(MAX(total.cost), 0) AS \"Share of cost\"\nFROM total\nLEFT JOIN cold ON 1 = 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cold-Return Cost",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Cold-return cost as a share of all prompt cost in the range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Share of cost$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH cold AS (\n  -- A cold return is a prompt whose first main-thread request came more than an hour after the session's previous one; it counts as an explicit resume when the session logged a resume start in the prompt's hour or the hour before.\n  SELECT p.started_at, COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    p.first_request_context_tokens AS context, p.first_request_cost_usd AS cost,\n    EXISTS (\n      SELECT 1 FROM _tool_claude_code_otel_hourly_session_starts ss\n      WHERE ss.connection_id = p.source_connection_id\n        AND ss.session_id = p.session_id\n        AND ss.start_type = 'resume'\n        AND ss.hour_start BETWEEN TIMESTAMP(DATE_FORMAT(p.started_at, '%Y-%m-%d %H:00:00')) - INTERVAL 1 HOUR AND TIMESTAMP(DATE_FORMAT(p.started_at, '%Y-%m-%d %H:00:00'))\n    ) AS resumed\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.idle_before_seconds > 3600\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n),\ntotal AS (\n  SELECT SUM(p.estimated_cost_usd) AS cost\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n)\nSELECT COUNT(cold.started_at) AS \"Cold returns\",\n  COALESCE(SUM(cold.cost), 0) AS \"Cold-return cost\",\n  SUM(cold.cost) / NULLIF(MAX(total.cost), 0) AS \"Share of cost\"\nFROM total\nLEFT JOIN cold ON 1 = 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Share of Cost",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of session starts that resumed an earlier session. Repository doesn't apply.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 8
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Explicit resume share$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(CASE WHEN start_type = 'resume' THEN start_count ELSE 0 END) / NULLIF(SUM(start_count), 0) AS \"Explicit resume share\"\nFROM _tool_claude_code_otel_hourly_session_starts\nWHERE $__timeFilter(hour_start)\n  AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Explicit Resume Share",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 6,
+      "panels": [],
+      "title": "Cold Returns",
+      "type": "row",
+      "description": "Prompts in the range whose first main-thread request came after more than an hour of idle time in their session."
+    },
+    {
+      "datasource": "mysql",
+      "description": "Cost of cold returns in each completed week, split by whether the session was resumed explicitly (bars, left axis), and the number of cold returns (line, right axis).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisSoftMin": 0,
+            "barWidthFactor": 0.4
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost after an explicit resume"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Cost (USD)"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost after idle, no resume"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Cost (USD)"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cold returns"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "A",
+                  "mode": "none"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Cold returns"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "After an explicit resume"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "legend": true,
+                  "tooltip": false
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "A",
+                  "mode": "none"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "After idle, no resume"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "legend": true,
+                  "tooltip": false
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "A",
+                  "mode": "none"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\ncold AS (\n  -- A cold return is a prompt whose first main-thread request came more than an hour after the session's previous one; it counts as an explicit resume when the session logged a resume start in the prompt's hour or the hour before.\n  SELECT p.started_at, COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    p.first_request_context_tokens AS context, p.first_request_cost_usd AS cost,\n    EXISTS (\n      SELECT 1 FROM _tool_claude_code_otel_hourly_session_starts ss\n      WHERE ss.connection_id = p.source_connection_id\n        AND ss.session_id = p.session_id\n        AND ss.start_type = 'resume'\n        AND ss.hour_start BETWEEN TIMESTAMP(DATE_FORMAT(p.started_at, '%Y-%m-%d %H:00:00')) - INTERVAL 1 HOUR AND TIMESTAMP(DATE_FORMAT(p.started_at, '%Y-%m-%d %H:00:00'))\n    ) AS resumed\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.idle_before_seconds > 3600\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n),\nx AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(started_at), INTERVAL WEEKDAY(started_at) DAY), '%Y-%m-%d') AS week,\n    SUM(CASE WHEN resumed THEN cost ELSE 0 END) AS resumed_cost,\n    SUM(CASE WHEN NOT resumed THEN cost ELSE 0 END) AS idle_cost,\n    SUM(resumed) AS resumed_n,\n    SUM(NOT resumed) AS idle_n\n  FROM cold\n  GROUP BY 1\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  COALESCE(x.resumed_cost, 0) AS \"Cost after an explicit resume\",\n  COALESCE(x.idle_cost, 0) AS \"Cost after idle, no resume\",\n  COALESCE(x.resumed_n, 0) + COALESCE(x.idle_n, 0) AS \"Cold returns\",\n  COALESCE(x.resumed_n, 0) AS \"After an explicit resume\",\n  COALESCE(x.idle_n, 0) AS \"After idle, no resume\"\nFROM weeks w\nLEFT JOIN x ON x.week = w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cold Returns (Weekly)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Each engineer's cold returns over the selected range: how many, how many came right after a resume, the context re-sent in tokens (median and p90), the median request cost and the total. Resume rate comes from session starts, which every user sends and which Repository doesn't narrow.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 60
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Context, median"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Context, p90"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost, median"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cold-return cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Resume rate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Engineer"
+            },
+            "properties": [
+              {
+                "id": "custom.minWidth",
+                "value": 120
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH cold AS (\n  -- A cold return is a prompt whose first main-thread request came more than an hour after the session's previous one; it counts as an explicit resume when the session logged a resume start in the prompt's hour or the hour before.\n  SELECT p.started_at, COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    p.first_request_context_tokens AS context, p.first_request_cost_usd AS cost,\n    EXISTS (\n      SELECT 1 FROM _tool_claude_code_otel_hourly_session_starts ss\n      WHERE ss.connection_id = p.source_connection_id\n        AND ss.session_id = p.session_id\n        AND ss.start_type = 'resume'\n        AND ss.hour_start BETWEEN TIMESTAMP(DATE_FORMAT(p.started_at, '%Y-%m-%d %H:00:00')) - INTERVAL 1 HOUR AND TIMESTAMP(DATE_FORMAT(p.started_at, '%Y-%m-%d %H:00:00'))\n    ) AS resumed\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.idle_before_seconds > 3600\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n),\nranked AS (\n  SELECT user, context, cost, resumed,\n    ROW_NUMBER() OVER (PARTITION BY user ORDER BY context) AS rn_ctx,\n    ROW_NUMBER() OVER (PARTITION BY user ORDER BY cost) AS rn_cost,\n    COUNT(*) OVER (PARTITION BY user) AS n\n  FROM cold\n),\nper_user AS (\n  SELECT user, MAX(n) AS cold_returns,\n    MAX(CASE WHEN rn_ctx = CEIL(n / 2) THEN context END) AS ctx_p50,\n    MAX(CASE WHEN rn_ctx = CEIL(n * 0.9) THEN context END) AS ctx_p90,\n    MAX(CASE WHEN rn_cost = CEIL(n / 2) THEN cost END) AS cost_p50,\n    SUM(cost) AS cost_total,\n    SUM(resumed) AS after_resume\n  FROM ranked\n  GROUP BY user\n),\nstarts AS (\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user,\n    SUM(CASE WHEN start_type = 'resume' THEN start_count ELSE 0 END) AS resumes,\n    SUM(start_count) AS starts\n  FROM _tool_claude_code_otel_hourly_session_starts\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n  GROUP BY 1\n)\nSELECT COALESCE(names.full_name, u.user) AS \"Engineer\",\n  COALESCE(p.cold_returns, 0) AS \"Cold returns\",\n  COALESCE(p.after_resume, 0) AS \"After a resume\",\n  p.ctx_p50 AS \"Context, median\",\n  p.ctx_p90 AS \"Context, p90\",\n  p.cost_p50 AS \"Cost, median\",\n  COALESCE(p.cost_total, 0) AS \"Cold-return cost\",\n  s.resumes / NULLIF(s.starts, 0) AS \"Resume rate\"\nFROM (SELECT user FROM per_user UNION SELECT user FROM starts) u\nLEFT JOIN per_user p ON p.user = u.user\nLEFT JOIN starts s ON s.user = u.user\nLEFT JOIN (\n  SELECT LOWER(TRIM(a_n.email)) AS email_key,\n         COALESCE(MAX(CASE WHEN a_n.id = a_n.email THEN n_n.name END), MAX(n_n.name)) AS full_name\n  FROM accounts a_n\n  JOIN (SELECT id, TRIM(REPLACE(full_name, UNHEX('E2808B'), '')) AS name FROM accounts) n_n\n    ON n_n.id = a_n.id AND n_n.name LIKE '% %' AND n_n.name NOT LIKE '%@%'\n  WHERE NULLIF(TRIM(a_n.email), '') IS NOT NULL\n  GROUP BY LOWER(TRIM(a_n.email))\n) names ON names.email_key = LOWER(TRIM(u.user))\nORDER BY 7 DESC, 2 DESC, 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cold Returns per Engineer",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 9,
+      "panels": [],
+      "title": "Resumes",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of each Claude Code OTel team's session starts in each completed week that resumed an earlier session. Repository doesn't apply.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "-- Completed Monday-start UTC weeks only; every start counts, with or without a session id.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\ns AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(hour_start), INTERVAL WEEKDAY(hour_start) DAY), '%Y-%m-%d') AS week, team_slug,\n    SUM(CASE WHEN start_type = 'resume' THEN start_count ELSE 0 END) AS resumes,\n    SUM(start_count) AS starts\n  FROM _tool_claude_code_otel_hourly_session_starts\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n  GROUP BY 1, 2\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  s.team_slug AS metric,\n  s.resumes / NULLIF(s.starts, 0) AS value\nFROM weeks w\nJOIN s ON s.week = w.week\nORDER BY 1, 2\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Explicit Resume Rate by Team (Weekly)",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "claude",
+    "anthropic",
+    "devlake",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Engineer",
+        "multi": true,
+        "name": "user",
+        "options": [],
+        "query": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "refresh": 2,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Repository",
+        "multi": true,
+        "name": "repository",
+        "options": [],
+        "query": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "utc",
+  "title": "Sessions & Resumes",
+  "uid": "claude_prompts_sessions_mysql"
+}
