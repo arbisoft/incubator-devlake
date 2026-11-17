@@ -23,7 +23,7 @@ import (
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 )
 
-// AiCommit is one git commit a Claude Code session reported, from the vcs.ref.head.revision of a tool_result event.
+// AiCommit is one row per commit SHA per prompt that reported it, from the vcs.ref.head.revision of a tool_result event.
 type AiCommit struct {
 	domainlayer.DomainEntity
 	Provider           string `gorm:"type:varchar(100);index" json:"provider"`
