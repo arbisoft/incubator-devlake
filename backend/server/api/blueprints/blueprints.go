@@ -69,6 +69,9 @@ func Post(c *gin.Context) {
 // @Param keyword query string false "case-insensitive match on the blueprint or project name"
 // @Param sortBy query string false "sort column, defaults to creation order" Enums(name, createdAt)
 // @Param sortOrder query string false "sort direction, defaults to desc" Enums(asc, desc)
+// @Param connection query []string false "repeatable plugin:connectionId; matches blueprints using any of them" collectionFormat(multi)
+// @Param projectName query []string false "repeatable project name" collectionFormat(multi)
+// @Param type query []string false "repeatable blueprint type" Enums(ALL, MANUAL, DAILY, WEEKLY, MONTHLY, CUSTOM) collectionFormat(multi)
 // @Success 200  {object} PaginatedBlueprint
 // @Failure 400  {object} shared.ApiBody "Bad Request"
 // @Failure 500  {object} shared.ApiBody "Internal Error"

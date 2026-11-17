@@ -52,3 +52,35 @@ func TestDeleteBlueprintInTransaction(t *testing.T) {
 		assert.Len(t, tx.Calls, 2)
 	})
 }
+
+func TestBlueprintTypesClause(t *testing.T) {
+	tests := []struct {
+		name       string
+		types      []string
+		wantErr    bool
+		wantClause string
+	}{
+		{name: "ALL before unknown is rejected", types: []string{"ALL", "bogus"}, wantErr: true},
+		{name: "unknown before ALL is rejected", types: []string{"bogus", "ALL"}, wantErr: true},
+		{name: "ALL with a known type drops the filter", types: []string{"ALL", "DAILY"}},
+		{name: "known types are OR'd", types: []string{"MANUAL", "DAILY"}, wantClause: "(is_manual = ?) OR (is_manual = ? AND cron_config = ?)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clause, _, err := blueprintTypesClause(&GetBlueprintQuery{Types: tt.types})
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantClause, clause)
+		})
+	}
+}
+
+func TestBlueprintTypeClauseErrorDoesNotEchoInput(t *testing.T) {
+	_, _, err := blueprintTypeClause("bogus-xyz123")
+	if assert.Error(t, err) {
+		assert.NotContains(t, err.Error(), "xyz123")
+	}
+}

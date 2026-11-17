@@ -19,7 +19,7 @@
 import type { ReactNode } from 'react';
 
 export type ListToolbarProps = {
-  list: { keyword: string; setKeyword: (keyword: string) => void };
+  list: { keyword: string; setKeyword: (keyword: string, options?: { replace?: boolean }) => void };
   searchPlaceholder: string;
   filters?: ReactNode;
   end?: ReactNode;

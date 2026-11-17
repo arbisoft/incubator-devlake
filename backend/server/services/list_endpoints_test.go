@@ -27,25 +27,38 @@ import (
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/services"
 	"github.com/apache/incubator-devlake/impls/logruslog"
 	dalmocks "github.com/apache/incubator-devlake/mocks/core/dal"
 )
 
 type capturedQueries struct {
-	count []dal.Clause
-	list  []dal.Clause
+	count     []dal.Clause
+	list      []dal.Clause
+	listCalls int
+	rows      []*models.Project
 }
 
 func useCapturingDal(t *testing.T) *capturedQueries {
 	t.Helper()
+	return useCapturingDalWithOtelTable(t, true)
+}
+
+func useCapturingDalWithOtelTable(t *testing.T, hasOtelTable bool) *capturedQueries {
+	t.Helper()
 	captured := &capturedQueries{}
 	testDal := dalmocks.NewDal(t)
+	testDal.On("HasTable", otelConnectionProjectTable).Return(hasOtelTable).Maybe()
 	testDal.On("Count", mock.Anything).Run(func(args mock.Arguments) {
 		captured.count = args.Get(0).([]dal.Clause)
 	}).Return(int64(0), nil).Maybe()
 	testDal.On("All", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		captured.list = args.Get(1).([]dal.Clause)
+		captured.listCalls++
+		if dest, ok := args.Get(0).(*[]*models.Project); ok && captured.rows != nil {
+			*dest = captured.rows
+		}
 	}).Return(nil).Maybe()
 
 	previousDb, previousManager, previousValidator, previousLogger := db, bpManager, vld, logger
@@ -158,6 +171,38 @@ func TestGetProjectsSortAndKeyword(t *testing.T) {
 			assert.Equal(t, []interface{}{"%foo%"}, wheres[0].Params)
 		}
 		assert.Len(t, whereExprs(captured.count), 1)
+	})
+}
+
+func TestGetProjectsNamesOnly(t *testing.T) {
+	t.Run("sorts by name ascending, ignores sortBy and runs one list query", func(t *testing.T) {
+		captured := useCapturingDal(t)
+		_, _, err := GetProjects(&ProjectQuery{NamesOnly: true, SortQuery: SortQuery{SortBy: "lastRunAt", SortOrder: "desc"}})
+		assert.NoError(t, err)
+		assert.Equal(t, 1, captured.listCalls)
+		assert.Equal(t, "projects.name ASC", orderByOf(t, captured.list))
+		assert.Empty(t, clausesOfType(captured.list, dal.JoinClause))
+	})
+
+	t.Run("keeps the filters and returns bare project rows", func(t *testing.T) {
+		captured := useCapturingDal(t)
+		keyword := "Foo"
+		captured.rows = []*models.Project{{BaseProject: models.BaseProject{Name: "alpha"}}}
+		projects, _, err := GetProjects(&ProjectQuery{NamesOnly: true, Keyword: &keyword})
+		assert.NoError(t, err)
+		assert.Len(t, whereExprs(captured.list), 1)
+		assert.Len(t, whereExprs(captured.count), 1)
+		if assert.Len(t, projects, 1) {
+			assert.Equal(t, "alpha", projects[0].Name)
+			assert.Nil(t, projects[0].Blueprint)
+			assert.Empty(t, projects[0].Metrics)
+		}
+	})
+
+	t.Run("still rejects an invalid sort when not names only", func(t *testing.T) {
+		useCapturingDal(t)
+		_, _, err := GetProjects(&ProjectQuery{SortQuery: SortQuery{SortBy: "bogus"}})
+		assert.Error(t, err)
 	})
 }
 

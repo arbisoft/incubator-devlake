@@ -22,26 +22,34 @@ import { ICON_BUTTON_TONE } from './constants';
 import { ToneButton } from './styled';
 import type { IconButtonProps } from './types';
 
+const TOOLTIP_TRIGGERS: ('hover' | 'focus')[] = ['hover', 'focus'];
+
 export const IconButton = ({
   icon,
   label,
   tone = ICON_BUTTON_TONE.DEFAULT,
   disabled,
+  disabledReason,
   loading,
   buttonRef,
   onClick,
-}: IconButtonProps) => (
-  <Tooltip title={label}>
-    <ToneButton
-      type="text"
-      danger={tone === ICON_BUTTON_TONE.DANGER}
-      $brand={tone === ICON_BUTTON_TONE.PRIMARY}
-      icon={icon}
-      aria-label={label}
-      ref={buttonRef}
-      disabled={disabled}
-      loading={loading}
-      onClick={onClick}
-    />
-  </Tooltip>
-);
+}: IconButtonProps) => {
+  const blocked = disabledReason !== undefined;
+  return (
+    <Tooltip title={disabledReason ?? label} trigger={TOOLTIP_TRIGGERS}>
+      <ToneButton
+        type="text"
+        danger={tone === ICON_BUTTON_TONE.DANGER}
+        $brand={tone === ICON_BUTTON_TONE.PRIMARY}
+        $blocked={blocked}
+        icon={icon}
+        aria-label={label}
+        aria-disabled={blocked || undefined}
+        ref={buttonRef}
+        disabled={disabled}
+        loading={loading}
+        onClick={blocked ? undefined : onClick}
+      />
+    </Tooltip>
+  );
+};

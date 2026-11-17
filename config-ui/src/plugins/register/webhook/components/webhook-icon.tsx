@@ -16,8 +16,9 @@
  *
  */
 
+import { getConnectorVisual } from '@/plugins/utils';
 import { PluginIcon } from '@/ui';
 
 import { WebhookConfig } from '../config';
 
-export const WebhookIcon = () => <PluginIcon icon={WebhookConfig.icon} size="md" />;
+export const WebhookIcon = () => <PluginIcon {...getConnectorVisual(WebhookConfig.plugin)} size="md" />;

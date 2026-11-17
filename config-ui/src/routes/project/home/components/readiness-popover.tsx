@@ -20,6 +20,7 @@ import { Link } from 'react-router-dom';
 import { useTheme } from 'styled-components';
 
 import { BLUEPRINT_VIEW, PATHS } from '@/config';
+import { ListPopoverBody, ListPopoverHead, ListPopoverList, ListPopoverRow } from '@/ui';
 
 import {
   COPY as READINESS_COPY,
@@ -29,18 +30,7 @@ import {
   getMissingHint,
 } from '../../readiness';
 import { COPY } from '../constants';
-import {
-  PercentLabel,
-  PopoverBody,
-  PopoverFooter,
-  PopoverHead,
-  PopoverList,
-  PopoverRow,
-  PopoverSubtitle,
-  RowCopy,
-  RowTitle,
-  SourceText,
-} from '../styled';
+import { PercentLabel, PopoverFooter, PopoverSubtitle, RowCopy, RowTitle, SourceText } from '../styled';
 
 import type { ReadinessPopoverProps } from './types';
 
@@ -53,24 +43,24 @@ export const ReadinessPopover = ({ readiness }: ReadinessPopoverProps) => {
   const { layout } = useTheme();
   const hint = getMissingHint(readiness);
   return (
-    <PopoverBody $width={layout.readinessPopoverWidth}>
-      <PopoverHead>
+    <ListPopoverBody $width={layout.readinessPopoverWidth}>
+      <ListPopoverHead>
         {READINESS_COPY.title}
         <ReadinessMeter readiness={readiness} />
         {readiness.percentLabel && <PercentLabel>{readiness.percentLabel}</PercentLabel>}
-      </PopoverHead>
+      </ListPopoverHead>
       <PopoverSubtitle>{COPY.readinessPopover.projectSummary(readiness.available, readiness.total)}</PopoverSubtitle>
-      <PopoverList>
+      <ListPopoverList>
         {readiness.signals.map(({ key, state, sources }) => (
-          <PopoverRow key={key}>
+          <ListPopoverRow key={key}>
             <SignalStatusIcon state={state} />
             <RowCopy>
               <RowTitle>{READINESS_COPY.signals[key].name}</RowTitle>
             </RowCopy>
             <SourceText>{sourceText(state, sources)}</SourceText>
-          </PopoverRow>
+          </ListPopoverRow>
         ))}
-      </PopoverList>
+      </ListPopoverList>
       {hint && (
         <PopoverFooter>
           <span>{hint}</span>
@@ -79,6 +69,6 @@ export const ReadinessPopover = ({ readiness }: ReadinessPopoverProps) => {
           </Link>
         </PopoverFooter>
       )}
-    </PopoverBody>
+    </ListPopoverBody>
   );
 };

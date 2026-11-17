@@ -18,9 +18,10 @@
 
 import type { AccessDomain, AccessUser, LocalCredentialResponse } from '@/api/access';
 
-import type { ACCESS_MODAL, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
+import type { ACCESS_MODAL, ACTIONS_LAYOUT, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
 
 export type AccessModal = (typeof ACCESS_MODAL)[keyof typeof ACCESS_MODAL];
+export type ActionsLayout = (typeof ACTIONS_LAYOUT)[keyof typeof ACTIONS_LAYOUT];
 export type LifecycleSubject = (typeof LIFECYCLE_SUBJECT)[keyof typeof LIFECYCLE_SUBJECT];
 export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
 
