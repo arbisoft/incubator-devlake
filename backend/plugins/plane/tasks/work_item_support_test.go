@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/plane/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -431,4 +432,12 @@ func planeTestApiFloat64(value float64) planeApiFloat64 {
 
 func planeTestStringPtr(value string) *string {
 	return &value
+}
+
+func TestPlaneWorkItemTypeCollectorArgsSkips404(t *testing.T) {
+	args := planeWorkItemTypeCollectorArgs(nil)
+	require.NotNil(t, args.AfterResponse)
+	assert.Equal(t, api.ErrIgnoreAndContinue, args.AfterResponse(&http.Response{StatusCode: http.StatusNotFound}))
+	assert.NoError(t, args.AfterResponse(&http.Response{StatusCode: http.StatusOK}))
+	assert.Equal(t, "api/v1/workspaces/{{ .Params.WorkspaceSlug }}/projects/{{ .Params.ProjectId }}/work-item-types/", args.UrlTemplate)
 }
