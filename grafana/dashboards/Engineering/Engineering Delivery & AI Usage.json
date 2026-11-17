@@ -3604,7 +3604,7 @@
             "spec": {
               "options": {
                 "mode": "markdown",
-                "content": "This week net **${n_net}**, leaving a backlog of **${n_backlog}**.\n\nHow long individual items have been open is not charted here. Anything that has waited past its threshold is listed by name in Needs attention, which is where someone can act on it.",
+                "content": "In the selected range net **${n_net}**, leaving a backlog of **${n_backlog}**.\n\nHow long individual items have been open is not charted here. Anything that has waited past its threshold is listed by name in Needs attention, which is where someone can act on it.",
                 "code": {
                   "language": "plaintext",
                   "showLineNumbers": false,
