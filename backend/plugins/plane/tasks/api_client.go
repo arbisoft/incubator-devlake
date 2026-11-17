@@ -18,6 +18,8 @@ limitations under the License.
 package tasks
 
 import (
+	"net/http"
+
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
@@ -39,4 +41,14 @@ func NewPlaneApiClient(taskCtx plugin.TaskContext, connection *models.PlaneConne
 		return nil, err
 	}
 	return asyncApiClient, nil
+}
+
+func ignoreHTTPStatus404(res *http.Response) errors.Error {
+	if res.StatusCode == http.StatusUnauthorized {
+		return errors.Unauthorized.New("authentication failed, please check your Plane API key")
+	}
+	if res.StatusCode == http.StatusNotFound {
+		return helper.ErrIgnoreAndContinue
+	}
+	return nil
 }

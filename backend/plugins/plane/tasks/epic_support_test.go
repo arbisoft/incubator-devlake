@@ -23,8 +23,10 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
+	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/plane/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -338,4 +340,12 @@ func TestResolvePlaneParentIssueIdEmptyString(t *testing.T) {
 
 func planeTestIntPtr(value int) *int {
 	return &value
+}
+
+func TestPlaneEpicCollectorArgsSkips404(t *testing.T) {
+	args := planeEpicCollectorArgs(nil, func() *time.Time { return nil })
+	require.NotNil(t, args.AfterResponse)
+	assert.Equal(t, api.ErrIgnoreAndContinue, args.AfterResponse(&http.Response{StatusCode: http.StatusNotFound}))
+	assert.NoError(t, args.AfterResponse(&http.Response{StatusCode: http.StatusOK}))
+	assert.Equal(t, "api/v1/workspaces/{{ .Params.WorkspaceSlug }}/projects/{{ .Params.ProjectId }}/epics/", args.UrlTemplate)
 }

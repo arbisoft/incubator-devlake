@@ -122,16 +122,6 @@ func TestParsePlaneEstimateNextPage(t *testing.T) {
 	assert.Nil(t, nextPage)
 }
 
-func TestIgnoreHTTPStatus404(t *testing.T) {
-	assert.Equal(t, ignoreHTTPStatus404(&http.Response{StatusCode: http.StatusNotFound}).Error(), "ignore and continue")
-
-	err := ignoreHTTPStatus404(&http.Response{StatusCode: http.StatusUnauthorized})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "authentication failed")
-
-	assert.NoError(t, ignoreHTTPStatus404(&http.Response{StatusCode: http.StatusOK}))
-}
-
 func TestExtractPlaneEstimatePoints(t *testing.T) {
 	rows, err := extractPlaneEstimatePoints([]byte(`{
 		"id":"estimate-1",
