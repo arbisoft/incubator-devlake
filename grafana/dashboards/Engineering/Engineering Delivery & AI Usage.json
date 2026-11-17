@@ -117,7 +117,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -150,7 +150,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -183,7 +183,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -216,7 +216,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -249,7 +249,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -282,7 +282,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -315,7 +315,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -348,7 +348,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -381,7 +381,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -414,7 +414,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -447,7 +447,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -480,7 +480,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -513,7 +513,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -546,7 +546,7 @@
             "value": ""
           },
           "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
+          "refresh": "onTimeRangeChanged",
           "skipUrlSync": true,
           "query": {
             "kind": "DataQuery",
@@ -753,7 +753,7 @@
                         "name": "devlake-mysql"
                       },
                       "spec": {
-                        "rawSql": "SELECT value FROM (\nWITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_cicd AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_boards AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, deploys AS (\n  SELECT DISTINCT pc.project_name, dc.finished_date\n  FROM cicd_deployment_commits dc\n  JOIN project_cicd pc ON pc.scope_id = dc.cicd_scope_id\n  WHERE dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%'\n    AND dc.finished_date >= LEAST(NOW() - INTERVAL 70 DAY, (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND), $__timeFrom() - INTERVAL 63 DAY)\n),\nbugs AS (\n  SELECT i.id, i.created_date\n  FROM issues i\n  WHERE i.created_date >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND i.created_date < $__timeTo() AND (i.type = 'BUG' OR (i.id LIKE 'github:%' AND EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = i.id AND il.label_name IN ('bug','Production-Bug'))))\n    AND EXISTS (\n      SELECT 1\n      FROM board_issues bi\n      JOIN project_boards pb ON pb.board_id = bi.board_id\n      JOIN deploys d ON d.project_name = pb.project_name\n      WHERE bi.issue_id = i.id AND i.created_date >= d.finished_date AND i.created_date <= d.finished_date + INTERVAL 14 DAY\n    )\n),\nprs AS (\n  SELECT pr.id, pr.merged_date\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND pr.merged_date < $__timeTo()\n),\nrates AS (\n  SELECT\n    100 * (SELECT COUNT(*) FROM bugs WHERE created_date >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY))\n      / NULLIF((SELECT COUNT(*) FROM prs WHERE merged_date >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY)), 0) AS cur,\n    100 * (SELECT COUNT(*) FROM bugs WHERE created_date < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY))\n      / NULLIF((SELECT COUNT(*) FROM prs WHERE merged_date < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY)), 0) AS prev\n)\nSELECT ROUND(cur, 1) AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 1), ' vs previous period') END AS label FROM rates\n) AS labelled",
+                        "rawSql": "SELECT value FROM (\nWITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_cicd AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_boards AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, deploys AS (\n  SELECT DISTINCT pc.project_name, dc.finished_date\n  FROM cicd_deployment_commits dc\n  JOIN project_cicd pc ON pc.scope_id = dc.cicd_scope_id\n  WHERE dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%'\n    AND dc.finished_date >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) - INTERVAL 14 DAY\n),\nbugs AS (\n  SELECT i.id, i.created_date\n  FROM issues i\n  WHERE i.created_date >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND i.created_date < $__timeTo() AND (i.type = 'BUG' OR (i.id LIKE 'github:%' AND EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = i.id AND il.label_name IN ('bug','Production-Bug'))))\n    AND EXISTS (\n      SELECT 1\n      FROM board_issues bi\n      JOIN project_boards pb ON pb.board_id = bi.board_id\n      JOIN deploys d ON d.project_name = pb.project_name\n      WHERE bi.issue_id = i.id AND i.created_date >= d.finished_date AND i.created_date <= d.finished_date + INTERVAL 14 DAY\n    )\n),\nprs AS (\n  SELECT pr.id, pr.merged_date\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND pr.merged_date < $__timeTo()\n),\nrates AS (\n  SELECT\n    100 * (SELECT COUNT(*) FROM bugs WHERE created_date >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY))\n      / NULLIF((SELECT COUNT(*) FROM prs WHERE merged_date >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY)), 0) AS cur,\n    100 * (SELECT COUNT(*) FROM bugs WHERE created_date < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY))\n      / NULLIF((SELECT COUNT(*) FROM prs WHERE merged_date < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY)), 0) AS prev\n)\nSELECT ROUND(cur, 1) AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 1), ' vs previous period') END AS label FROM rates\n) AS labelled",
                         "format": "table",
                         "rawQuery": true,
                         "editorMode": "code"
@@ -774,7 +774,7 @@
                         "name": "devlake-mysql"
                       },
                       "spec": {
-                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_cicd AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_boards AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, deploys AS (\n  SELECT DISTINCT pc.project_name, dc.finished_date\n  FROM cicd_deployment_commits dc\n  JOIN project_cicd pc ON pc.scope_id = dc.cicd_scope_id\n  WHERE dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%'\n    AND dc.finished_date >= LEAST(NOW() - INTERVAL 70 DAY, (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND), $__timeFrom() - INTERVAL 63 DAY)\n),\nbugs AS (\n  SELECT i.id, i.created_date\n  FROM issues i\n  WHERE i.created_date >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND i.created_date < $__timeTo() AND (i.type = 'BUG' OR (i.id LIKE 'github:%' AND EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = i.id AND il.label_name IN ('bug','Production-Bug'))))\n    AND EXISTS (\n      SELECT 1\n      FROM board_issues bi\n      JOIN project_boards pb ON pb.board_id = bi.board_id\n      JOIN deploys d ON d.project_name = pb.project_name\n      WHERE bi.issue_id = i.id AND i.created_date >= d.finished_date AND i.created_date <= d.finished_date + INTERVAL 14 DAY\n    )\n),\nprs AS (\n  SELECT pr.id, pr.merged_date\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND pr.merged_date < $__timeTo()\n),\nrates AS (\n  SELECT\n    100 * (SELECT COUNT(*) FROM bugs WHERE created_date >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY))\n      / NULLIF((SELECT COUNT(*) FROM prs WHERE merged_date >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY)), 0) AS cur,\n    100 * (SELECT COUNT(*) FROM bugs WHERE created_date < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY))\n      / NULLIF((SELECT COUNT(*) FROM prs WHERE merged_date < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY)), 0) AS prev\n)\nSELECT ROUND(cur, 1) AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 1), ' vs previous period') END AS label FROM rates",
+                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_cicd AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_boards AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, deploys AS (\n  SELECT DISTINCT pc.project_name, dc.finished_date\n  FROM cicd_deployment_commits dc\n  JOIN project_cicd pc ON pc.scope_id = dc.cicd_scope_id\n  WHERE dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%'\n    AND dc.finished_date >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) - INTERVAL 14 DAY\n),\nbugs AS (\n  SELECT i.id, i.created_date\n  FROM issues i\n  WHERE i.created_date >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND i.created_date < $__timeTo() AND (i.type = 'BUG' OR (i.id LIKE 'github:%' AND EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = i.id AND il.label_name IN ('bug','Production-Bug'))))\n    AND EXISTS (\n      SELECT 1\n      FROM board_issues bi\n      JOIN project_boards pb ON pb.board_id = bi.board_id\n      JOIN deploys d ON d.project_name = pb.project_name\n      WHERE bi.issue_id = i.id AND i.created_date >= d.finished_date AND i.created_date <= d.finished_date + INTERVAL 14 DAY\n    )\n),\nprs AS (\n  SELECT pr.id, pr.merged_date\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND pr.merged_date < $__timeTo()\n),\nrates AS (\n  SELECT\n    100 * (SELECT COUNT(*) FROM bugs WHERE created_date >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY))\n      / NULLIF((SELECT COUNT(*) FROM prs WHERE merged_date >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY)), 0) AS cur,\n    100 * (SELECT COUNT(*) FROM bugs WHERE created_date < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY))\n      / NULLIF((SELECT COUNT(*) FROM prs WHERE merged_date < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY)), 0) AS prev\n)\nSELECT ROUND(cur, 1) AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 1), ' vs previous period') END AS label FROM rates",
                         "format": "table",
                         "rawQuery": true,
                         "editorMode": "code"
@@ -6342,7 +6342,7 @@
                         "name": "devlake-mysql"
                       },
                       "spec": {
-                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n)\n, seq AS (\n  SELECT ts, failed,\n    LAG(failed) OVER w AS prev_failed,\n    MIN(CASE WHEN failed = 0 THEN ts END) OVER (PARTITION BY scope_id, env ORDER BY ts DESC ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS restored_ts\n  FROM prod_deploys\n  WINDOW w AS (PARTITION BY scope_id, env ORDER BY ts)\n),\nrestores AS (\n  SELECT ts, TIMESTAMPDIFF(MINUTE, ts, restored_ts) / 60 AS hours\n  FROM seq\n  WHERE failed = 1 AND COALESCE(prev_failed, 0) = 0 AND restored_ts IS NOT NULL\n    AND ts >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND)\n),\nranked AS (\n  SELECT hours, ts >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) AS is_cur,\n    ROW_NUMBER() OVER (PARTITION BY ts >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) ORDER BY hours) AS rn,\n    COUNT(*) OVER (PARTITION BY ts >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY)) AS n\n  FROM restores\n)\nSELECT LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) AS time, MAX(hours) AS value FROM ranked WHERE is_cur = 0 AND rn = CEIL(0.5 * n)\nUNION ALL\nSELECT $__timeTo() AS time, MAX(hours) AS value FROM ranked WHERE is_cur = 1 AND rn = CEIL(0.5 * n)\nORDER BY time",
+                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n)\n, seq AS (\n  SELECT ts, failed,\n    LAG(failed) OVER w AS prev_failed,\n    MIN(CASE WHEN failed = 0 THEN ts END) OVER (PARTITION BY scope_id, env ORDER BY ts DESC ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS restored_ts\n  FROM prod_deploys\n  WINDOW w AS (PARTITION BY scope_id, env ORDER BY ts)\n),\nrestores AS (\n  SELECT ts, TIMESTAMPDIFF(MINUTE, ts, restored_ts) / 60 AS hours\n  FROM seq\n  WHERE failed = 1 AND COALESCE(prev_failed, 0) = 0 AND restored_ts IS NOT NULL\n    AND ts >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND ts < $__timeTo()\n),\nranked AS (\n  SELECT hours, ts >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) AS is_cur,\n    ROW_NUMBER() OVER (PARTITION BY ts >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) ORDER BY hours) AS rn,\n    COUNT(*) OVER (PARTITION BY ts >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY)) AS n\n  FROM restores\n)\nSELECT LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) AS time, MAX(hours) AS value FROM ranked WHERE is_cur = 0 AND rn = CEIL(0.5 * n)\nUNION ALL\nSELECT $__timeTo() AS time, MAX(hours) AS value FROM ranked WHERE is_cur = 1 AND rn = CEIL(0.5 * n)\nORDER BY time",
                         "format": "table",
                         "rawQuery": true,
                         "editorMode": "code"
@@ -6557,7 +6557,7 @@
                         "name": "devlake-mysql"
                       },
                       "spec": {
-                        "rawSql": "SELECT value FROM (\nWITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n)\n, seq AS (\n  SELECT id, ts, sha,\n    LAG(sha) OVER (PARTITION BY scope_id, env ORDER BY ts) AS prev_sha,\n    MIN(ts) OVER (PARTITION BY scope_id, env, sha) AS first_ts\n  FROM prod_deploys\n  WHERE failed = 0\n),\nrollbacks AS (\n  SELECT id, ts FROM seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_ts < ts\n),\ncounts AS (\n  SELECT COUNT(DISTINCT CASE WHEN ts >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) THEN id END) AS cur,\n    COUNT(DISTINCT CASE WHEN ts < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) THEN id END) AS prev\n  FROM rollbacks\n  WHERE ts >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND)\n)\nSELECT cur AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 0), ' vs previous period') END AS label FROM counts\n) AS labelled",
+                        "rawSql": "SELECT value FROM (\nWITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n)\n, seq AS (\n  SELECT id, ts, sha,\n    LAG(sha) OVER (PARTITION BY scope_id, env ORDER BY ts) AS prev_sha,\n    MIN(ts) OVER (PARTITION BY scope_id, env, sha) AS first_ts\n  FROM prod_deploys\n  WHERE failed = 0\n),\nrollbacks AS (\n  SELECT id, ts FROM seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_ts < ts\n),\ncounts AS (\n  SELECT COUNT(DISTINCT CASE WHEN ts >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) THEN id END) AS cur,\n    COUNT(DISTINCT CASE WHEN ts < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) THEN id END) AS prev\n  FROM rollbacks\n  WHERE ts >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND ts < $__timeTo()\n)\nSELECT cur AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 0), ' vs previous period') END AS label FROM counts\n) AS labelled",
                         "format": "table",
                         "rawQuery": true,
                         "editorMode": "code"
@@ -6578,7 +6578,7 @@
                         "name": "devlake-mysql"
                       },
                       "spec": {
-                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n)\n, seq AS (\n  SELECT id, ts, sha,\n    LAG(sha) OVER (PARTITION BY scope_id, env ORDER BY ts) AS prev_sha,\n    MIN(ts) OVER (PARTITION BY scope_id, env, sha) AS first_ts\n  FROM prod_deploys\n  WHERE failed = 0\n),\nrollbacks AS (\n  SELECT id, ts FROM seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_ts < ts\n),\ncounts AS (\n  SELECT COUNT(DISTINCT CASE WHEN ts >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) THEN id END) AS cur,\n    COUNT(DISTINCT CASE WHEN ts < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) THEN id END) AS prev\n  FROM rollbacks\n  WHERE ts >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND)\n)\nSELECT cur AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 0), ' vs previous period') END AS label FROM counts",
+                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n)\n, seq AS (\n  SELECT id, ts, sha,\n    LAG(sha) OVER (PARTITION BY scope_id, env ORDER BY ts) AS prev_sha,\n    MIN(ts) OVER (PARTITION BY scope_id, env, sha) AS first_ts\n  FROM prod_deploys\n  WHERE failed = 0\n),\nrollbacks AS (\n  SELECT id, ts FROM seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_ts < ts\n),\ncounts AS (\n  SELECT COUNT(DISTINCT CASE WHEN ts >= LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) THEN id END) AS cur,\n    COUNT(DISTINCT CASE WHEN ts < LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) THEN id END) AS prev\n  FROM rollbacks\n  WHERE ts >= (LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY) - INTERVAL TIMESTAMPDIFF(SECOND, LEAST($__timeFrom(), $__timeTo() - INTERVAL 28 DAY), $__timeTo()) SECOND) AND ts < $__timeTo()\n)\nSELECT cur AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 0), ' vs previous period') END AS label FROM counts",
                         "format": "table",
                         "rawQuery": true,
                         "editorMode": "code"
