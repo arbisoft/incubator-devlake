@@ -639,27 +639,32 @@ func TestSyncSkipsV2DashboardChangedDuringSync(t *testing.T) {
 	}
 }
 
-func TestSyncV2FetchFailureKeepsLastGoodSet(t *testing.T) {
+func TestSyncV2FetchFailureSkipsOnlyThatDashboard(t *testing.T) {
 	caller := templates.Caller{Login: "alice"}
 	for name, status := range map[string]int{"missing": 0, "error": http.StatusInternalServerError} {
 		t.Run(name, func(t *testing.T) {
 			f := newFake()
-			f.dashboard = map[string]dash{"ok": {1, by("user:u-root"), dashJSON("Ok", "SELECT ok WHERE o = ${__user.login:sqlstring}")}}
+			okJSON := dashJSON("Ok", "SELECT ok WHERE o = ${__user.login:sqlstring}")
+			f.dashboard = map[string]dash{"ok": {1, by("user:u-root"), okJSON}}
 			s := newSyncer(t, f, "svc", nil)
 			if err := s.RunOnce(context.Background()); err != nil {
 				t.Fatal(err)
 			}
+			if !s.Current().Match("SELECT ok WHERE o = 'alice'", caller).Accepted {
+				t.Fatal("first sync did not accept the query")
+			}
 			f.edit(func() {
+				f.dashboard["ok"] = dash{2, by("user:u-ed"), okJSON}
 				f.dashboard["v2"] = dash{1, by("user:u-root"), `{}`}
 				f.conversionFailed = map[string]bool{"v2": true}
 				f.v2 = map[string]v2Dash{}
 				f.v2Status = status
 			})
-			if err := s.RunOnce(context.Background()); err == nil {
-				t.Fatal("expected an error when the v2 fetch fails")
+			if err := s.RunOnce(context.Background()); err != nil {
+				t.Fatal(err)
 			}
-			if !s.Current().Match("SELECT ok WHERE o = 'alice'", caller).Accepted || s.Current().Len() != 1 {
-				t.Fatalf("last good set lost: Len = %d", s.Current().Len())
+			if s.Current().Match("SELECT ok WHERE o = 'alice'", caller).Accepted || s.Current().Len() != 0 || s.cache["v2"] != nil {
+				t.Fatalf("revocation frozen: Len = %d, cache[v2] = %v", s.Current().Len(), s.cache["v2"])
 			}
 		})
 	}

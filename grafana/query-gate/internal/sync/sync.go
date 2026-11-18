@@ -281,7 +281,9 @@ func (s *Syncer) dashboardTemplates(ctx context.Context, item dashboardItem, adm
 		if conv := item.Status.Conversion; conv != nil && conv.Failed {
 			var fetched dashboardItem
 			if err := s.get(ctx, dashboardsV2+"/"+url.PathEscape(uid), &fetched); err != nil {
-				return nil, err
+				s.logger.Warn("dashboard skipped: v2 fetch failed", "dashboard_uid", uid, "generation", gen, "error", err)
+				delete(s.cache, uid)
+				return nil, nil
 			}
 			if fetched.Metadata.Generation != gen || saverOf(fetched.Metadata.Annotations, fetched.Metadata.Generation) != saver {
 				s.logger.Warn("dashboard skipped: changed during sync", "dashboard_uid", uid, "generation", gen)
