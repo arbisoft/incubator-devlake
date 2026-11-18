@@ -54,6 +54,10 @@ const (
 	v2APIVersionPrefix = "dashboard.grafana.app/v2"
 	v2PanelKind        = "Panel"
 	v2LegacyStringKey  = "__legacyStringValue"
+	v2GridLayout       = "GridLayout"
+	v2AutoGridLayout   = "AutoGridLayout"
+	v2RowsLayout       = "RowsLayout"
+	v2TabsLayout       = "TabsLayout"
 )
 
 // classicKeys mark classic dashboard JSON, so a spec with any of them is not read as a bare v2 spec.
@@ -188,14 +192,13 @@ var v2VariableTypes = map[string]string{
 	"IntervalVariable":   varInterval,
 }
 
-func collectV2(spec map[string]any, fallbackTitle string) []source {
-	title := str(spec, "title")
-	if title == "" {
-		title = fallbackTitle
-	}
-	vars := map[string]Variable{}
+// varScope is the set of variables visible in one part of a v2 dashboard; scopes compare by identity.
+type varScope struct{ vars map[string]Variable }
+
+// addV2Variables parses v2 variable items into vars and returns the query variables among them.
+func addV2Variables(vars map[string]Variable, items []map[string]any) []map[string]any {
 	var queryVars []map[string]any
-	for _, item := range list(spec, "variables") {
+	for _, item := range items {
 		v := v2Variable(item)
 		variable := parseVariable(v)
 		if variable.Name != "" {
@@ -205,6 +208,73 @@ func collectV2(spec map[string]any, fallbackTitle string) []source {
 			queryVars = append(queryVars, v)
 		}
 	}
+	return queryVars
+}
+
+// v2SectionWalk maps each element to the scopes of its layout items and collects section query variables.
+type v2SectionWalk struct {
+	title    string
+	scopes   map[string][]*varScope
+	sections []source
+}
+
+func (w *v2SectionWalk) walk(layout map[string]any, scope *varScope) {
+	lspec := obj(layout, "spec")
+	switch str(layout, "kind") {
+	case v2GridLayout, v2AutoGridLayout:
+		for _, item := range list(lspec, "items") {
+			w.record(str(obj(obj(item, "spec"), "element"), "name"), scope)
+		}
+	case v2RowsLayout:
+		for _, row := range list(lspec, "rows") {
+			w.section(obj(row, "spec"), scope)
+		}
+	case v2TabsLayout:
+		for _, tab := range list(lspec, "tabs") {
+			w.section(obj(tab, "spec"), scope)
+		}
+	}
+}
+
+func (w *v2SectionWalk) record(name string, scope *varScope) {
+	if name == "" {
+		return
+	}
+	for _, s := range w.scopes[name] {
+		if s == scope {
+			return
+		}
+	}
+	w.scopes[name] = append(w.scopes[name], scope)
+}
+
+func (w *v2SectionWalk) section(sec map[string]any, parent *varScope) {
+	scope := parent
+	if items := list(sec, "variables"); len(items) > 0 {
+		vars := make(map[string]Variable, len(parent.vars))
+		for k, v := range parent.vars {
+			vars[k] = v
+		}
+		scope = &varScope{vars: vars}
+		for _, v := range addV2Variables(vars, items) {
+			if sql := variableSQL(v); sql != "" {
+				loc := fmt.Sprintf("%s :: %s :: var %s", w.title, str(sec, "title"), str(v, "name"))
+				w.sections = append(w.sections, source{Location: loc, SQL: sql, Vars: vars})
+			}
+		}
+	}
+	w.walk(obj(sec, "layout"), scope)
+}
+
+func collectV2(spec map[string]any, fallbackTitle string) []source {
+	title := str(spec, "title")
+	if title == "" {
+		title = fallbackTitle
+	}
+	root := &varScope{vars: map[string]Variable{}}
+	queryVars := addV2Variables(root.vars, list(spec, "variables"))
+	w := &v2SectionWalk{title: title, scopes: map[string][]*varScope{}}
+	w.walk(obj(spec, "layout"), root)
 	var out []source
 	elements := obj(spec, "elements")
 	names := make([]string, 0, len(elements))
@@ -217,21 +287,27 @@ func collectV2(spec map[string]any, fallbackTitle string) []source {
 		if str(panel, "kind") != v2PanelKind {
 			continue
 		}
+		scopes := w.scopes[name]
+		if len(scopes) == 0 {
+			scopes = []*varScope{root}
+		}
 		pspec := obj(panel, "spec")
-		for _, q := range list(obj(obj(pspec, "data"), "spec"), "queries") {
-			qspec := obj(q, "spec")
-			if sql := str(obj(obj(qspec, "query"), "spec"), "rawSql"); sql != "" {
-				loc := fmt.Sprintf("%s :: %s [%s]", title, str(pspec, "title"), str(qspec, "refId"))
-				out = append(out, source{Location: loc, SQL: sql, Vars: vars})
+		for _, scope := range scopes {
+			for _, q := range list(obj(obj(pspec, "data"), "spec"), "queries") {
+				qspec := obj(q, "spec")
+				if sql := str(obj(obj(qspec, "query"), "spec"), "rawSql"); sql != "" {
+					loc := fmt.Sprintf("%s :: %s [%s]", title, str(pspec, "title"), str(qspec, "refId"))
+					out = append(out, source{Location: loc, SQL: sql, Vars: scope.vars})
+				}
 			}
 		}
 	}
 	for _, v := range queryVars {
 		if sql := variableSQL(v); sql != "" {
-			out = append(out, source{Location: fmt.Sprintf("%s :: var %s", title, str(v, "name")), SQL: sql, Vars: vars})
+			out = append(out, source{Location: fmt.Sprintf("%s :: var %s", title, str(v, "name")), SQL: sql, Vars: root.vars})
 		}
 	}
-	return out
+	return append(out, w.sections...)
 }
 
 // v2Variable rewrites a v2 variable into the classic shape that parseVariable reads.

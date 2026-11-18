@@ -63,6 +63,8 @@ type fakeGrafana struct {
 	failUsers int
 	// conversionFailed marks list items whose v1 conversion failed; the list then serves an empty spec.
 	conversionFailed map[string]bool
+	// storedVersion marks list items with a stored version in their conversion status.
+	storedVersion map[string]string
 	// v2 is served by the v2 dashboard endpoint; a uid without an entry answers 404.
 	v2 map[string]v2Dash
 	// v2Status overrides the v2 endpoint's answer when non-zero.
@@ -138,6 +140,9 @@ func (f *fakeGrafana) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if f.conversionFailed[uid] {
 				item["spec"] = json.RawMessage(`{}`)
 				item["status"] = map[string]any{"conversion": map[string]any{"failed": true}}
+			}
+			if sv, ok := f.storedVersion[uid]; ok {
+				item["status"] = map[string]any{"conversion": map[string]any{"failed": f.conversionFailed[uid], "storedVersion": sv}}
 			}
 			items = append(items, item)
 		}
@@ -580,6 +585,42 @@ func TestRootPathCheck(t *testing.T) {
 func v2Spec(title, sql string) string {
 	q, _ := json.Marshal(sql)
 	return fmt.Sprintf(`{"title":%q,"elements":{"panel-1":{"kind":"Panel","spec":{"title":"P","data":{"kind":"QueryGroup","spec":{"queries":[{"kind":"PanelQuery","spec":{"refId":"A","query":{"kind":"DataQuery","spec":{"rawSql":%s}}}}]}}}}}}`, title, q)
+}
+
+func v2TabSpec(title, sql string) string {
+	q, _ := json.Marshal(sql)
+	return fmt.Sprintf(`{"title":%q,"elements":{"panel-1":{"kind":"Panel","spec":{"title":"P","data":{"kind":"QueryGroup","spec":{"queries":[{"kind":"PanelQuery","spec":{"refId":"A","query":{"kind":"DataQuery","spec":{"rawSql":%s}}}}]}}}}},`+
+		`"layout":{"kind":"TabsLayout","spec":{"tabs":[{"kind":"TabsLayoutTab","spec":{"title":"T","variables":[{"kind":"CustomVariable","spec":{"name":"grp","query":"a,b"}}],`+
+		`"layout":{"kind":"GridLayout","spec":{"items":[{"kind":"GridLayoutItem","spec":{"element":{"kind":"ElementReference","name":"panel-1"}}}]}}}}]}}}`, title, q)
+}
+
+func TestSyncStoredV2FetchesV2Spec(t *testing.T) {
+	caller := templates.Caller{Login: "alice"}
+	tabSQL := "SELECT g FROM t WHERE o = ${__user.login:sqlstring} AND g = '$grp'"
+	f := newFake()
+	f.dashboard = map[string]dash{
+		"tabbed":  {2, by("user:u-root"), dashJSON("Tabbed", tabSQL)},
+		"classic": {1, by("user:u-root"), dashJSON("Classic", own)},
+	}
+	f.storedVersion = map[string]string{"tabbed": "v2", "classic": "v1beta1"}
+	f.v2 = map[string]v2Dash{"tabbed": {spec: v2TabSpec("Tabbed", tabSQL)}}
+	s := newSyncer(t, f, "svc", nil)
+	if err := s.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for sql, want := range map[string]bool{
+		"SELECT g FROM t WHERE o = 'alice' AND g = 'a'":   true,
+		"SELECT g FROM t WHERE o = 'alice' AND g = 'b'":   true,
+		"SELECT g FROM t WHERE o = 'alice' AND g = 'zzz'": false,
+		"SELECT a FROM t WHERE owner = 'alice'":           true,
+	} {
+		if got := s.Current().Match(sql, caller).Accepted; got != want {
+			t.Errorf("%q accepted = %v, want %v", sql, got, want)
+		}
+	}
+	if strings.Join(f.v2Calls, ",") != "tabbed" {
+		t.Fatalf("v2 fetches = %v", f.v2Calls)
+	}
 }
 
 func TestSyncLoadsV2SpecWhenConversionFailed(t *testing.T) {

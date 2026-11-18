@@ -45,6 +45,7 @@ const (
 	userPrefix     = "user:"
 	dashboardsV1   = "/apis/dashboard.grafana.app/v1beta1/namespaces/" + namespace + "/dashboards"
 	dashboardsV2   = "/apis/dashboard.grafana.app/v2/namespaces/" + namespace + "/dashboards"
+	storedV2Prefix = "v2"
 	requestTimeout = 10 * time.Second
 	maxBody        = 64 << 20
 )
@@ -245,9 +246,16 @@ type dashboardItem struct {
 	Spec   json.RawMessage `json:"spec"`
 	Status struct {
 		Conversion *struct {
-			Failed bool `json:"failed"`
+			Failed        bool   `json:"failed"`
+			StoredVersion string `json:"storedVersion"`
 		} `json:"conversion"`
 	} `json:"status"`
+}
+
+// needsV2Spec reports whether the v1beta1 item can miss parts of the dashboard, so the v2 spec must be read.
+func needsV2Spec(item dashboardItem) bool {
+	c := item.Status.Conversion
+	return c != nil && (c.Failed || strings.HasPrefix(c.StoredVersion, storedV2Prefix))
 }
 
 // saverOf names the last saver; the creator stands in only for a never-updated first generation.
@@ -278,7 +286,7 @@ func (s *Syncer) dashboardTemplates(ctx context.Context, item dashboardItem, adm
 	c := s.cache[uid]
 	if c == nil || c.generation != item.Metadata.Generation || c.saver != saver {
 		spec := item.Spec
-		if conv := item.Status.Conversion; conv != nil && conv.Failed {
+		if needsV2Spec(item) {
 			var fetched dashboardItem
 			if err := s.get(ctx, dashboardsV2+"/"+url.PathEscape(uid), &fetched); err != nil {
 				s.logger.Warn("dashboard skipped: v2 fetch failed", "dashboard_uid", uid, "generation", gen, "error", err)

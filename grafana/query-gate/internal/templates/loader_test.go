@@ -293,3 +293,87 @@ func TestLoadV2VariableQueryShapes(t *testing.T) {
 		})
 	}
 }
+
+const v2SectionVariables = `{
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {"name": "sect"},
+  "spec": {
+    "title": "Sect",
+    "variables": [
+      {"kind": "CustomVariable", "spec": {"name": "grp", "query": "x,y"}}
+    ],
+    "elements": {
+      "panel-in": {"kind": "Panel", "spec": {"title": "In", "data": {"kind": "QueryGroup", "spec": {"queries": [
+        {"kind": "PanelQuery", "spec": {"refId": "A", "query": {"kind": "DataQuery", "spec": {"rawSql": "SELECT 1 FROM t WHERE o = ${__user.login:sqlstring} AND g = '$grouping' AND s = '$grp'"}}}}
+      ]}}}},
+      "panel-out": {"kind": "Panel", "spec": {"title": "Out", "data": {"kind": "QueryGroup", "spec": {"queries": [
+        {"kind": "PanelQuery", "spec": {"refId": "A", "query": {"kind": "DataQuery", "spec": {"rawSql": "SELECT 2 FROM t WHERE o = ${__user.login:sqlstring} AND g = '$grouping'"}}}}
+      ]}}}},
+      "panel-nested": {"kind": "Panel", "spec": {"title": "Nested", "data": {"kind": "QueryGroup", "spec": {"queries": [
+        {"kind": "PanelQuery", "spec": {"refId": "A", "query": {"kind": "DataQuery", "spec": {"rawSql": "SELECT 3 FROM t WHERE o = ${__user.login:sqlstring} AND n = '$inner'"}}}}
+      ]}}}}
+    },
+    "layout": {"kind": "RowsLayout", "spec": {"rows": [
+      {"kind": "RowsLayoutRow", "spec": {"title": "Top", "layout": {"kind": "GridLayout", "spec": {"items": [
+        {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "panel-out"}}}
+      ]}}}},
+      {"kind": "RowsLayoutRow", "spec": {"title": "Tabs", "layout": {"kind": "TabsLayout", "spec": {"tabs": [
+        {"kind": "TabsLayoutTab", "spec": {"title": "Progress",
+          "variables": [
+            {"kind": "CustomVariable", "spec": {"name": "grouping", "query": "Label,Board,Milestone,Epic"}},
+            {"kind": "CustomVariable", "spec": {"name": "grp", "query": "p,q"}},
+            {"kind": "QueryVariable", "spec": {"name": "tq", "query": {"kind": "DataQuery", "spec": {"rawSql": "SELECT name FROM t WHERE o = ${__user.login:sqlstring}"}}}}
+          ],
+          "layout": {"kind": "GridLayout", "spec": {"items": [
+            {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "panel-in"}}}
+          ]}}}},
+        {"kind": "TabsLayoutTab", "spec": {"title": "Other", "layout": {"kind": "RowsLayout", "spec": {"rows": [
+          {"kind": "RowsLayoutRow", "spec": {"title": "Inner",
+            "variables": [{"kind": "CustomVariable", "spec": {"name": "inner", "query": "m,n"}}],
+            "layout": {"kind": "GridLayout", "spec": {"items": [
+              {"kind": "GridLayoutItem", "spec": {"element": {"kind": "ElementReference", "name": "panel-nested"}}}
+            ]}}}}
+        ]}}}}
+      ]}}}}
+    ]}}
+  }
+}`
+
+func TestLoadV2SectionVariables(t *testing.T) {
+	ts, errs := LoadDashboard([]byte(v2SectionVariables), "db:sect")
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	set := NewSet(ts)
+	alice := Caller{Login: "alice"}
+	sqlIn := func(g, s string) string {
+		return fmt.Sprintf("SELECT 1 FROM t WHERE o = 'alice' AND g = '%s' AND s = '%s'", g, s)
+	}
+	for _, g := range []string{"Label", "Board", "Milestone", "Epic"} {
+		if !set.Match(sqlIn(g, "p"), alice).Accepted {
+			t.Errorf("panel-in rejected for grouping %s", g)
+		}
+	}
+	if set.Match(sqlIn("Label", "x"), alice).Accepted {
+		t.Error("panel-in accepted with the dashboard-level grp value")
+	}
+	if set.Match("SELECT 2 FROM t WHERE o = 'alice' AND g = 'Label'", alice).Accepted {
+		t.Error("panel-out accepted a tab-scoped grouping value")
+	}
+	for val, want := range map[string]bool{"m": true, "n": true, "zzz": false} {
+		if got := set.Match("SELECT 3 FROM t WHERE o = 'alice' AND n = '"+val+"'", alice).Accepted; got != want {
+			t.Errorf("panel-nested with %q accepted = %v, want %v", val, got, want)
+		}
+	}
+	found := false
+	for _, tpl := range ts {
+		found = found || tpl.Location == "Sect :: Progress :: var tq"
+	}
+	if !found {
+		t.Error("no template for the tab variable tq")
+	}
+	if !set.Match("SELECT name FROM t WHERE o = 'alice'", alice).Accepted {
+		t.Error("tab variable query not accepted")
+	}
+}
