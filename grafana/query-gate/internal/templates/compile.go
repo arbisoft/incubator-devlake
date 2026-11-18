@@ -339,7 +339,7 @@ func resolveSlot(name, format string, vars map[string]Variable) (slotPlan, error
 		return slotPlan{kind: slotUnknown}, nil
 	}
 	switch {
-	case v.Type == "constant":
+	case v.Type == varConstant:
 		switch format {
 		case "", "raw":
 			return slotPlan{kind: slotLiteral, text: v.Query}, nil
@@ -347,14 +347,14 @@ func resolveSlot(name, format string, vars map[string]Variable) (slotPlan, error
 			return slotPlan{kind: slotLiteral, text: quoteSQL(v.Query)}, nil
 		}
 		return slotPlan{}, fmt.Errorf("unsupported format %q for a constant variable", format)
-	case v.Type == "custom" && !v.Multi && !v.IncludeAll:
+	case v.Type == varCustom && !v.Multi && !v.IncludeAll:
 		return resolveCustom(v, format)
-	case v.Type == "query" || v.Type == "custom":
+	case v.Type == varQuery || v.Type == varCustom:
 		if v.Multi || v.IncludeAll {
 			return resolveList(v, format)
 		}
 		return resolveSingle(v, format)
-	case v.Type == "textbox":
+	case v.Type == varTextbox:
 		return resolveSingle(v, format)
 	}
 	return slotPlan{}, fmt.Errorf("unsupported variable type %q", v.Type)

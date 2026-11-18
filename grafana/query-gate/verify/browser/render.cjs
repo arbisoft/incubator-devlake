@@ -58,6 +58,14 @@ const PLAN = {
 
 const RANGE_STEPS = { default: 'from=now-90d&to=now', 'range-2y': 'from=now-2y&to=now' };
 const VAR_TYPES = ['query', 'custom'];
+const V2_DOCUMENT_KIND = 'Dashboard';
+const V2_API_VERSION_PREFIX = 'dashboard.grafana.app/v2';
+const V2_PANEL_KIND = 'Panel';
+const TABS_LAYOUT = 'TabsLayout';
+const ROWS_LAYOUT = 'RowsLayout';
+// Grafana's URL parameter for the selected tab; a tabs layout inside a row prefixes it with the row's slug.
+const TAB_PARAM = 'dtab';
+const TAB_SCENARIO_PREFIX = 'tab:';
 
 const FORGE_QUERY = 'orgId=1&from=now-1y&to=now&var-project=snap-Sophia&var-project=Supercal&var-project=edly-Github';
 const BREAKOUT_QUERY = 'orgId=1&from=now-1y&to=now&var-user=a%5C&var-user=%29%29%20OR%201%3D1%20--%20';
@@ -134,15 +142,37 @@ function walkJson(dir) {
   return out;
 }
 
+// Query strings that select each tab of a v2 TabsLayout, whose panels only query once their tab is shown.
+function v2Tabs(layout) {
+  const slug = (title) => title.replace(/ /g, '-');
+  const tabsQuery = (key, tabsLayout) => ((tabsLayout.spec && tabsLayout.spec.tabs) || [])
+    .map((tab) => ({ title: tab.spec.title, query: `${key}=${encodeURIComponent(slug(tab.spec.title))}`, vars: (tab.spec.variables || []).map((v) => v.spec.name) }));
+  if (!layout) return [];
+  if (layout.kind === TABS_LAYOUT) return tabsQuery(TAB_PARAM, layout);
+  if (layout.kind !== ROWS_LAYOUT) return [];
+  return ((layout.spec && layout.spec.rows) || []).flatMap((row) => (row.spec.layout && row.spec.layout.kind === TABS_LAYOUT
+    ? tabsQuery(`${slug(row.spec.title)}-${TAB_PARAM}`, row.spec.layout) : []));
+}
+
 function loadDashboards() {
   const all = walkJson(DASHBOARDS_DIR).sort().map((file) => {
     const j = JSON.parse(fs.readFileSync(file, 'utf8'));
     const rel = path.relative(ROOT, file).split(path.sep).join('/');
+    if (j.kind === V2_DOCUMENT_KIND && String(j.apiVersion || '').startsWith(V2_API_VERSION_PREFIX)) {
+      const spec = j.spec || {};
+      const v2Vars = (spec.variables || []).map((v) => v.spec.name);
+      const v2SqlPanelUids = Object.values(spec.elements || {}).filter((el) => el.kind === V2_PANEL_KIND)
+        .map((el) => ((el.spec.data && el.spec.data.spec && el.spec.data.spec.queries) || [])
+          .find((q) => typeof q.spec.query.spec.rawSql === 'string' && q.spec.query.spec.rawSql.trim() !== ''))
+        .filter(Boolean)
+        .map((q) => q.spec.query.datasource.name || '');
+      return { file: rel, uid: j.metadata.name, title: spec.title, vars: v2Vars, sqlPanelUids: v2SqlPanelUids, tabs: v2Tabs(spec.layout) };
+    }
     const vars = ((j.templating && j.templating.list) || []).map((v) => v.name);
     // Datasource uid of each top-level panel with SQL, so the count can follow what each topology has.
     const sqlPanelUids = (j.panels || []).filter((pn) => (pn.targets || []).some((t) => typeof t.rawSql === 'string' && t.rawSql.trim() !== ''))
       .map((pn) => ((pn.datasource && pn.datasource.uid) || ''));
-    return { file: rel, uid: j.uid, title: j.title, vars, sqlPanelUids };
+    return { file: rel, uid: j.uid, title: j.title, vars, sqlPanelUids, tabs: [] };
   });
   const bad = all.filter((d) => !d.uid);
   if (bad.length) fail(`dashboards without uid: ${bad.map((d) => d.file).join(', ')}`);
@@ -188,7 +218,8 @@ function printPlan(opts, selected, all, inputs) {
     console.log(`\ntopology ${t}: ${TOPOLOGIES[t].base}${TOPOLOGIES[t].direct ? ' (replay against direct Grafana)' : ' (no replay)'}`);
     for (const [user, setName] of Object.entries(PLAN[t])) {
       const steps = STEP_SETS[setName];
-      const fixed = steps.filter((s) => s !== 'vars').length * selected.length;
+      const tabScenarios = steps.includes('default') ? selected.reduce((n, d) => n + d.tabs.length, 0) : 0;
+      const fixed = steps.filter((s) => s !== 'vars').length * selected.length + tabScenarios;
       const specials = SPECIALS.filter((s) => s.users.includes(user)).reduce((n, s) => n + specialPages(s, inputs).length, 0);
       const extra = steps.includes('vars') ? ' + variable scenarios (found at run time)' : '';
       console.log(`  ${user}: steps [${steps.join(', ')}]: ${fixed} dashboard scenarios${extra}, ${specials} special`);
@@ -200,7 +231,10 @@ function printPlan(opts, selected, all, inputs) {
     console.log(`  ${s.name} (${s.users.join(', ')}): ${pages.map((p) => p.dash.uid).join(', ') || 'none selected'}`);
   }
   console.log('\ndashboards:');
-  for (const d of selected) console.log(`  ${d.uid}  ${d.title}`);
+  for (const d of selected) {
+    console.log(`  ${d.uid}  ${d.title}`);
+    for (const tab of d.tabs) console.log(`    tab ${tab.title}${tab.vars.length ? `: variables ${tab.vars.join(', ')}` : ''}`);
+  }
 }
 
 // ---------- page capture ----------
@@ -403,7 +437,7 @@ function evaluate(scn, topo) {
     if (e.replay) {
       if (e.replay.match === false) addFinding(scn, 'replay-mismatch', e, e.replay.reason);
       for (const [ref, r] of gateErr) {
-        if (!e.replay.directErrorRefs.includes(ref)) addFinding(scn, 'frame-error-gate-only', e, `${ref}: ${r.error}`);
+        if (!(e.replay.directErrorRefs || []).includes(ref)) addFinding(scn, 'frame-error-gate-only', e, `${ref}: ${r.error}`);
       }
     } else {
       if (e.status >= 400) addFinding(scn, 'ds-status', e, `no replay for ${topo}`);
@@ -476,22 +510,24 @@ async function runScenario(st, page, rec, dash, name, action, extra = {}) {
 const gotoUrl = (page, url) => page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 const dashUrl = (st, dash, query) => `${st.topo.base}/d/${dash.uid}?${query}`;
 
-const listVariables = () => {
-  const vs = (window.__grafanaSceneContext && window.__grafanaSceneContext.state.$variables && window.__grafanaSceneContext.state.$variables.state.variables) || [];
-  return vs.map((v) => ({ name: v.state.name, type: v.state.type, hide: v.state.hide }));
-};
-
-const readVariable = (name) => {
-  const vs = (window.__grafanaSceneContext && window.__grafanaSceneContext.state.$variables && window.__grafanaSceneContext.state.$variables.state.variables) || [];
+// Runs in the page: lists, reads or changes the variables of the dashboard, or of the section titled `section`.
+const sceneVariables = async ({ op, section, name, value, text }) => {
+  const root = window.__grafanaSceneContext;
+  let set = !section && root ? root.state.$variables : null;
+  const walk = (o, d) => {
+    if (!o || set || d > 12) return;
+    if (o.state && o.state.title === section && o.state.$variables) { set = o.state.$variables; return; }
+    if (typeof o.forEachChild === 'function') o.forEachChild((c) => walk(c, d + 1));
+  };
+  if (section) walk(root, 0);
+  const vs = (set && set.state.variables) || [];
+  if (op === 'list') return vs.map((v) => ({ name: v.state.name, type: v.state.type, hide: v.state.hide }));
   const v = vs.find((x) => x.state.name === name);
-  if (!v) return null;
-  const s = v.state;
-  return { isMulti: !!s.isMulti, includeAll: !!s.includeAll, value: s.value, text: s.text, options: (s.options || []).map((o) => ({ value: o.value, text: o.text })) };
-};
-
-const changeVariable = async ({ name, value, text }) => {
-  const vs = (window.__grafanaSceneContext && window.__grafanaSceneContext.state.$variables && window.__grafanaSceneContext.state.$variables.state.variables) || [];
-  const v = vs.find((x) => x.state.name === name);
+  if (op === 'read') {
+    if (!v) return null;
+    const s = v.state;
+    return { isMulti: !!s.isMulti, includeAll: !!s.includeAll, value: s.value, text: s.text, options: (s.options || []).map((o) => ({ value: o.value, text: o.text })) };
+  }
   if (!v || typeof v.changeValueTo !== 'function') return { error: 'variable or changeValueTo missing' };
   try { await v.changeValueTo(value, text); return { ok: true }; } catch (e) { return { error: String(e).slice(0, 200) }; }
 };
@@ -521,29 +557,38 @@ function variableChanges(v) {
 }
 
 async function runVariables(st, page, rec, dash) {
-  const names = (await page.evaluate(listVariables))
-    .filter((v) => VAR_TYPES.includes(v.type) && v.hide !== 2)
-    .map((v) => v.name);
-  for (const name of names) {
-    const v = await page.evaluate(readVariable, name);
-    if (!v) continue;
+  const applyChanges = async (name, section) => {
+    const v = await page.evaluate(sceneVariables, { op: 'read', name, section });
+    if (!v) return;
+    const prefix = section ? `${section}/` : '';
     for (const c of variableChanges(v)) {
-      await runScenario(st, page, rec, dash, `var:${name}:${c.label}`, async () => {
-        await evalOrThrow(page, changeVariable, { name, value: c.value, text: c.text });
+      await runScenario(st, page, rec, dash, `var:${prefix}${name}:${c.label}`, async () => {
+        await evalOrThrow(page, sceneVariables, { op: 'change', name, section, value: c.value, text: c.text });
         if (c.restore) {
           await settle(rec);
-          await evalOrThrow(page, changeVariable, { name, value: c.restore.value, text: c.restore.text });
+          await evalOrThrow(page, sceneVariables, { op: 'change', name, section, value: c.restore.value, text: c.restore.text });
         }
       });
     }
+  };
+  const visibleNames = async (section) => (await page.evaluate(sceneVariables, { op: 'list', section }))
+    .filter((v) => VAR_TYPES.includes(v.type) && v.hide !== 2)
+    .map((v) => v.name);
+  for (const name of await visibleNames()) await applyChanges(name);
+  for (const tab of dash.tabs.filter((t) => t.vars.length > 0)) {
+    await runScenario(st, page, rec, dash, `${TAB_SCENARIO_PREFIX}${tab.title}:vars`, () => gotoUrl(page, dashUrl(st, dash, `orgId=1&${RANGE_STEPS.default}&${tab.query}`)));
+    for (const name of (await visibleNames(tab.title)).filter((n) => tab.vars.includes(n))) await applyChanges(name, tab.title);
   }
 }
 
 async function runDashboardSteps(st, page, rec, dash, steps) {
   for (const step of steps) {
     if (RANGE_STEPS[step]) await runScenario(st, page, rec, dash, step, () => gotoUrl(page, dashUrl(st, dash, `orgId=1&${RANGE_STEPS[step]}`)));
-    else if (step === 'refresh') await runScenario(st, page, rec, dash, 'refresh', () => evalOrThrow(page, refreshTimeRange));
-    else if (step === 'vars') await runVariables(st, page, rec, dash);
+    if (step === 'default') {
+      for (const tab of dash.tabs) await runScenario(st, page, rec, dash, `${TAB_SCENARIO_PREFIX}${tab.title}`, () => gotoUrl(page, dashUrl(st, dash, `orgId=1&${RANGE_STEPS.default}&${tab.query}`)));
+    }
+    if (step === 'refresh') await runScenario(st, page, rec, dash, 'refresh', () => evalOrThrow(page, refreshTimeRange));
+    if (step === 'vars') await runVariables(st, page, rec, dash);
   }
 }
 
