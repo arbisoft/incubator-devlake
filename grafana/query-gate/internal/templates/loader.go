@@ -53,6 +53,7 @@ const (
 	v2DocumentKind     = "Dashboard"
 	v2APIVersionPrefix = "dashboard.grafana.app/v2"
 	v2PanelKind        = "Panel"
+	v2LegacyStringKey  = "__legacyStringValue"
 )
 
 // classicKeys mark classic dashboard JSON, so a spec with any of them is not read as a bare v2 spec.
@@ -251,7 +252,12 @@ func v2Variable(item map[string]any) map[string]any {
 	case string:
 		v["query"] = q
 	case map[string]any:
-		v["query"] = map[string]any{"rawSql": str(obj(q, "spec"), "rawSql")}
+		qs := obj(q, "spec")
+		if s, ok := qs[v2LegacyStringKey].(string); ok {
+			v["query"] = s
+		} else {
+			v["query"] = qs
+		}
 	}
 	return v
 }

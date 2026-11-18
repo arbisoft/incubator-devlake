@@ -247,3 +247,49 @@ func TestLoadV2BareSpec(t *testing.T) {
 		t.Fatalf("bare = %+v, full = %+v", bare, full)
 	}
 }
+
+func TestLoadV2VariableQueryShapes(t *testing.T) {
+	raw, err := os.ReadFile("testdata/v2_sample.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var base map[string]any
+	if err := json.Unmarshal(raw, &base); err != nil {
+		t.Fatal(err)
+	}
+	var project map[string]any
+	for _, v := range base["spec"].(map[string]any)["variables"].([]any) {
+		if spec := v.(map[string]any)["spec"].(map[string]any); spec["name"] == "project" {
+			project = spec["query"].(map[string]any)
+		}
+	}
+	sql := project["spec"].(map[string]any)["rawSql"].(string)
+	accepted := strings.ReplaceAll(sql, "${__user.login:sqlstring}", "'alice'")
+	for name, spec := range map[string]map[string]any{
+		"rawSql":             {"rawSql": sql},
+		"legacyStringValue":  {"__legacyStringValue": sql},
+		"classicQueryString": {"query": sql},
+	} {
+		t.Run(name, func(t *testing.T) {
+			project["spec"] = spec
+			doc, err := json.Marshal(base)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ts, errs := LoadDashboard(doc, "db:v2")
+			if len(errs) != 0 {
+				t.Fatal(errs)
+			}
+			found := false
+			for _, tpl := range ts {
+				found = found || tpl.Location == "Engineering Delivery & AI Usage :: var project"
+			}
+			if !found {
+				t.Fatal("no template for var project")
+			}
+			if !NewSet(ts).Match(accepted, Caller{Login: "alice"}).Accepted {
+				t.Fatal("interpolated variable query not accepted")
+			}
+		})
+	}
+}
