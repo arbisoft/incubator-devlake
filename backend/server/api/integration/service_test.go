@@ -205,12 +205,12 @@ func TestStatsWithNoDataAreZeroAndNeverNull(t *testing.T) {
 		t.Errorf("Jira() = %+v, %v; want zeros", jira, err)
 	}
 	github, err := s.GitHub("abc@arbisoft.com", Period{TimeFrame: "24h"})
-	if err != nil || github.Commits != 0 || github.Reviews != 0 {
+	if err != nil || github.Commits != 0 || github.Reviews != 0 || github.ReviewComments != 0 || github.PullRequestsReviewed != 0 {
 		t.Errorf("GitHub() = %+v, %v; want zeros", github, err)
 	}
 	usage, err := s.AIUsage("abc@arbisoft.com", Period{TimeFrame: "24h"})
-	if err != nil || usage.Providers == nil || len(usage.Providers) != 0 {
-		t.Errorf("AIUsage().Providers = %#v, %v; want an empty, non-nil slice", usage.Providers, err)
+	if err != nil || usage.Providers == nil || len(usage.Providers) != 0 || usage.Monthly == nil || len(usage.Monthly) != 0 {
+		t.Errorf("AIUsage() = %#v, %v; want empty, non-nil providers and monthly", usage, err)
 	}
 	cost, err := s.AICost("abc@arbisoft.com", Period{TimeFrame: "24h"})
 	if err != nil || cost.Models == nil || len(cost.Models) != 0 || cost.TotalEstimatedCostUSD != "0.00000000" {
@@ -341,15 +341,15 @@ func TestSinceRejectsOtherValuesAndCombinations(t *testing.T) {
 func TestGitHubBreakdownComputesTheShareOfEveryContributor(t *testing.T) {
 	db := newFakeDB(t)
 	db.lists["AS repo_commits"] = []map[string]interface{}{
-		{"Name": "org/a", "RepoCommits": int64(20), "RepoLines": int64(1000), "Contributors": int64(4), "Commits": int64(5), "Lines": int64(250)},
-		{"Name": "org/b", "RepoCommits": int64(3), "RepoLines": int64(0), "Contributors": int64(1), "Commits": int64(3), "Lines": int64(0)},
+		{"Name": "org/a", "RepoCommits": int64(20), "RepoLines": int64(1000), "Contributors": int64(4), "Commits": int64(5), "LineChanged": int64(250)},
+		{"Name": "org/b", "RepoCommits": int64(3), "RepoLines": int64(0), "Contributors": int64(1), "Commits": int64(3), "LineChanged": int64(0)},
 	}
 	db.lists["AS repo_opened"] = []map[string]interface{}{
 		{"Name": "org/a", "RepoOpened": int64(8), "RepoMerged": int64(4), "Opened": int64(2), "Merged": int64(1)},
 		{"Name": "org/c", "RepoOpened": int64(1), "RepoMerged": int64(0), "Opened": int64(1)},
 	}
 	db.answers["AS avg_pr_merge_hours"] = map[string]interface{}{"AvgPrMergeHours": 4.5}
-	db.answers["pull_requests_reviewed"] = map[string]interface{}{"Reviews": int64(6), "PullRequestsReviewed": int64(3)}
+	db.answers["pull_requests_reviewed"] = map[string]interface{}{"Reviews": int64(6), "ReviewComments": int64(4), "PullRequestsReviewed": int64(3)}
 
 	got, err := newService(t, db.db).GitHub("abc@arbisoft.com", Period{TimeFrame: "1y"})
 	if err != nil {
@@ -364,7 +364,7 @@ func TestGitHubBreakdownComputesTheShareOfEveryContributor(t *testing.T) {
 	if !reflect.DeepEqual(got.ByRepo, want) || !reflect.DeepEqual(got.ByTeam, want) {
 		t.Errorf("ByRepo = %+v, ByTeam = %+v, want %+v", got.ByRepo, got.ByTeam, want)
 	}
-	if got.AvgPrMergeHours != 4.5 || got.PullRequestsReviewed != 3 || got.Reviews != 6 {
+	if got.AvgPrMergeHours != 4.5 || got.PullRequestsReviewed != 3 || got.Reviews != 6 || got.ReviewComments != 4 {
 		t.Errorf("GitHub() = %+v", got)
 	}
 }
@@ -383,7 +383,7 @@ func TestSharePct(t *testing.T) {
 func TestAIMonthlyTrendsAndActiveFlag(t *testing.T) {
 	db := newFakeDB(t)
 	db.lists["days_active"] = []map[string]interface{}{
-		{"Provider": "claude", "Month": "2026-10", "ActiveDays": int64(3), "Sessions": int64(9)},
+		{"Provider": "claude", "Month": "2026-10", "ActiveDays": int64(3), "Sessions": int64(9), "Suggestions": int64(640), "Acceptances": int64(210)},
 		{"Provider": "claude", "Month": "2026-11", "ActiveDays": int64(1)},
 	}
 	db.lists["AS cost_usd"] = []map[string]interface{}{{"Month": "2026-10", "InputTokens": int64(5), "CostUSD": "2.50000000"}}
@@ -393,7 +393,8 @@ func TestAIMonthlyTrendsAndActiveFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AIUsage() error = %v", err)
 	}
-	if len(usage.Monthly) != 2 || usage.Monthly[0].ActiveDays != 3 || !usage.ActiveInLastMonth {
+	if len(usage.Monthly) != 2 || usage.Monthly[0].ActiveDays != 3 || usage.Monthly[0].Suggestions != 640 ||
+		usage.Monthly[0].Acceptances != 210 || !usage.ActiveInLastMonth {
 		t.Errorf("AIUsage() = %+v, want two months and active in the month the window ends", usage)
 	}
 	cost, err := s.AICost("abc@arbisoft.com", Period{TimeFrame: "30d"})
@@ -403,4 +404,104 @@ func TestAIMonthlyTrendsAndActiveFlag(t *testing.T) {
 	if len(cost.Monthly) != 1 || cost.Monthly[0].CostUSD != "2.50000000" {
 		t.Errorf("AICost().Monthly = %+v", cost.Monthly)
 	}
+}
+
+func TestGitHubReviewQueryCountsWorkOnOtherPeoplesPullRequests(t *testing.T) {
+	db := newFakeDB(t)
+
+	if _, err := newService(t, db.db).GitHub("ABC@arbisoft.com", Period{TimeFrame: "1w"}); err != nil {
+		t.Fatalf("GitHub() error = %v", err)
+	}
+
+	q, ok := findQuery(db.queries, "AS reviews")
+	if !ok {
+		t.Fatal("no query selects the reviews")
+	}
+	sql := q.sel + " FROM " + q.from + " WHERE " + q.where
+	for _, want := range []string{
+		"CASE WHEN pc.type = 'REVIEW' THEN pc.id END) AS reviews",
+		"CASE WHEN pc.type IN ('NORMAL', 'DIFF') THEN pc.id END) AS review_comments",
+		"COUNT(DISTINCT pc.pull_request_id) AS pull_requests_reviewed",
+		"pc.type IN ('REVIEW', 'NORMAL', 'DIFF')",
+		"JOIN pull_requests p ON p.id = pc.pull_request_id",
+		"LEFT JOIN accounts pa ON pa.id = p.author_id",
+		"(pa.email IS NULL OR LOWER(pa.email) <> ?)",
+	} {
+		if !strings.Contains(sql, want) {
+			t.Errorf("query %q doesn't contain %q", sql, want)
+		}
+	}
+	if got := countParam(q.params, "abc@arbisoft.com"); got != 2 {
+		t.Errorf("params = %v hold the lowercased email %d times, want 2", q.params, got)
+	}
+	from := fixedNow.AddDate(0, 0, -7)
+	if !containsParam(q.params, from) || !containsParam(q.params, fixedNow) {
+		t.Errorf("params = %v, want the window %v .. %v", q.params, from, fixedNow)
+	}
+}
+
+func TestGitHubReviewQueryErrorIsWrapped(t *testing.T) {
+	db := dalmocks.NewDal(t)
+	db.On("All", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		func(_ interface{}, clauses ...dal.Clause) errors.Error {
+			if strings.Contains(selectText(clauses), "review_comments") {
+				return errors.Default.New("connection refused")
+			}
+			return nil
+		})
+
+	_, err := newService(t, db).GitHub("abc@arbisoft.com", Period{TimeFrame: "1d"})
+
+	if err == nil || !strings.Contains(err.Error(), "read github reviews") {
+		t.Errorf("GitHub() error = %v, want it wrapped with the reviews query", err)
+	}
+}
+
+func TestAIMonthlySelectsSuggestionsAndAcceptances(t *testing.T) {
+	db := newFakeDB(t)
+
+	if _, err := newService(t, db.db).AIUsage("abc@arbisoft.com", Period{TimeFrame: "30d"}); err != nil {
+		t.Fatalf("AIUsage() error = %v", err)
+	}
+
+	q, ok := findQuery(db.queries, "days_active")
+	if !ok {
+		t.Fatal("no monthly query ran")
+	}
+	for _, want := range []string{"SUM(suggestions_count), 0) AS suggestions", "SUM(acceptance_count), 0) AS acceptances"} {
+		if !strings.Contains(q.sel, want) {
+			t.Errorf("monthly select %q doesn't contain %q", q.sel, want)
+		}
+	}
+}
+
+// findQuery returns the first recorded query whose SELECT contains fragment.
+func findQuery(queries []query, fragment string) (query, bool) {
+	for _, q := range queries {
+		if strings.Contains(q.sel, fragment) {
+			return q, true
+		}
+	}
+	return query{}, false
+}
+
+// countParam counts the params equal to want.
+func countParam(params []interface{}, want interface{}) int {
+	n := 0
+	for _, p := range params {
+		if reflect.DeepEqual(p, want) {
+			n++
+		}
+	}
+	return n
+}
+
+// selectText returns the SELECT expression among clauses, or "" without one.
+func selectText(clauses []dal.Clause) string {
+	for _, c := range clauses {
+		if data, ok := c.Data.(dal.DalClause); ok && c.Type == dal.SelectClause {
+			return data.Expr
+		}
+	}
+	return ""
 }

@@ -60,7 +60,8 @@ func (f *fakeStats) AIUsage(email string, p Period) (*AIUsageStats, errors.Error
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &AIUsageStats{StatsWindow: StatsWindow{Email: email}, Providers: []AIProviderUsage{}}, nil
+	return &AIUsageStats{StatsWindow: StatsWindow{Email: email}, Providers: []AIProviderUsage{},
+		Monthly: []AIMonthlyUsage{{Provider: "copilot", Month: "2026-11"}}}, nil
 }
 
 func (f *fakeStats) AICost(email string, p Period) (*AICostStats, errors.Error) {
@@ -182,6 +183,51 @@ func TestRoutesRejectCallsWithoutAnAPIKey(t *testing.T) {
 			}
 			if stats.email != "" {
 				t.Error("the service ran for a request without an API key")
+			}
+		})
+	}
+}
+
+func TestStatsJSONHasTheNewFieldsAsZeros(t *testing.T) {
+	tests := []struct {
+		path string
+		want func(body map[string]interface{}) map[string]interface{}
+		keys []string
+	}{
+		{
+			path: "/stats/abc@arbisoft.com/github?tf=1w",
+			want: func(body map[string]interface{}) map[string]interface{} { return body },
+			keys: []string{"reviewComments", "pullRequestsReviewed"},
+		},
+		{
+			path: "/stats/abc@arbisoft.com/ai_usage?tf=1w",
+			want: func(body map[string]interface{}) map[string]interface{} {
+				monthly, _ := body["monthly"].([]interface{})
+				if len(monthly) != 1 {
+					return nil
+				}
+				entry, _ := monthly[0].(map[string]interface{})
+				return entry
+			},
+			keys: []string{"suggestions", "acceptances"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.path, func(t *testing.T) {
+			resp := get(newTestRouter(t, &fakeStats{}, true), tc.path)
+
+			var body map[string]interface{}
+			if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+				t.Fatalf("body isn't JSON: %v", err)
+			}
+			obj := tc.want(body)
+			if obj == nil {
+				t.Fatalf("body = %s, want one monthly entry", resp.Body.String())
+			}
+			for _, key := range tc.keys {
+				if v, ok := obj[key]; !ok || v != float64(0) {
+					t.Errorf("%s = %v (present %v), want 0", key, v, ok)
+				}
 			}
 		})
 	}

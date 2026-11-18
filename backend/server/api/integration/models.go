@@ -86,9 +86,14 @@ type GitHubStats struct {
 	PullRequestsMerged int64 `json:"pullRequestsMerged"`
 	// PullRequestsWithCommits counts pull requests with a commit the engineer authored in the window.
 	PullRequestsWithCommits int64 `json:"pullRequestsWithCommits"`
-	// Reviews counts pull request reviews the engineer's account submitted in the window.
+	// Reviews counts pull request reviews the engineer's account submitted in the window on pull requests someone
+	// else authored.
 	Reviews int64 `json:"reviews"`
-	// PullRequestsReviewed counts distinct pull requests the engineer's account reviewed in the window.
+	// ReviewComments counts the normal and inline comments the engineer's account wrote in the window on pull
+	// requests someone else authored. Review submissions are left out, because Reviews counts them.
+	ReviewComments int64 `json:"reviewComments"`
+	// PullRequestsReviewed counts distinct pull requests someone else authored that the engineer's account reviewed
+	// or commented on in the window. A pull request with both counts once.
 	PullRequestsReviewed int64 `json:"pullRequestsReviewed"`
 	// AvgPrMergeHours averages created-to-merged time of the engineer's pull requests merged in the window.
 	AvgPrMergeHours float64 `json:"avgPrMergeHours"`
@@ -154,6 +159,10 @@ type AIMonthlyUsage struct {
 	Month      string `json:"month" example:"2026-11"`
 	ActiveDays int64  `json:"activeDays" gorm:"column:days_active"`
 	Sessions   int64  `json:"sessions"`
+	// Suggestions sums the suggestions the provider made in the month.
+	Suggestions int64 `json:"suggestions"`
+	// Acceptances sums the suggestions the engineer accepted in the month.
+	Acceptances int64 `json:"acceptances"`
 }
 
 // AIModelCost is the token use and estimated cost of one model. Costs are decimal strings in US dollars.

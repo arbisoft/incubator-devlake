@@ -261,12 +261,19 @@ func (s *StatsService) GitHub(email string, p Period) (*GitHubStats, errors.Erro
 	); err != nil {
 		return nil, errors.Default.Wrap(err, "read github pull requests with the engineer's commits")
 	}
-	var reviews []struct{ Reviews, PullRequestsReviewed int64 }
+	var reviews []struct{ Reviews, ReviewComments, PullRequestsReviewed int64 }
 	if err := s.db.All(&reviews,
-		dal.Select("COUNT(*) AS reviews, COUNT(DISTINCT pc.pull_request_id) AS pull_requests_reviewed"),
-		dal.From("pull_request_comments pc JOIN accounts a ON a.id = pc.account_id"),
-		dal.Where(`pc.id LIKE 'github:%' AND pc.type = 'REVIEW' AND LOWER(a.email) = ?
-			AND pc.created_date >= ? AND pc.created_date < ?`, w.Email, w.From, w.To),
+		dal.Select(`COUNT(DISTINCT CASE WHEN pc.type = 'REVIEW' THEN pc.id END) AS reviews,
+			COUNT(DISTINCT CASE WHEN pc.type IN ('NORMAL', 'DIFF') THEN pc.id END) AS review_comments,
+			COUNT(DISTINCT pc.pull_request_id) AS pull_requests_reviewed`),
+		// Only pull requests someone else authored count: an author's replies in review threads on their own pull
+		// request are stored as reviews too. The author join is a LEFT JOIN so a pull request whose author has no
+		// email still counts: it isn't the engineer's.
+		dal.From(`pull_request_comments pc JOIN accounts a ON a.id = pc.account_id
+			JOIN pull_requests p ON p.id = pc.pull_request_id LEFT JOIN accounts pa ON pa.id = p.author_id`),
+		dal.Where(`pc.id LIKE 'github:%' AND pc.type IN ('REVIEW', 'NORMAL', 'DIFF') AND LOWER(a.email) = ?
+			AND pc.created_date >= ? AND pc.created_date < ? AND (pa.email IS NULL OR LOWER(pa.email) <> ?)`,
+			w.Email, w.From, w.To, w.Email),
 	); err != nil {
 		return nil, errors.Default.Wrap(err, "read github reviews")
 	}
@@ -290,7 +297,7 @@ func (s *StatsService) GitHub(email string, p Period) (*GitHubStats, errors.Erro
 		out.PullRequestsWithCommits = withCommits[0].PullRequestsWithCommits
 	}
 	if len(reviews) > 0 {
-		out.Reviews, out.PullRequestsReviewed = reviews[0].Reviews, reviews[0].PullRequestsReviewed
+		out.Reviews, out.ReviewComments, out.PullRequestsReviewed = reviews[0].Reviews, reviews[0].ReviewComments, reviews[0].PullRequestsReviewed
 	}
 	return out, nil
 }
@@ -420,7 +427,8 @@ func (s *StatsService) AIUsage(email string, p Period) (*AIUsageStats, errors.Er
 	var monthly []AIMonthlyUsage
 	if err := s.db.All(&monthly,
 		dal.Select(`provider, DATE_FORMAT(date, '%Y-%m') AS month, COUNT(DISTINCT date) AS days_active,
-			COALESCE(SUM(num_sessions), 0) AS sessions`),
+			COALESCE(SUM(num_sessions), 0) AS sessions, COALESCE(SUM(suggestions_count), 0) AS suggestions,
+			COALESCE(SUM(acceptance_count), 0) AS acceptances`),
 		dal.From("ai_activities"),
 		dal.Where("LOWER(user_email) = ? AND date >= ? AND date <= ?", w.Email, first, last),
 		dal.Groupby("provider, month"),
