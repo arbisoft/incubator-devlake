@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package repositories
 
 import (
 	"github.com/apache/incubator-devlake/core/dal"
@@ -92,22 +92,22 @@ const aiMonthlyCostRows = `(
 	FROM ai_activities WHERE provider <> 'claude' AND LOWER(user_email) = ? AND date >= ? AND date <= ? GROUP BY DATE_FORMAT(date, '%Y-%m')
 ) costs`
 
-// AIRepository reads AI activity and cost from the daily domain tables. Every method takes an inclusive range of
+// AI reads AI activity and cost from the daily domain tables. Every method takes an inclusive range of
 // days, formatted YYYY-MM-DD. It is safe for concurrent use.
-type AIRepository struct {
+type AI struct {
 	db rowsReader
 }
 
-// NewAIRepository returns a repository that reads through db, which must not be nil.
-func NewAIRepository(db rowsReader) (*AIRepository, errors.Error) {
+// NewAI returns a repository that reads through db, which must not be nil.
+func NewAI(db rowsReader) (*AI, errors.Error) {
 	if db == nil {
 		return nil, errors.Default.New("ai repository: nil db")
 	}
-	return &AIRepository{db: db}, nil
+	return &AI{db: db}, nil
 }
 
 // Providers lists email's activity per provider over the days, sorted by provider.
-func (r *AIRepository) Providers(email, firstDay, lastDay string) ([]AIProviderRow, errors.Error) {
+func (r *AI) Providers(email, firstDay, lastDay string) ([]AIProviderRow, errors.Error) {
 	var rows []AIProviderRow
 	if err := r.db.All(&rows,
 		dal.Select(`provider, COUNT(DISTINCT date) AS active_days, COALESCE(SUM(num_sessions), 0) AS sessions,
@@ -125,7 +125,7 @@ func (r *AIRepository) Providers(email, firstDay, lastDay string) ([]AIProviderR
 }
 
 // ToolDecisions sums email's accepted and rejected file edits and writes over the days.
-func (r *AIRepository) ToolDecisions(email, firstDay, lastDay string) (AIToolDecisionCounts, errors.Error) {
+func (r *AI) ToolDecisions(email, firstDay, lastDay string) (AIToolDecisionCounts, errors.Error) {
 	var rows []AIToolDecisionCounts
 	if err := r.db.All(&rows,
 		dal.Select("COALESCE(SUM(accepted_count), 0) AS tool_edits_accepted, COALESCE(SUM(rejected_count), 0) AS tool_edits_rejected"),
@@ -138,7 +138,7 @@ func (r *AIRepository) ToolDecisions(email, firstDay, lastDay string) (AIToolDec
 }
 
 // Monthly lists email's activity per provider and UTC month over the days, oldest month first.
-func (r *AIRepository) Monthly(email, firstDay, lastDay string) ([]AIMonthlyRow, errors.Error) {
+func (r *AI) Monthly(email, firstDay, lastDay string) ([]AIMonthlyRow, errors.Error) {
 	var rows []AIMonthlyRow
 	if err := r.db.All(&rows,
 		dal.Select(`provider, DATE_FORMAT(date, '%Y-%m') AS month, COUNT(DISTINCT date) AS active_days,
@@ -155,7 +155,7 @@ func (r *AIRepository) Monthly(email, firstDay, lastDay string) ([]AIMonthlyRow,
 }
 
 // ModelCosts lists email's token use and cost per provider and model over the days, sorted.
-func (r *AIRepository) ModelCosts(email, firstDay, lastDay string) ([]AIModelCostRow, errors.Error) {
+func (r *AI) ModelCosts(email, firstDay, lastDay string) ([]AIModelCostRow, errors.Error) {
 	var rows []AIModelCostRow
 	if err := r.db.All(&rows,
 		dal.Select(`provider, model, COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(output_tokens), 0) AS output_tokens,
@@ -171,7 +171,7 @@ func (r *AIRepository) ModelCosts(email, firstDay, lastDay string) ([]AIModelCos
 }
 
 // TotalCost sums email's cost over the days as a decimal string in US dollars, or "" when the query reads no row.
-func (r *AIRepository) TotalCost(email, firstDay, lastDay string) (string, errors.Error) {
+func (r *AI) TotalCost(email, firstDay, lastDay string) (string, errors.Error) {
 	var rows []struct{ TotalEstimatedCostUsd string }
 	if err := r.db.All(&rows,
 		dal.Select("CAST(CAST(COALESCE(SUM(cost), 0) AS DECIMAL(20,8)) AS CHAR) AS total_estimated_cost_usd"),
@@ -183,7 +183,7 @@ func (r *AIRepository) TotalCost(email, firstDay, lastDay string) (string, error
 }
 
 // MonthlyCosts lists email's token use and cost per UTC month over the days, oldest first.
-func (r *AIRepository) MonthlyCosts(email, firstDay, lastDay string) ([]AIMonthlyCostRow, errors.Error) {
+func (r *AI) MonthlyCosts(email, firstDay, lastDay string) ([]AIMonthlyCostRow, errors.Error) {
 	var rows []AIMonthlyCostRow
 	if err := r.db.All(&rows,
 		dal.Select(`month, COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(output_tokens), 0) AS output_tokens,

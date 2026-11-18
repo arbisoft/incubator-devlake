@@ -28,6 +28,8 @@ import (
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
+	"github.com/apache/incubator-devlake/server/api/integration/services"
+	"github.com/apache/incubator-devlake/server/api/integration/utils"
 	"github.com/apache/incubator-devlake/server/api/shared"
 )
 
@@ -37,39 +39,41 @@ type fakeStats struct {
 	err              errors.Error
 }
 
-func (f *fakeStats) record(email string, p Period) { f.email, f.timeFrame = email, p.TimeFrame }
-
-func (f *fakeStats) Jira(email string, p Period) (*JiraStats, errors.Error) {
-	f.record(email, p)
-	if f.err != nil {
-		return nil, f.err
-	}
-	return &JiraStats{StatsWindow: StatsWindow{Email: email, TimeFrame: p.TimeFrame}, IssuesResolved: 3}, nil
+func (f *fakeStats) record(email string, p utils.Period) {
+	f.email, f.timeFrame = email, p.TimeFrame
 }
 
-func (f *fakeStats) GitHub(email string, p Period) (*GitHubStats, errors.Error) {
+func (f *fakeStats) Jira(email string, p utils.Period) (*services.JiraStats, errors.Error) {
 	f.record(email, p)
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &GitHubStats{StatsWindow: StatsWindow{Email: email}, Commits: 7}, nil
+	return &services.JiraStats{StatsWindow: services.StatsWindow{Email: email, TimeFrame: p.TimeFrame}, IssuesResolved: 3}, nil
 }
 
-func (f *fakeStats) AIUsage(email string, p Period) (*AIUsageStats, errors.Error) {
+func (f *fakeStats) GitHub(email string, p utils.Period) (*services.GitHubStats, errors.Error) {
 	f.record(email, p)
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &AIUsageStats{StatsWindow: StatsWindow{Email: email}, Providers: []AIProviderUsage{},
-		Monthly: []AIMonthlyUsage{{Provider: "copilot", Month: "2026-11"}}}, nil
+	return &services.GitHubStats{StatsWindow: services.StatsWindow{Email: email}, Commits: 7}, nil
 }
 
-func (f *fakeStats) AICost(email string, p Period) (*AICostStats, errors.Error) {
+func (f *fakeStats) AIUsage(email string, p utils.Period) (*services.AIUsageStats, errors.Error) {
 	f.record(email, p)
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &AICostStats{StatsWindow: StatsWindow{Email: email}, Models: []AIModelCost{}, TotalEstimatedCostUSD: "0.00000000"}, nil
+	return &services.AIUsageStats{StatsWindow: services.StatsWindow{Email: email}, Providers: []services.AIProviderUsage{},
+		Monthly: []services.AIMonthlyUsage{{Provider: "copilot", Month: "2026-11"}}}, nil
+}
+
+func (f *fakeStats) AICost(email string, p utils.Period) (*services.AICostStats, errors.Error) {
+	f.record(email, p)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &services.AICostStats{StatsWindow: services.StatsWindow{Email: email}, Models: []services.AIModelCost{}, TotalEstimatedCostUSD: "0.00000000"}, nil
 }
 
 // newTestRouter registers the routes as router.go does. viaAPIKey marks requests as RestAuthentication would.

@@ -37,6 +37,8 @@ import (
 	"github.com/apache/incubator-devlake/server/api/domainlayer"
 	"github.com/apache/incubator-devlake/server/api/grafanausers"
 	"github.com/apache/incubator-devlake/server/api/integration"
+	statsrepositories "github.com/apache/incubator-devlake/server/api/integration/repositories"
+	statsservices "github.com/apache/incubator-devlake/server/api/integration/services"
 	"github.com/apache/incubator-devlake/server/api/pipelines"
 	"github.com/apache/incubator-devlake/server/api/plugininfo"
 	"github.com/apache/incubator-devlake/server/api/project"
@@ -130,23 +132,23 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 // registerIntegrationRoutes is the composition root for the Integration Service endpoints.
 func registerIntegrationRoutes(r *gin.Engine, basicRes context.BasicRes) {
 	db := basicRes.GetDal()
-	activity, err := integration.NewActivityRepository(db)
+	activity, err := statsrepositories.NewActivity(db)
 	if err != nil {
 		panic(err)
 	}
-	jira, err := integration.NewJiraRepository(db)
+	jira, err := statsrepositories.NewIssues(db, statsrepositories.SourceJira)
 	if err != nil {
 		panic(err)
 	}
-	github, err := integration.NewGitHubRepository(db)
+	github, err := statsrepositories.NewCode(db, statsrepositories.SourceGitHub)
 	if err != nil {
 		panic(err)
 	}
-	ai, err := integration.NewAIRepository(db)
+	ai, err := statsrepositories.NewAI(db)
 	if err != nil {
 		panic(err)
 	}
-	stats, err := integration.NewStatsService(activity, jira, github, ai)
+	stats, err := statsservices.NewStatsService(activity, jira, github, ai)
 	if err != nil {
 		panic(err)
 	}

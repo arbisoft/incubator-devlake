@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package repositories
 
 import (
 	"os"
@@ -141,16 +141,25 @@ func TestGitHubReviewsOnMySQL(t *testing.T) {
 		comment(p+"c11", "8", "other", "NORMAL", in),       // someone else's comment
 		comment("gitlab:x:c12", "2", "user", "NORMAL", in), // not GitHub
 	)
-	r := mustRepo(t, NewGitHubRepository, rowsReader(tx))
+	r := codeRepo(t, rowsReader(tx), SourceGitHub)
 
 	got, err := r.Reviews(dbTestUser, day("2026-11-01"), day("2026-11-10"))
 
 	if err != nil {
 		t.Fatalf("Reviews() error = %v", err)
 	}
-	want := GitHubReviewCounts{Reviews: 2, ReviewComments: 5, PullRequestsReviewed: 5}
+	want := ReviewCounts{Reviews: 2, ReviewComments: 5, PullRequestsReviewed: 5}
 	if got != want {
 		t.Errorf("Reviews() = %+v, want %+v", got, want)
+	}
+
+	// The same rows read as another source count only that source's comment.
+	gitlab, err := codeRepo(t, rowsReader(tx), "gitlab").Reviews(dbTestUser, day("2026-11-01"), day("2026-11-10"))
+	if err != nil {
+		t.Fatalf("gitlab Reviews() error = %v", err)
+	}
+	if want := (ReviewCounts{ReviewComments: 1, PullRequestsReviewed: 1}); gitlab != want {
+		t.Errorf("gitlab Reviews() = %+v, want %+v", gitlab, want)
 	}
 }
 
@@ -170,7 +179,7 @@ func TestGitHubBreakdownOnMySQL(t *testing.T) {
 		&code.PullRequest{DomainEntity: entity(p + "pr1"), BaseRepoId: p + "repo", AuthorId: p + "user", CreatedDate: in, MergedDate: &in},
 		&code.PullRequest{DomainEntity: entity(p + "pr2"), BaseRepoId: p + "repo", AuthorId: p + "nobody", CreatedDate: in, MergedDate: &in},
 	)
-	r := mustRepo(t, NewGitHubRepository, rowsReader(tx))
+	r := codeRepo(t, rowsReader(tx), SourceGitHub)
 	from, to := day("2026-11-01"), day("2026-11-10")
 
 	commits, err := r.CommitsByGroup(dbTestUser, from, to, GroupByRepo)
@@ -182,11 +191,11 @@ func TestGitHubBreakdownOnMySQL(t *testing.T) {
 		t.Fatalf("PullRequestsByGroup() error = %v", err)
 	}
 
-	wantCommits := GitHubCommitGroupRow{Name: "org/repo-test", RepoCommits: 3, RepoLines: 20, Contributors: 2, EngineerCommits: 2, EngineerLines: 15}
+	wantCommits := CommitGroupRow{Name: "org/repo-test", RepoCommits: 3, RepoLines: 20, Contributors: 2, EngineerCommits: 2, EngineerLines: 15}
 	if len(commits) != 1 || commits[0] != wantCommits {
 		t.Errorf("CommitsByGroup() = %+v, want [%+v]", commits, wantCommits)
 	}
-	wantPRs := GitHubPullRequestGroupRow{Name: "org/repo-test", RepoOpened: 2, RepoMerged: 2, EngineerOpened: 1, EngineerMerged: 1}
+	wantPRs := PullRequestGroupRow{Name: "org/repo-test", RepoOpened: 2, RepoMerged: 2, EngineerOpened: 1, EngineerMerged: 1}
 	if len(prs) != 1 || prs[0] != wantPRs {
 		t.Errorf("PullRequestsByGroup() = %+v, want [%+v]", prs, wantPRs)
 	}
@@ -207,7 +216,7 @@ func TestAIMonthlyOnMySQL(t *testing.T) {
 		activity("6", "cursor", dbTestOther, "2026-11-03", 9, 99, 99),
 		activity("7", "cursor", dbTestUser, "2026-09-30", 9, 99, 99), // before the first day
 	)
-	r := mustRepo(t, NewAIRepository, rowsReader(tx))
+	r := mustRepo(t, NewAI, rowsReader(tx))
 
 	monthly, err := r.Monthly(dbTestUser, "2026-10-01", "2026-11-10")
 	if err != nil {

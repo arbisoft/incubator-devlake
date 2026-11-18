@@ -23,19 +23,21 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/server/api/integration/services"
+	"github.com/apache/incubator-devlake/server/api/integration/utils"
 	"github.com/apache/incubator-devlake/server/api/shared"
 )
 
-// statsProvider is what the handlers need from StatsService. Each method validates its input and returns a
+// statsProvider is what the handlers need from services.StatsService. Each method validates its input and returns a
 // BadInput error naming the field when it is wrong.
 type statsProvider interface {
-	Jira(email string, p Period) (*JiraStats, errors.Error)
-	GitHub(email string, p Period) (*GitHubStats, errors.Error)
-	AIUsage(email string, p Period) (*AIUsageStats, errors.Error)
-	AICost(email string, p Period) (*AICostStats, errors.Error)
+	Jira(email string, p utils.Period) (*services.JiraStats, errors.Error)
+	GitHub(email string, p utils.Period) (*services.GitHubStats, errors.Error)
+	AIUsage(email string, p utils.Period) (*services.AIUsageStats, errors.Error)
+	AICost(email string, p utils.Period) (*services.AICostStats, errors.Error)
 }
 
-var _ statsProvider = (*StatsService)(nil)
+var _ statsProvider = (*services.StatsService)(nil)
 
 const (
 	emailParam     = "email"
@@ -84,7 +86,7 @@ func (h *Handlers) IsValid(c *gin.Context) {
 // @Param since query string false "Use joining to start at the email's first Jira, GitHub or AI activity and end now" Enums(joining)
 // @Param from query string false "Start of an explicit range, RFC 3339 with an offset, for example 2026-11-01T00:00:00Z"
 // @Param to query string false "End of an explicit range, RFC 3339 with an offset"
-// @Success 200 {object} JiraStats
+// @Success 200 {object} services.JiraStats
 // @Failure 400 {object} shared.ApiBody "Invalid email, tf or range"
 // @Failure 401 {object} shared.ApiBody "API key missing"
 // @Failure 403 {object} shared.ApiBody "API key invalid or out of scope"
@@ -106,7 +108,7 @@ func (h *Handlers) GetJiraStats(c *gin.Context) {
 // @Param since query string false "Use joining to start at the email's first Jira, GitHub or AI activity and end now" Enums(joining)
 // @Param from query string false "Start of an explicit range, RFC 3339 with an offset, for example 2026-11-01T00:00:00Z"
 // @Param to query string false "End of an explicit range, RFC 3339 with an offset"
-// @Success 200 {object} GitHubStats
+// @Success 200 {object} services.GitHubStats
 // @Failure 400 {object} shared.ApiBody "Invalid email, tf or range"
 // @Failure 401 {object} shared.ApiBody "API key missing"
 // @Failure 403 {object} shared.ApiBody "API key invalid or out of scope"
@@ -128,7 +130,7 @@ func (h *Handlers) GetGitHubStats(c *gin.Context) {
 // @Param since query string false "Use joining to start at the email's first Jira, GitHub or AI activity and end now" Enums(joining)
 // @Param from query string false "Start of an explicit range, RFC 3339 with an offset, for example 2026-11-01T00:00:00Z"
 // @Param to query string false "End of an explicit range, RFC 3339 with an offset"
-// @Success 200 {object} AIUsageStats
+// @Success 200 {object} services.AIUsageStats
 // @Failure 400 {object} shared.ApiBody "Invalid email, tf or range"
 // @Failure 401 {object} shared.ApiBody "API key missing"
 // @Failure 403 {object} shared.ApiBody "API key invalid or out of scope"
@@ -150,7 +152,7 @@ func (h *Handlers) GetAIUsageStats(c *gin.Context) {
 // @Param since query string false "Use joining to start at the email's first Jira, GitHub or AI activity and end now" Enums(joining)
 // @Param from query string false "Start of an explicit range, RFC 3339 with an offset, for example 2026-11-01T00:00:00Z"
 // @Param to query string false "End of an explicit range, RFC 3339 with an offset"
-// @Success 200 {object} AICostStats
+// @Success 200 {object} services.AICostStats
 // @Failure 400 {object} shared.ApiBody "Invalid email, tf or range"
 // @Failure 401 {object} shared.ApiBody "API key missing"
 // @Failure 403 {object} shared.ApiBody "API key invalid or out of scope"
@@ -162,8 +164,8 @@ func (h *Handlers) GetAICostStats(c *gin.Context) {
 }
 
 // periodOf reads the period from the query: tf, since, or from and to.
-func periodOf(c *gin.Context) Period {
-	return Period{TimeFrame: c.Query(timeFrameParam), Since: c.Query(sinceParam), From: c.Query(fromParam), To: c.Query(toParam)}
+func periodOf(c *gin.Context) utils.Period {
+	return utils.Period{TimeFrame: c.Query(timeFrameParam), Since: c.Query(sinceParam), From: c.Query(fromParam), To: c.Query(toParam)}
 }
 
 // respond writes body, or the error with the status its kind carries.

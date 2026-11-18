@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package services
 
 import (
 	"reflect"
@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/server/api/integration/repositories"
+	"github.com/apache/incubator-devlake/server/api/integration/utils"
 )
 
 var fixedNow = time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
@@ -38,22 +40,22 @@ type call struct {
 // named in failOn.
 type fakeRepos struct {
 	joined       *time.Time
-	assigned     JiraAssignedCounts
+	assigned     repositories.AssignedCounts
 	created      int64
-	byType       []JiraTypeRow
-	byTeam       []JiraTeamRow
-	commits      GitHubCommitCounts
-	authored     GitHubAuthoredCounts
+	byType       []repositories.IssueTypeRow
+	byTeam       []repositories.IssueTeamRow
+	commits      repositories.CommitCounts
+	authored     repositories.AuthoredCounts
 	withCommits  int64
-	reviews      GitHubReviewCounts
-	commitGroups map[GitHubGroup][]GitHubCommitGroupRow
-	prGroups     map[GitHubGroup][]GitHubPullRequestGroupRow
-	providers    []AIProviderRow
-	decisions    AIToolDecisionCounts
-	monthly      []AIMonthlyRow
-	modelCosts   []AIModelCostRow
+	reviews      repositories.ReviewCounts
+	commitGroups map[repositories.Group][]repositories.CommitGroupRow
+	prGroups     map[repositories.Group][]repositories.PullRequestGroupRow
+	providers    []repositories.AIProviderRow
+	decisions    repositories.AIToolDecisionCounts
+	monthly      []repositories.AIMonthlyRow
+	modelCosts   []repositories.AIModelCostRow
 	totalCost    string
-	monthlyCosts []AIMonthlyCostRow
+	monthlyCosts []repositories.AIMonthlyCostRow
 	failOn       string
 	calls        []call
 }
@@ -80,7 +82,7 @@ func (f *fakeRepos) FirstActivity(email string) (*time.Time, errors.Error) {
 	return f.joined, f.record("FirstActivity", email)
 }
 
-func (f *fakeRepos) Assigned(email string, from, to time.Time) (JiraAssignedCounts, errors.Error) {
+func (f *fakeRepos) Assigned(email string, from, to time.Time) (repositories.AssignedCounts, errors.Error) {
 	return f.assigned, f.record("Assigned", email, from, to)
 }
 
@@ -88,19 +90,19 @@ func (f *fakeRepos) Created(email string, from, to time.Time) (int64, errors.Err
 	return f.created, f.record("Created", email, from, to)
 }
 
-func (f *fakeRepos) ResolvedByType(email string, from, to time.Time) ([]JiraTypeRow, errors.Error) {
+func (f *fakeRepos) ResolvedByType(email string, from, to time.Time) ([]repositories.IssueTypeRow, errors.Error) {
 	return f.byType, f.record("ResolvedByType", email, from, to)
 }
 
-func (f *fakeRepos) ResolvedByTeam(email string, from, to time.Time) ([]JiraTeamRow, errors.Error) {
+func (f *fakeRepos) ResolvedByTeam(email string, from, to time.Time) ([]repositories.IssueTeamRow, errors.Error) {
 	return f.byTeam, f.record("ResolvedByTeam", email, from, to)
 }
 
-func (f *fakeRepos) Commits(email string, from, to time.Time) (GitHubCommitCounts, errors.Error) {
+func (f *fakeRepos) Commits(email string, from, to time.Time) (repositories.CommitCounts, errors.Error) {
 	return f.commits, f.record("Commits", email, from, to)
 }
 
-func (f *fakeRepos) Authored(email string, from, to time.Time) (GitHubAuthoredCounts, errors.Error) {
+func (f *fakeRepos) Authored(email string, from, to time.Time) (repositories.AuthoredCounts, errors.Error) {
 	return f.authored, f.record("Authored", email, from, to)
 }
 
@@ -108,31 +110,31 @@ func (f *fakeRepos) PullRequestsWithCommits(email string, from, to time.Time) (i
 	return f.withCommits, f.record("PullRequestsWithCommits", email, from, to)
 }
 
-func (f *fakeRepos) Reviews(email string, from, to time.Time) (GitHubReviewCounts, errors.Error) {
+func (f *fakeRepos) Reviews(email string, from, to time.Time) (repositories.ReviewCounts, errors.Error) {
 	return f.reviews, f.record("Reviews", email, from, to)
 }
 
-func (f *fakeRepos) CommitsByGroup(email string, from, to time.Time, group GitHubGroup) ([]GitHubCommitGroupRow, errors.Error) {
+func (f *fakeRepos) CommitsByGroup(email string, from, to time.Time, group repositories.Group) ([]repositories.CommitGroupRow, errors.Error) {
 	return f.commitGroups[group], f.record("CommitsByGroup", email, from, to, group)
 }
 
-func (f *fakeRepos) PullRequestsByGroup(email string, from, to time.Time, group GitHubGroup) ([]GitHubPullRequestGroupRow, errors.Error) {
+func (f *fakeRepos) PullRequestsByGroup(email string, from, to time.Time, group repositories.Group) ([]repositories.PullRequestGroupRow, errors.Error) {
 	return f.prGroups[group], f.record("PullRequestsByGroup", email, from, to, group)
 }
 
-func (f *fakeRepos) Providers(email, firstDay, lastDay string) ([]AIProviderRow, errors.Error) {
+func (f *fakeRepos) Providers(email, firstDay, lastDay string) ([]repositories.AIProviderRow, errors.Error) {
 	return f.providers, f.record("Providers", email, firstDay, lastDay)
 }
 
-func (f *fakeRepos) ToolDecisions(email, firstDay, lastDay string) (AIToolDecisionCounts, errors.Error) {
+func (f *fakeRepos) ToolDecisions(email, firstDay, lastDay string) (repositories.AIToolDecisionCounts, errors.Error) {
 	return f.decisions, f.record("ToolDecisions", email, firstDay, lastDay)
 }
 
-func (f *fakeRepos) Monthly(email, firstDay, lastDay string) ([]AIMonthlyRow, errors.Error) {
+func (f *fakeRepos) Monthly(email, firstDay, lastDay string) ([]repositories.AIMonthlyRow, errors.Error) {
 	return f.monthly, f.record("Monthly", email, firstDay, lastDay)
 }
 
-func (f *fakeRepos) ModelCosts(email, firstDay, lastDay string) ([]AIModelCostRow, errors.Error) {
+func (f *fakeRepos) ModelCosts(email, firstDay, lastDay string) ([]repositories.AIModelCostRow, errors.Error) {
 	return f.modelCosts, f.record("ModelCosts", email, firstDay, lastDay)
 }
 
@@ -140,7 +142,7 @@ func (f *fakeRepos) TotalCost(email, firstDay, lastDay string) (string, errors.E
 	return f.totalCost, f.record("TotalCost", email, firstDay, lastDay)
 }
 
-func (f *fakeRepos) MonthlyCosts(email, firstDay, lastDay string) ([]AIMonthlyCostRow, errors.Error) {
+func (f *fakeRepos) MonthlyCosts(email, firstDay, lastDay string) ([]repositories.AIMonthlyCostRow, errors.Error) {
 	return f.monthlyCosts, f.record("MonthlyCosts", email, firstDay, lastDay)
 }
 
@@ -179,7 +181,7 @@ func TestNewStatsServiceRejectsNilDependencies(t *testing.T) {
 }
 
 // statsCalls runs each stats method, so a test can check all four the same way.
-func statsCalls(s *StatsService, email string, p Period) map[string]func() errors.Error {
+func statsCalls(s *StatsService, email string, p utils.Period) map[string]func() errors.Error {
 	return map[string]func() errors.Error{
 		"Jira":    func() errors.Error { _, err := s.Jira(email, p); return err },
 		"GitHub":  func() errors.Error { _, err := s.GitHub(email, p); return err },
@@ -191,16 +193,16 @@ func statsCalls(s *StatsService, email string, p Period) map[string]func() error
 func TestStatsServiceValidatesInputBeforeReading(t *testing.T) {
 	tests := []struct {
 		name, email, wantField string
-		p                      Period
+		p                      utils.Period
 	}{
-		{"bad email", "not-an-email", "email", Period{TimeFrame: "1d"}},
-		{"display name", "Abc <abc@arbisoft.com>", "email", Period{TimeFrame: "1d"}},
-		{"empty email", "", "email", Period{TimeFrame: "1d"}},
-		{"bad tf", "abc@arbisoft.com", "tf", Period{TimeFrame: "1D"}},
-		{"missing period", "abc@arbisoft.com", "tf", Period{}},
-		{"unknown since", "abc@arbisoft.com", "since", Period{Since: "start"}},
-		{"since with tf", "abc@arbisoft.com", "since", Period{Since: "joining", TimeFrame: "1y"}},
-		{"since with range", "abc@arbisoft.com", "since", Period{Since: "joining", From: "2026-11-01T00:00:00Z", To: "2026-11-08T00:00:00Z"}},
+		{"bad email", "not-an-email", "email", utils.Period{TimeFrame: "1d"}},
+		{"display name", "Abc <abc@arbisoft.com>", "email", utils.Period{TimeFrame: "1d"}},
+		{"empty email", "", "email", utils.Period{TimeFrame: "1d"}},
+		{"bad tf", "abc@arbisoft.com", "tf", utils.Period{TimeFrame: "1D"}},
+		{"missing period", "abc@arbisoft.com", "tf", utils.Period{}},
+		{"unknown since", "abc@arbisoft.com", "since", utils.Period{Since: "start"}},
+		{"since with tf", "abc@arbisoft.com", "since", utils.Period{Since: "joining", TimeFrame: "1y"}},
+		{"since with range", "abc@arbisoft.com", "since", utils.Period{Since: "joining", From: "2026-11-01T00:00:00Z", To: "2026-11-08T00:00:00Z"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -221,7 +223,7 @@ func TestStatsServiceValidatesInputBeforeReading(t *testing.T) {
 func TestStatsServicePassesTheLowercasedEmailAndWindow(t *testing.T) {
 	repos := &fakeRepos{}
 	from := fixedNow.AddDate(0, 0, -7)
-	for method, run := range statsCalls(newService(t, repos), " ABC@Arbisoft.com ", Period{TimeFrame: "1w"}) {
+	for method, run := range statsCalls(newService(t, repos), " ABC@Arbisoft.com ", utils.Period{TimeFrame: "1w"}) {
 		if err := run(); err != nil {
 			t.Fatalf("%s() error = %v", method, err)
 		}
@@ -252,9 +254,9 @@ func TestStatsServiceReturnsRepositoryErrorsUnchanged(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.stats+"/"+tc.failOn, func(t *testing.T) {
-			p := Period{TimeFrame: "1d"}
+			p := utils.Period{TimeFrame: "1d"}
 			if tc.failOn == "FirstActivity" {
-				p = Period{Since: sinceJoining}
+				p = utils.Period{Since: sinceJoining}
 			}
 			err := statsCalls(newService(t, &fakeRepos{failOn: tc.failOn}), "abc@arbisoft.com", p)[tc.stats]()
 			if err != errRepo {
@@ -266,13 +268,13 @@ func TestStatsServiceReturnsRepositoryErrorsUnchanged(t *testing.T) {
 
 func TestJiraMapsTheRepositoryRows(t *testing.T) {
 	repos := &fakeRepos{
-		assigned: JiraAssignedCounts{IssuesResolved: 4, StoryPointsResolved: 7.5, IssuesInProgress: 2, IssuesTodo: 3, AvgResolutionHours: 36.5},
+		assigned: repositories.AssignedCounts{IssuesResolved: 4, StoryPointsResolved: 7.5, IssuesInProgress: 2, IssuesTodo: 3, AvgResolutionHours: 36.5},
 		created:  5,
-		byType:   []JiraTypeRow{{IssueType: "BUG", IssuesResolved: 4, StoryPoints: 7.5}},
-		byTeam:   []JiraTeamRow{{Team: "Akina", IssuesResolved: 4, StoryPoints: 7.5}},
+		byType:   []repositories.IssueTypeRow{{IssueType: "BUG", IssuesResolved: 4, StoryPoints: 7.5}},
+		byTeam:   []repositories.IssueTeamRow{{Team: "Akina", IssuesResolved: 4, StoryPoints: 7.5}},
 	}
 
-	got, err := newService(t, repos).Jira("abc@arbisoft.com", Period{TimeFrame: "1w"})
+	got, err := newService(t, repos).Jira("abc@arbisoft.com", utils.Period{TimeFrame: "1w"})
 	if err != nil {
 		t.Fatalf("Jira() error = %v", err)
 	}
@@ -287,17 +289,17 @@ func TestJiraMapsTheRepositoryRows(t *testing.T) {
 }
 
 func TestGitHubMapsTheRepositoryRows(t *testing.T) {
-	repoRows := []GitHubCommitGroupRow{{Name: "org/a", RepoCommits: 4, Contributors: 2, EngineerCommits: 1}}
-	teamRows := []GitHubCommitGroupRow{{Name: "Akina", RepoCommits: 10, Contributors: 5, EngineerCommits: 1}}
+	repoRows := []repositories.CommitGroupRow{{Name: "org/a", RepoCommits: 4, Contributors: 2, EngineerCommits: 1}}
+	teamRows := []repositories.CommitGroupRow{{Name: "Akina", RepoCommits: 10, Contributors: 5, EngineerCommits: 1}}
 	repos := &fakeRepos{
-		commits:      GitHubCommitCounts{Commits: 9, Additions: 120, Deletions: 30},
-		authored:     GitHubAuthoredCounts{PullRequestsOpened: 2, PullRequestsMerged: 1, AvgPrMergeHours: 4.5},
+		commits:      repositories.CommitCounts{Commits: 9, Additions: 120, Deletions: 30},
+		authored:     repositories.AuthoredCounts{PullRequestsOpened: 2, PullRequestsMerged: 1, AvgPrMergeHours: 4.5},
 		withCommits:  3,
-		reviews:      GitHubReviewCounts{Reviews: 6, ReviewComments: 4, PullRequestsReviewed: 5},
-		commitGroups: map[GitHubGroup][]GitHubCommitGroupRow{GroupByRepo: repoRows, GroupByTeam: teamRows},
+		reviews:      repositories.ReviewCounts{Reviews: 6, ReviewComments: 4, PullRequestsReviewed: 5},
+		commitGroups: map[repositories.Group][]repositories.CommitGroupRow{repositories.GroupByRepo: repoRows, repositories.GroupByTeam: teamRows},
 	}
 
-	got, err := newService(t, repos).GitHub("abc@arbisoft.com", Period{TimeFrame: "30d"})
+	got, err := newService(t, repos).GitHub("abc@arbisoft.com", utils.Period{TimeFrame: "30d"})
 	if err != nil {
 		t.Fatalf("GitHub() error = %v", err)
 	}
@@ -315,18 +317,18 @@ func TestGitHubMapsTheRepositoryRows(t *testing.T) {
 func TestMergeBreakdown(t *testing.T) {
 	tests := []struct {
 		name    string
-		commits []GitHubCommitGroupRow
-		prs     []GitHubPullRequestGroupRow
+		commits []repositories.CommitGroupRow
+		prs     []repositories.PullRequestGroupRow
 		want    []GitHubBreakdown
 	}{
 		{name: "no data is empty, not null", want: []GitHubBreakdown{}},
 		{
 			name: "commits and pull requests of a group merge, groups sort by name, shares use every contributor",
-			commits: []GitHubCommitGroupRow{
+			commits: []repositories.CommitGroupRow{
 				{Name: "org/b", RepoCommits: 3, Contributors: 1, EngineerCommits: 3},
 				{Name: "org/a", RepoCommits: 20, RepoLines: 1000, Contributors: 4, EngineerCommits: 5, EngineerLines: 250},
 			},
-			prs: []GitHubPullRequestGroupRow{
+			prs: []repositories.PullRequestGroupRow{
 				{Name: "org/a", RepoOpened: 8, RepoMerged: 4, EngineerOpened: 2, EngineerMerged: 1},
 				{Name: "org/c", RepoOpened: 1, EngineerOpened: 1},
 			},
@@ -360,12 +362,12 @@ func TestSharePct(t *testing.T) {
 
 func TestAIUsageMapsTheRepositoryRows(t *testing.T) {
 	repos := &fakeRepos{
-		providers: []AIProviderRow{{Provider: "copilot", ActiveDays: 2, Suggestions: 640, Acceptances: 210, CommitsByAI: 1}},
-		decisions: AIToolDecisionCounts{ToolEditsAccepted: 8, ToolEditsRejected: 1},
-		monthly:   []AIMonthlyRow{{Provider: "copilot", Month: "2026-10", ActiveDays: 2, Sessions: 9, Suggestions: 640, Acceptances: 210}},
+		providers: []repositories.AIProviderRow{{Provider: "copilot", ActiveDays: 2, Suggestions: 640, Acceptances: 210, CommitsByAI: 1}},
+		decisions: repositories.AIToolDecisionCounts{ToolEditsAccepted: 8, ToolEditsRejected: 1},
+		monthly:   []repositories.AIMonthlyRow{{Provider: "copilot", Month: "2026-10", ActiveDays: 2, Sessions: 9, Suggestions: 640, Acceptances: 210}},
 	}
 
-	got, err := newService(t, repos).AIUsage("abc@arbisoft.com", Period{TimeFrame: "30d"})
+	got, err := newService(t, repos).AIUsage("abc@arbisoft.com", utils.Period{TimeFrame: "30d"})
 	if err != nil {
 		t.Fatalf("AIUsage() error = %v", err)
 	}
@@ -393,9 +395,9 @@ func TestAIUsageActiveInLastMonth(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			repos := &fakeRepos{}
 			for _, m := range tc.months {
-				repos.monthly = append(repos.monthly, AIMonthlyRow{Provider: "claude", Month: m, ActiveDays: 1})
+				repos.monthly = append(repos.monthly, repositories.AIMonthlyRow{Provider: "claude", Month: m, ActiveDays: 1})
 			}
-			got, err := newService(t, repos).AIUsage("abc@arbisoft.com", Period{TimeFrame: "1y"})
+			got, err := newService(t, repos).AIUsage("abc@arbisoft.com", utils.Period{TimeFrame: "1y"})
 			if err != nil {
 				t.Fatalf("AIUsage() error = %v", err)
 			}
@@ -416,11 +418,11 @@ func TestAICostMapsTheRepositoryRows(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			repos := &fakeRepos{
-				modelCosts:   []AIModelCostRow{{Provider: "claude", Model: "claude-sonnet-5", InputTokens: 10, EstimatedCostUSD: "1.25000000"}},
+				modelCosts:   []repositories.AIModelCostRow{{Provider: "claude", Model: "claude-sonnet-5", InputTokens: 10, EstimatedCostUSD: "1.25000000"}},
 				totalCost:    tc.total,
-				monthlyCosts: []AIMonthlyCostRow{{Month: "2026-11", InputTokens: 10, CostUSD: "1.25000000"}},
+				monthlyCosts: []repositories.AIMonthlyCostRow{{Month: "2026-11", InputTokens: 10, CostUSD: "1.25000000"}},
 			}
-			got, err := newService(t, repos).AICost("abc@arbisoft.com", Period{TimeFrame: "24h"})
+			got, err := newService(t, repos).AICost("abc@arbisoft.com", utils.Period{TimeFrame: "24h"})
 			if err != nil {
 				t.Fatalf("AICost() error = %v", err)
 			}
@@ -438,19 +440,19 @@ func TestAICostMapsTheRepositoryRows(t *testing.T) {
 func TestStatsWithNoDataAreZeroAndNeverNull(t *testing.T) {
 	s := newService(t, &fakeRepos{})
 
-	jira, err := s.Jira("abc@arbisoft.com", Period{TimeFrame: "24h"})
+	jira, err := s.Jira("abc@arbisoft.com", utils.Period{TimeFrame: "24h"})
 	if err != nil || jira.ByType == nil || jira.ByTeam == nil || jira.IssuesResolved != 0 {
 		t.Errorf("Jira() = %+v, %v; want zeros and empty lists", jira, err)
 	}
-	github, err := s.GitHub("abc@arbisoft.com", Period{TimeFrame: "24h"})
+	github, err := s.GitHub("abc@arbisoft.com", utils.Period{TimeFrame: "24h"})
 	if err != nil || github.ByRepo == nil || github.ByTeam == nil || github.Reviews != 0 {
 		t.Errorf("GitHub() = %+v, %v; want zeros and empty lists", github, err)
 	}
-	usage, err := s.AIUsage("abc@arbisoft.com", Period{TimeFrame: "24h"})
+	usage, err := s.AIUsage("abc@arbisoft.com", utils.Period{TimeFrame: "24h"})
 	if err != nil || usage.Providers == nil || usage.Monthly == nil || len(usage.Providers)+len(usage.Monthly) != 0 {
 		t.Errorf("AIUsage() = %+v, %v; want empty, non-nil lists", usage, err)
 	}
-	cost, err := s.AICost("abc@arbisoft.com", Period{TimeFrame: "24h"})
+	cost, err := s.AICost("abc@arbisoft.com", utils.Period{TimeFrame: "24h"})
 	if err != nil || cost.Models == nil || cost.Monthly == nil || cost.TotalEstimatedCostUSD != zeroCost {
 		t.Errorf("AICost() = %+v, %v; want empty lists and a zero total", cost, err)
 	}
@@ -460,7 +462,7 @@ func TestSinceJoiningStartsAtTheFirstActivity(t *testing.T) {
 	joined := time.Date(2025, 3, 4, 9, 0, 0, 0, time.UTC)
 	repos := &fakeRepos{joined: &joined}
 
-	got, err := newService(t, repos).Jira("ABC@arbisoft.com", Period{Since: "joining"})
+	got, err := newService(t, repos).Jira("ABC@arbisoft.com", utils.Period{Since: "joining"})
 	if err != nil {
 		t.Fatalf("Jira() error = %v", err)
 	}
@@ -468,7 +470,7 @@ func TestSinceJoiningStartsAtTheFirstActivity(t *testing.T) {
 		t.Errorf("window = %+v, want joining %v .. %v", got.StatsWindow, joined, fixedNow)
 	}
 	// The window is longer than a year, which only since=joining may do.
-	if got.To.Sub(got.From) <= maxRange {
+	if got.To.Sub(got.From) <= utils.MaxRange {
 		t.Errorf("window = %v, want longer than the explicit range limit", got.To.Sub(got.From))
 	}
 	if repos.calls[0].method != "FirstActivity" || repos.calls[0].email != "abc@arbisoft.com" {
@@ -477,7 +479,7 @@ func TestSinceJoiningStartsAtTheFirstActivity(t *testing.T) {
 }
 
 func TestSinceJoiningWithoutActivityIsAnEmptyWindow(t *testing.T) {
-	got, err := newService(t, &fakeRepos{}).AICost("abc@arbisoft.com", Period{Since: "joining"})
+	got, err := newService(t, &fakeRepos{}).AICost("abc@arbisoft.com", utils.Period{Since: "joining"})
 	if err != nil {
 		t.Fatalf("AICost() error = %v", err)
 	}

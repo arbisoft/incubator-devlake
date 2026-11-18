@@ -15,9 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package repositories
 
 import (
+	"regexp"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
@@ -31,24 +32,42 @@ type rowsReader interface {
 
 var _ rowsReader = (dal.Dal)(nil)
 
+// The sources the Integration Service reads today. A source is the prefix DevLake gives the domain ids of one tool.
+const (
+	SourceJira   = "jira"
+	SourceGitHub = "github"
+)
+
+// sourcePattern is what a source must look like: a lowercase tool name such as jira, github, gitlab or plane.
+var sourcePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// idLike validates source and returns the LIKE pattern for its domain ids, for example "github:%". The pattern is
+// always bound as a query parameter, never written into the SQL.
+func idLike(source string) (string, errors.Error) {
+	if !sourcePattern.MatchString(source) {
+		return "", errors.Default.New("repository source must be a lowercase tool name such as jira or github")
+	}
+	return source + ":%", nil
+}
+
 // The repositories match emails case-insensitively and expect them lowercased, because the stored emails are not.
 // Every window is half-open, [from, to), except the AI ones, which are inclusive day ranges.
 
-// ActivityRepository reads when an engineer was first active. It is safe for concurrent use.
-type ActivityRepository struct {
+// Activity reads when an engineer was first active. It is safe for concurrent use.
+type Activity struct {
 	db rowsReader
 }
 
-// NewActivityRepository returns a repository that reads through db, which must not be nil.
-func NewActivityRepository(db rowsReader) (*ActivityRepository, errors.Error) {
+// NewActivity returns a repository that reads through db, which must not be nil.
+func NewActivity(db rowsReader) (*Activity, errors.Error) {
 	if db == nil {
 		return nil, errors.Default.New("activity repository: nil db")
 	}
-	return &ActivityRepository{db: db}, nil
+	return &Activity{db: db}, nil
 }
 
 // FirstActivity returns the earliest Jira, GitHub or AI activity recorded for email, or nil when there is none.
-func (r *ActivityRepository) FirstActivity(email string) (*time.Time, errors.Error) {
+func (r *Activity) FirstActivity(email string) (*time.Time, errors.Error) {
 	var rows []struct{ Joined *time.Time }
 	if err := r.db.All(&rows,
 		dal.Select("MIN(activity) AS joined"),

@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package utils
 
 import (
 	"net/http"
@@ -80,7 +80,7 @@ func TestParseTimeFrameRejects(t *testing.T) {
 func TestPeriodResolve(t *testing.T) {
 	now := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
 	t.Run("range is converted to UTC and keeps no time frame", func(t *testing.T) {
-		from, to, tf, err := Period{From: "2026-11-01T05:00:00+05:00", To: "2026-11-08T00:00:00Z"}.resolve(now)
+		from, to, tf, err := Period{From: "2026-11-01T05:00:00+05:00", To: "2026-11-08T00:00:00Z"}.Resolve(now)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -89,7 +89,7 @@ func TestPeriodResolve(t *testing.T) {
 		}
 	})
 	t.Run("time frame still resolves from now", func(t *testing.T) {
-		from, to, tf, err := Period{TimeFrame: "1w"}.resolve(now)
+		from, to, tf, err := Period{TimeFrame: "1w"}.Resolve(now)
 		if err != nil || tf != "1w" || !to.Equal(now) || !from.Equal(now.AddDate(0, 0, -7)) {
 			t.Errorf("got (%v, %v, %q, %v)", from, to, tf, err)
 		}
@@ -108,7 +108,7 @@ func TestPeriodResolve(t *testing.T) {
 	}
 	for name, p := range rejects {
 		t.Run(name, func(t *testing.T) {
-			if _, _, _, err := p.resolve(now); err == nil {
+			if _, _, _, err := p.Resolve(now); err == nil {
 				t.Errorf("expected a BadInput error for %+v", p)
 			}
 		})

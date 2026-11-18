@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package utils
 
 import (
 	"regexp"
@@ -70,8 +70,8 @@ func (tf TimeFrame) Window(now time.Time) (from, to time.Time) {
 	return from, to
 }
 
-// maxRange is the longest explicit range, the same limit the Integration Service applies.
-const maxRange = 366 * 24 * time.Hour
+// MaxRange is the longest explicit range, the same limit the Integration Service applies.
+const MaxRange = 366 * 24 * time.Hour
 
 // Period is what the caller asked for: a time frame counted back from now, an explicit range, or everything since the
 // engineer joined. Exactly one of the three must be given.
@@ -83,8 +83,8 @@ type Period struct {
 	To    string
 }
 
-// resolve returns the half-open window [from, to) in UTC and the time frame text (empty for a range). Errors are BadInput.
-func (p Period) resolve(now time.Time) (from, to time.Time, timeFrame string, err errors.Error) {
+// Resolve returns the half-open window [from, to) in UTC and the time frame text (empty for a range). Errors are BadInput.
+func (p Period) Resolve(now time.Time) (from, to time.Time, timeFrame string, err errors.Error) {
 	hasRange := p.From != "" || p.To != ""
 	switch {
 	case p.Since != "":
@@ -123,7 +123,7 @@ func parseRange(rawFrom, rawTo string) (from, to time.Time, err errors.Error) {
 	if !from.Before(to) {
 		return time.Time{}, time.Time{}, errors.BadInput.New("from must be earlier than to")
 	}
-	if to.Sub(from) > maxRange {
+	if to.Sub(from) > MaxRange {
 		return time.Time{}, time.Time{}, errors.BadInput.New("the range can be at most one year")
 	}
 	return from, to, nil

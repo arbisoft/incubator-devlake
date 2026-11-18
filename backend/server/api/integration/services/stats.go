@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package services
 
 import (
 	"math"
@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/server/api/integration/repositories"
+	"github.com/apache/incubator-devlake/server/api/integration/utils"
 )
 
 const (
@@ -38,44 +40,44 @@ const (
 	zeroCost = "0.00000000"
 )
 
-// activityReader finds when an engineer was first active. ActivityRepository satisfies it.
+// activityReader finds when an engineer was first active. repositories.Activity satisfies it.
 type activityReader interface {
 	FirstActivity(email string) (*time.Time, errors.Error)
 }
 
-// jiraReader reads Jira issues. JiraRepository satisfies it.
+// jiraReader reads Jira issues. repositories.Issues satisfies it.
 type jiraReader interface {
-	Assigned(email string, from, to time.Time) (JiraAssignedCounts, errors.Error)
+	Assigned(email string, from, to time.Time) (repositories.AssignedCounts, errors.Error)
 	Created(email string, from, to time.Time) (int64, errors.Error)
-	ResolvedByType(email string, from, to time.Time) ([]JiraTypeRow, errors.Error)
-	ResolvedByTeam(email string, from, to time.Time) ([]JiraTeamRow, errors.Error)
+	ResolvedByType(email string, from, to time.Time) ([]repositories.IssueTypeRow, errors.Error)
+	ResolvedByTeam(email string, from, to time.Time) ([]repositories.IssueTeamRow, errors.Error)
 }
 
-// githubReader reads GitHub work. GitHubRepository satisfies it.
+// githubReader reads GitHub work. repositories.Code satisfies it.
 type githubReader interface {
-	Commits(email string, from, to time.Time) (GitHubCommitCounts, errors.Error)
-	Authored(email string, from, to time.Time) (GitHubAuthoredCounts, errors.Error)
+	Commits(email string, from, to time.Time) (repositories.CommitCounts, errors.Error)
+	Authored(email string, from, to time.Time) (repositories.AuthoredCounts, errors.Error)
 	PullRequestsWithCommits(email string, from, to time.Time) (int64, errors.Error)
-	Reviews(email string, from, to time.Time) (GitHubReviewCounts, errors.Error)
-	CommitsByGroup(email string, from, to time.Time, group GitHubGroup) ([]GitHubCommitGroupRow, errors.Error)
-	PullRequestsByGroup(email string, from, to time.Time, group GitHubGroup) ([]GitHubPullRequestGroupRow, errors.Error)
+	Reviews(email string, from, to time.Time) (repositories.ReviewCounts, errors.Error)
+	CommitsByGroup(email string, from, to time.Time, group repositories.Group) ([]repositories.CommitGroupRow, errors.Error)
+	PullRequestsByGroup(email string, from, to time.Time, group repositories.Group) ([]repositories.PullRequestGroupRow, errors.Error)
 }
 
-// aiReader reads AI activity and cost over an inclusive range of days. AIRepository satisfies it.
+// aiReader reads AI activity and cost over an inclusive range of days. repositories.AI satisfies it.
 type aiReader interface {
-	Providers(email, firstDay, lastDay string) ([]AIProviderRow, errors.Error)
-	ToolDecisions(email, firstDay, lastDay string) (AIToolDecisionCounts, errors.Error)
-	Monthly(email, firstDay, lastDay string) ([]AIMonthlyRow, errors.Error)
-	ModelCosts(email, firstDay, lastDay string) ([]AIModelCostRow, errors.Error)
+	Providers(email, firstDay, lastDay string) ([]repositories.AIProviderRow, errors.Error)
+	ToolDecisions(email, firstDay, lastDay string) (repositories.AIToolDecisionCounts, errors.Error)
+	Monthly(email, firstDay, lastDay string) ([]repositories.AIMonthlyRow, errors.Error)
+	ModelCosts(email, firstDay, lastDay string) ([]repositories.AIModelCostRow, errors.Error)
 	TotalCost(email, firstDay, lastDay string) (string, errors.Error)
-	MonthlyCosts(email, firstDay, lastDay string) ([]AIMonthlyCostRow, errors.Error)
+	MonthlyCosts(email, firstDay, lastDay string) ([]repositories.AIMonthlyCostRow, errors.Error)
 }
 
 var (
-	_ activityReader = (*ActivityRepository)(nil)
-	_ jiraReader     = (*JiraRepository)(nil)
-	_ githubReader   = (*GitHubRepository)(nil)
-	_ aiReader       = (*AIRepository)(nil)
+	_ activityReader = (*repositories.Activity)(nil)
+	_ jiraReader     = (*repositories.Issues)(nil)
+	_ githubReader   = (*repositories.Code)(nil)
+	_ aiReader       = (*repositories.AI)(nil)
 )
 
 // StatsService turns an engineer's email and period into stats: it validates the input, resolves the window, reads
@@ -112,7 +114,7 @@ func NewStatsService(activity activityReader, jira jiraReader, github githubRead
 }
 
 // window validates the email and period and returns the response header. Errors are BadInput and name the field.
-func (s *StatsService) window(email string, p Period) (StatsWindow, errors.Error) {
+func (s *StatsService) window(email string, p utils.Period) (StatsWindow, errors.Error) {
 	normalized, err := normalizeEmail(email)
 	if err != nil {
 		return StatsWindow{}, err
@@ -120,7 +122,7 @@ func (s *StatsService) window(email string, p Period) (StatsWindow, errors.Error
 	if p.Since != "" {
 		return s.sinceWindow(normalized, p)
 	}
-	from, to, timeFrame, err := p.resolve(s.now())
+	from, to, timeFrame, err := p.Resolve(s.now())
 	if err != nil {
 		return StatsWindow{}, err
 	}
@@ -131,7 +133,7 @@ func (s *StatsService) window(email string, p Period) (StatsWindow, errors.Error
 const sinceJoining = "joining"
 
 // sinceWindow resolves since=joining to [first activity, now). An email with no activity gets an empty window at now.
-func (s *StatsService) sinceWindow(email string, p Period) (StatsWindow, errors.Error) {
+func (s *StatsService) sinceWindow(email string, p utils.Period) (StatsWindow, errors.Error) {
 	if p.Since != sinceJoining {
 		return StatsWindow{}, errors.BadInput.New("since must be joining")
 	}
@@ -161,7 +163,7 @@ func normalizeEmail(email string) (string, errors.Error) {
 }
 
 // Jira returns the Jira stats for email over the period.
-func (s *StatsService) Jira(email string, p Period) (*JiraStats, errors.Error) {
+func (s *StatsService) Jira(email string, p utils.Period) (*JiraStats, errors.Error) {
 	w, err := s.window(email, p)
 	if err != nil {
 		return nil, err
@@ -190,13 +192,13 @@ func (s *StatsService) Jira(email string, p Period) (*JiraStats, errors.Error) {
 		IssuesInProgress:    assigned.IssuesInProgress,
 		IssuesTodo:          assigned.IssuesTodo,
 		AvgResolutionHours:  assigned.AvgResolutionHours,
-		ByType:              convert(byType, func(r JiraTypeRow) JiraTypeStats { return JiraTypeStats(r) }),
-		ByTeam:              convert(byTeam, func(r JiraTeamRow) JiraTeamStats { return JiraTeamStats(r) }),
+		ByType:              convert(byType, func(r repositories.IssueTypeRow) JiraTypeStats { return JiraTypeStats(r) }),
+		ByTeam:              convert(byTeam, func(r repositories.IssueTeamRow) JiraTeamStats { return JiraTeamStats(r) }),
 	}, nil
 }
 
 // GitHub returns the GitHub stats for email over the period.
-func (s *StatsService) GitHub(email string, p Period) (*GitHubStats, errors.Error) {
+func (s *StatsService) GitHub(email string, p utils.Period) (*GitHubStats, errors.Error) {
 	w, err := s.window(email, p)
 	if err != nil {
 		return nil, err
@@ -217,11 +219,11 @@ func (s *StatsService) GitHub(email string, p Period) (*GitHubStats, errors.Erro
 	if err != nil {
 		return nil, err
 	}
-	byRepo, err := s.githubBreakdown(w, GroupByRepo)
+	byRepo, err := s.githubBreakdown(w, repositories.GroupByRepo)
 	if err != nil {
 		return nil, err
 	}
-	byTeam, err := s.githubBreakdown(w, GroupByTeam)
+	byTeam, err := s.githubBreakdown(w, repositories.GroupByTeam)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +246,7 @@ func (s *StatsService) GitHub(email string, p Period) (*GitHubStats, errors.Erro
 
 // githubBreakdown merges the commit and pull request rows of each group into one entry, sorted by name, and works
 // out the engineer's share of each group.
-func (s *StatsService) githubBreakdown(w StatsWindow, group GitHubGroup) ([]GitHubBreakdown, errors.Error) {
+func (s *StatsService) githubBreakdown(w StatsWindow, group repositories.Group) ([]GitHubBreakdown, errors.Error) {
 	commits, err := s.github.CommitsByGroup(w.Email, w.From, w.To, group)
 	if err != nil {
 		return nil, err
@@ -258,7 +260,7 @@ func (s *StatsService) githubBreakdown(w StatsWindow, group GitHubGroup) ([]GitH
 
 // mergeBreakdown joins commit and pull request rows on the group name. A group with only one kind of work gets
 // zeros for the other.
-func mergeBreakdown(commits []GitHubCommitGroupRow, prs []GitHubPullRequestGroupRow) []GitHubBreakdown {
+func mergeBreakdown(commits []repositories.CommitGroupRow, prs []repositories.PullRequestGroupRow) []GitHubBreakdown {
 	byName := make(map[string]*GitHubBreakdown, len(commits)+len(prs))
 	row := func(name string) *GitHubBreakdown {
 		if r, ok := byName[name]; ok {
@@ -312,7 +314,7 @@ func days(w StatsWindow) (first, last string) {
 }
 
 // AIUsage returns the AI usage stats for email over the period, at day granularity.
-func (s *StatsService) AIUsage(email string, p Period) (*AIUsageStats, errors.Error) {
+func (s *StatsService) AIUsage(email string, p utils.Period) (*AIUsageStats, errors.Error) {
 	w, err := s.window(email, p)
 	if err != nil {
 		return nil, err
@@ -332,10 +334,10 @@ func (s *StatsService) AIUsage(email string, p Period) (*AIUsageStats, errors.Er
 	}
 	out := &AIUsageStats{
 		StatsWindow:       w,
-		Providers:         convert(providers, func(r AIProviderRow) AIProviderUsage { return AIProviderUsage(r) }),
+		Providers:         convert(providers, func(r repositories.AIProviderRow) AIProviderUsage { return AIProviderUsage(r) }),
 		ToolEditsAccepted: decisions.ToolEditsAccepted,
 		ToolEditsRejected: decisions.ToolEditsRejected,
-		Monthly:           convert(monthly, func(r AIMonthlyRow) AIMonthlyUsage { return AIMonthlyUsage(r) }),
+		Monthly:           convert(monthly, func(r repositories.AIMonthlyRow) AIMonthlyUsage { return AIMonthlyUsage(r) }),
 	}
 	lastMonth := w.To.Format(monthLayout)
 	for _, m := range out.Monthly {
@@ -348,7 +350,7 @@ func (s *StatsService) AIUsage(email string, p Period) (*AIUsageStats, errors.Er
 }
 
 // AICost returns the AI cost stats for email over the period, at day granularity.
-func (s *StatsService) AICost(email string, p Period) (*AICostStats, errors.Error) {
+func (s *StatsService) AICost(email string, p utils.Period) (*AICostStats, errors.Error) {
 	w, err := s.window(email, p)
 	if err != nil {
 		return nil, err
@@ -371,8 +373,8 @@ func (s *StatsService) AICost(email string, p Period) (*AICostStats, errors.Erro
 	}
 	return &AICostStats{
 		StatsWindow:           w,
-		Models:                convert(models, func(r AIModelCostRow) AIModelCost { return AIModelCost(r) }),
+		Models:                convert(models, func(r repositories.AIModelCostRow) AIModelCost { return AIModelCost(r) }),
 		TotalEstimatedCostUSD: total,
-		Monthly:               convert(monthly, func(r AIMonthlyCostRow) AIMonthlyCost { return AIMonthlyCost(r) }),
+		Monthly:               convert(monthly, func(r repositories.AIMonthlyCostRow) AIMonthlyCost { return AIMonthlyCost(r) }),
 	}, nil
 }
