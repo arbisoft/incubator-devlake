@@ -39,7 +39,6 @@ import {
   Pipelines,
   Pipeline,
   ApiKeys,
-  ProjectIngestion,
   SettingsActivity,
   SettingsAuthentication,
   SettingsUserManagement,
@@ -172,11 +171,6 @@ export const routes: RouteObject[] = [
         path: ROUTE_SEGMENTS.KEYS,
         loader: adminFeaturesLoader,
         element: <ApiKeys />,
-      },
-      {
-        path: ROUTE_SEGMENTS.PROJECT_INGESTION,
-        loader: adminFeaturesLoader,
-        element: <ProjectIngestion />,
       },
       {
         path: ROUTE_SEGMENTS.ACCESS,
