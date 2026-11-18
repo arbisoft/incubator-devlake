@@ -58,15 +58,15 @@ type JiraStats struct {
 // JiraTypeStats is the resolved work of one ticket type.
 type JiraTypeStats struct {
 	IssueType      string  `json:"type" example:"BUG"`
-	IssuesResolved int64   `json:"issuesResolved" gorm:"column:resolved_count"`
-	StoryPoints    float64 `json:"storyPoints" gorm:"column:points_total"`
+	IssuesResolved int64   `json:"issuesResolved"`
+	StoryPoints    float64 `json:"storyPoints"`
 }
 
 // JiraTeamStats is the resolved work in one DevLake project.
 type JiraTeamStats struct {
 	Team           string  `json:"team" example:"Akina"`
-	IssuesResolved int64   `json:"issuesResolved" gorm:"column:resolved_count"`
-	StoryPoints    float64 `json:"storyPoints" gorm:"column:points_total"`
+	IssuesResolved int64   `json:"issuesResolved"`
+	StoryPoints    float64 `json:"storyPoints"`
 }
 
 // GitHubStats summarizes GitHub work. Commit counts use the commit author email, which is reliable. Pull request
@@ -157,7 +157,7 @@ type AIUsageStats struct {
 type AIMonthlyUsage struct {
 	Provider   string `json:"provider" example:"claude"`
 	Month      string `json:"month" example:"2026-11"`
-	ActiveDays int64  `json:"activeDays" gorm:"column:days_active"`
+	ActiveDays int64  `json:"activeDays"`
 	Sessions   int64  `json:"sessions"`
 	// Suggestions sums the suggestions the provider made in the month.
 	Suggestions int64 `json:"suggestions"`

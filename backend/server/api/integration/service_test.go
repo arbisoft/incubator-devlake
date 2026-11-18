@@ -23,100 +23,130 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
-
-	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
-	dalmocks "github.com/apache/incubator-devlake/mocks/core/dal"
 )
 
 var fixedNow = time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
 
-// query is one recorded All call.
-type query struct {
-	sel, from, where string
-	params           []interface{}
+// call is one recorded repository call: the method, the email and the window or day range it was given.
+type call struct {
+	method, email string
+	args          []interface{}
 }
 
-// fakeDB answers All calls by matching the SELECT text, and records every call.
-type fakeDB struct {
-	t       *testing.T
-	db      *dalmocks.Dal
-	answers map[string]map[string]interface{} // select-text fragment -> column values of the single row
-	lists   map[string][]map[string]interface{}
-	queries []query
+// fakeRepos implements every repository interface with canned answers, records each call, and fails the method
+// named in failOn.
+type fakeRepos struct {
+	joined       *time.Time
+	assigned     JiraAssignedCounts
+	created      int64
+	byType       []JiraTypeRow
+	byTeam       []JiraTeamRow
+	commits      GitHubCommitCounts
+	authored     GitHubAuthoredCounts
+	withCommits  int64
+	reviews      GitHubReviewCounts
+	commitGroups map[GitHubGroup][]GitHubCommitGroupRow
+	prGroups     map[GitHubGroup][]GitHubPullRequestGroupRow
+	providers    []AIProviderRow
+	decisions    AIToolDecisionCounts
+	monthly      []AIMonthlyRow
+	modelCosts   []AIModelCostRow
+	totalCost    string
+	monthlyCosts []AIMonthlyCostRow
+	failOn       string
+	calls        []call
 }
 
-func newFakeDB(t *testing.T) *fakeDB {
+var (
+	_ activityReader = (*fakeRepos)(nil)
+	_ jiraReader     = (*fakeRepos)(nil)
+	_ githubReader   = (*fakeRepos)(nil)
+	_ aiReader       = (*fakeRepos)(nil)
+)
+
+// errRepo is the error a failing fake method returns.
+var errRepo = errors.Default.New("read something: connection refused")
+
+func (f *fakeRepos) record(method, email string, args ...interface{}) errors.Error {
+	f.calls = append(f.calls, call{method: method, email: email, args: args})
+	if f.failOn == method {
+		return errRepo
+	}
+	return nil
+}
+
+func (f *fakeRepos) FirstActivity(email string) (*time.Time, errors.Error) {
+	return f.joined, f.record("FirstActivity", email)
+}
+
+func (f *fakeRepos) Assigned(email string, from, to time.Time) (JiraAssignedCounts, errors.Error) {
+	return f.assigned, f.record("Assigned", email, from, to)
+}
+
+func (f *fakeRepos) Created(email string, from, to time.Time) (int64, errors.Error) {
+	return f.created, f.record("Created", email, from, to)
+}
+
+func (f *fakeRepos) ResolvedByType(email string, from, to time.Time) ([]JiraTypeRow, errors.Error) {
+	return f.byType, f.record("ResolvedByType", email, from, to)
+}
+
+func (f *fakeRepos) ResolvedByTeam(email string, from, to time.Time) ([]JiraTeamRow, errors.Error) {
+	return f.byTeam, f.record("ResolvedByTeam", email, from, to)
+}
+
+func (f *fakeRepos) Commits(email string, from, to time.Time) (GitHubCommitCounts, errors.Error) {
+	return f.commits, f.record("Commits", email, from, to)
+}
+
+func (f *fakeRepos) Authored(email string, from, to time.Time) (GitHubAuthoredCounts, errors.Error) {
+	return f.authored, f.record("Authored", email, from, to)
+}
+
+func (f *fakeRepos) PullRequestsWithCommits(email string, from, to time.Time) (int64, errors.Error) {
+	return f.withCommits, f.record("PullRequestsWithCommits", email, from, to)
+}
+
+func (f *fakeRepos) Reviews(email string, from, to time.Time) (GitHubReviewCounts, errors.Error) {
+	return f.reviews, f.record("Reviews", email, from, to)
+}
+
+func (f *fakeRepos) CommitsByGroup(email string, from, to time.Time, group GitHubGroup) ([]GitHubCommitGroupRow, errors.Error) {
+	return f.commitGroups[group], f.record("CommitsByGroup", email, from, to, group)
+}
+
+func (f *fakeRepos) PullRequestsByGroup(email string, from, to time.Time, group GitHubGroup) ([]GitHubPullRequestGroupRow, errors.Error) {
+	return f.prGroups[group], f.record("PullRequestsByGroup", email, from, to, group)
+}
+
+func (f *fakeRepos) Providers(email, firstDay, lastDay string) ([]AIProviderRow, errors.Error) {
+	return f.providers, f.record("Providers", email, firstDay, lastDay)
+}
+
+func (f *fakeRepos) ToolDecisions(email, firstDay, lastDay string) (AIToolDecisionCounts, errors.Error) {
+	return f.decisions, f.record("ToolDecisions", email, firstDay, lastDay)
+}
+
+func (f *fakeRepos) Monthly(email, firstDay, lastDay string) ([]AIMonthlyRow, errors.Error) {
+	return f.monthly, f.record("Monthly", email, firstDay, lastDay)
+}
+
+func (f *fakeRepos) ModelCosts(email, firstDay, lastDay string) ([]AIModelCostRow, errors.Error) {
+	return f.modelCosts, f.record("ModelCosts", email, firstDay, lastDay)
+}
+
+func (f *fakeRepos) TotalCost(email, firstDay, lastDay string) (string, errors.Error) {
+	return f.totalCost, f.record("TotalCost", email, firstDay, lastDay)
+}
+
+func (f *fakeRepos) MonthlyCosts(email, firstDay, lastDay string) ([]AIMonthlyCostRow, errors.Error) {
+	return f.monthlyCosts, f.record("MonthlyCosts", email, firstDay, lastDay)
+}
+
+func newService(t *testing.T, repos *fakeRepos) *StatsService {
 	t.Helper()
-	f := &fakeDB{t: t, db: dalmocks.NewDal(t), answers: map[string]map[string]interface{}{}, lists: map[string][]map[string]interface{}{}}
-	// Queries pass two to five clauses (Select, From, then optionally Where, Groupby and Orderby).
-	for clauses := 2; clauses <= 5; clauses++ {
-		args := make([]interface{}, clauses+1)
-		for i := range args {
-			args[i] = mock.Anything
-		}
-		f.db.On("All", args...).Run(f.serve).Return(nil).Maybe()
-	}
-	return f
-}
-
-func (f *fakeDB) serve(args mock.Arguments) {
-	var q query
-	for _, arg := range args[1:] {
-		clause := arg.(dal.Clause)
-		switch data := clause.Data.(type) {
-		case dal.DalClause:
-			switch clause.Type {
-			case dal.SelectClause:
-				q.sel = data.Expr
-			case dal.FromClause:
-				q.from = data.Expr
-			case dal.WhereClause:
-				q.where = data.Expr
-			}
-			q.params = append(q.params, data.Params...)
-		case string:
-			if clause.Type == dal.FromClause {
-				q.from = data
-			}
-		}
-	}
-	f.queries = append(f.queries, q)
-	for fragment, rows := range f.lists {
-		if strings.Contains(q.sel, fragment) {
-			for _, row := range rows {
-				appendRow(f.t, args[0], row)
-			}
-			return
-		}
-	}
-	for fragment, row := range f.answers {
-		if strings.Contains(q.sel, fragment) {
-			appendRow(f.t, args[0], row)
-			return
-		}
-	}
-}
-
-// appendRow appends one element to the slice dst points to, setting the named fields.
-func appendRow(t *testing.T, dst interface{}, values map[string]interface{}) {
-	t.Helper()
-	slice := reflect.ValueOf(dst).Elem()
-	row := reflect.New(slice.Type().Elem()).Elem()
-	for name, value := range values {
-		field := row.FieldByName(name)
-		if !field.IsValid() {
-			t.Fatalf("row type %s has no field %s", row.Type(), name)
-		}
-		field.Set(reflect.ValueOf(value))
-	}
-	slice.Set(reflect.Append(slice, row))
-}
-
-func newService(t *testing.T, db rowsReader) *StatsService {
-	t.Helper()
-	s, err := NewStatsService(db, WithClock(func() time.Time { return fixedNow }))
+	s, err := NewStatsService(repos, repos, repos, repos, WithClock(func() time.Time { return fixedNow }))
 	if err != nil {
 		t.Fatalf("NewStatsService() error = %v", err)
 	}
@@ -124,248 +154,196 @@ func newService(t *testing.T, db rowsReader) *StatsService {
 }
 
 func TestNewStatsServiceRejectsNilDependencies(t *testing.T) {
-	if _, err := NewStatsService(nil); err == nil {
-		t.Error("NewStatsService(nil) = nil error, want error")
-	}
-	if _, err := NewStatsService(dalmocks.NewDal(t), WithClock(nil)); err == nil {
-		t.Error("NewStatsService(WithClock(nil)) = nil error, want error")
-	}
-}
-
-func TestStatsServiceValidatesInputBeforeQuerying(t *testing.T) {
+	f := &fakeRepos{}
 	tests := []struct {
-		name, email, tf, wantField string
+		name     string
+		activity activityReader
+		jira     jiraReader
+		github   githubReader
+		ai       aiReader
+		opts     []Option
 	}{
-		{"bad email", "not-an-email", "1d", "email"},
-		{"display name", "Abc <abc@arbisoft.com>", "1d", "email"},
-		{"empty email", "", "1d", "email"},
-		{"bad tf", "abc@arbisoft.com", "1D", "tf"},
-		{"missing tf", "abc@arbisoft.com", "", "tf"},
+		{name: "nil activity", jira: f, github: f, ai: f},
+		{name: "nil jira", activity: f, github: f, ai: f},
+		{name: "nil github", activity: f, jira: f, ai: f},
+		{name: "nil ai", activity: f, jira: f, github: f},
+		{name: "nil clock", activity: f, jira: f, github: f, ai: f, opts: []Option{WithClock(nil)}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			db := newFakeDB(t)
-			s := newService(t, db.db)
-			calls := []func() errors.Error{
-				func() errors.Error { _, err := s.Jira(tc.email, Period{TimeFrame: tc.tf}); return err },
-				func() errors.Error { _, err := s.GitHub(tc.email, Period{TimeFrame: tc.tf}); return err },
-				func() errors.Error { _, err := s.AIUsage(tc.email, Period{TimeFrame: tc.tf}); return err },
-				func() errors.Error { _, err := s.AICost(tc.email, Period{TimeFrame: tc.tf}); return err },
-			}
-			for _, call := range calls {
-				err := call()
-				if err == nil || err.GetType().GetHttpCode() != 400 || !strings.Contains(err.Error(), tc.wantField) {
-					t.Errorf("error = %v, want a 400 naming %q", err, tc.wantField)
-				}
-			}
-			if len(db.queries) != 0 {
-				t.Errorf("ran %d queries for invalid input, want 0", len(db.queries))
+			if _, err := NewStatsService(tc.activity, tc.jira, tc.github, tc.ai, tc.opts...); err == nil {
+				t.Error("NewStatsService() = nil error, want error")
 			}
 		})
 	}
 }
 
-func TestJiraMapsRowsAndBindsTheWindow(t *testing.T) {
-	db := newFakeDB(t)
-	db.answers["issues_resolved"] = map[string]interface{}{"IssuesResolved": int64(4), "StoryPointsResolved": 7.5, "IssuesInProgress": int64(2), "IssuesTodo": int64(3), "AvgResolutionHours": 36.5}
-	db.lists["resolved_count"] = []map[string]interface{}{{"IssuesResolved": int64(4), "StoryPoints": 7.5}}
-	db.answers["issues_created"] = map[string]interface{}{"IssuesCreated": int64(5)}
+// statsCalls runs each stats method, so a test can check all four the same way.
+func statsCalls(s *StatsService, email string, p Period) map[string]func() errors.Error {
+	return map[string]func() errors.Error{
+		"Jira":    func() errors.Error { _, err := s.Jira(email, p); return err },
+		"GitHub":  func() errors.Error { _, err := s.GitHub(email, p); return err },
+		"AIUsage": func() errors.Error { _, err := s.AIUsage(email, p); return err },
+		"AICost":  func() errors.Error { _, err := s.AICost(email, p); return err },
+	}
+}
 
-	got, err := newService(t, db.db).Jira(" ABC@Arbisoft.com ", Period{TimeFrame: "1w"})
+func TestStatsServiceValidatesInputBeforeReading(t *testing.T) {
+	tests := []struct {
+		name, email, wantField string
+		p                      Period
+	}{
+		{"bad email", "not-an-email", "email", Period{TimeFrame: "1d"}},
+		{"display name", "Abc <abc@arbisoft.com>", "email", Period{TimeFrame: "1d"}},
+		{"empty email", "", "email", Period{TimeFrame: "1d"}},
+		{"bad tf", "abc@arbisoft.com", "tf", Period{TimeFrame: "1D"}},
+		{"missing period", "abc@arbisoft.com", "tf", Period{}},
+		{"unknown since", "abc@arbisoft.com", "since", Period{Since: "start"}},
+		{"since with tf", "abc@arbisoft.com", "since", Period{Since: "joining", TimeFrame: "1y"}},
+		{"since with range", "abc@arbisoft.com", "since", Period{Since: "joining", From: "2026-11-01T00:00:00Z", To: "2026-11-08T00:00:00Z"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repos := &fakeRepos{}
+			for method, run := range statsCalls(newService(t, repos), tc.email, tc.p) {
+				err := run()
+				if err == nil || err.GetType().GetHttpCode() != 400 || !strings.Contains(err.Error(), tc.wantField) {
+					t.Errorf("%s() error = %v, want a 400 naming %q", method, err, tc.wantField)
+				}
+			}
+			if len(repos.calls) != 0 {
+				t.Errorf("made %d repository calls for invalid input, want 0", len(repos.calls))
+			}
+		})
+	}
+}
+
+func TestStatsServicePassesTheLowercasedEmailAndWindow(t *testing.T) {
+	repos := &fakeRepos{}
+	from := fixedNow.AddDate(0, 0, -7)
+	for method, run := range statsCalls(newService(t, repos), " ABC@Arbisoft.com ", Period{TimeFrame: "1w"}) {
+		if err := run(); err != nil {
+			t.Fatalf("%s() error = %v", method, err)
+		}
+	}
+	for _, c := range repos.calls {
+		if c.email != "abc@arbisoft.com" {
+			t.Errorf("%s got email %q, want abc@arbisoft.com", c.method, c.email)
+		}
+		// AI methods get the inclusive day range; the others get the exact window.
+		want := []interface{}{from, fixedNow}
+		if _, isDay := c.args[0].(string); isDay {
+			want = []interface{}{"2026-11-03", "2026-11-10"}
+		}
+		if !reflect.DeepEqual(c.args[:2], want) {
+			t.Errorf("%s got %v, want %v", c.method, c.args[:2], want)
+		}
+	}
+}
+
+func TestStatsServiceReturnsRepositoryErrorsUnchanged(t *testing.T) {
+	tests := []struct{ stats, failOn string }{
+		{"Jira", "Assigned"}, {"Jira", "Created"}, {"Jira", "ResolvedByType"}, {"Jira", "ResolvedByTeam"},
+		{"Jira", "FirstActivity"},
+		{"GitHub", "Commits"}, {"GitHub", "Authored"}, {"GitHub", "PullRequestsWithCommits"}, {"GitHub", "Reviews"},
+		{"GitHub", "CommitsByGroup"}, {"GitHub", "PullRequestsByGroup"},
+		{"AIUsage", "Providers"}, {"AIUsage", "ToolDecisions"}, {"AIUsage", "Monthly"},
+		{"AICost", "ModelCosts"}, {"AICost", "TotalCost"}, {"AICost", "MonthlyCosts"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.stats+"/"+tc.failOn, func(t *testing.T) {
+			p := Period{TimeFrame: "1d"}
+			if tc.failOn == "FirstActivity" {
+				p = Period{Since: sinceJoining}
+			}
+			err := statsCalls(newService(t, &fakeRepos{failOn: tc.failOn}), "abc@arbisoft.com", p)[tc.stats]()
+			if err != errRepo {
+				t.Errorf("%s() error = %v, want the repository error %v", tc.stats, err, errRepo)
+			}
+		})
+	}
+}
+
+func TestJiraMapsTheRepositoryRows(t *testing.T) {
+	repos := &fakeRepos{
+		assigned: JiraAssignedCounts{IssuesResolved: 4, StoryPointsResolved: 7.5, IssuesInProgress: 2, IssuesTodo: 3, AvgResolutionHours: 36.5},
+		created:  5,
+		byType:   []JiraTypeRow{{IssueType: "BUG", IssuesResolved: 4, StoryPoints: 7.5}},
+		byTeam:   []JiraTeamRow{{Team: "Akina", IssuesResolved: 4, StoryPoints: 7.5}},
+	}
+
+	got, err := newService(t, repos).Jira("abc@arbisoft.com", Period{TimeFrame: "1w"})
 	if err != nil {
 		t.Fatalf("Jira() error = %v", err)
 	}
 
-	from := fixedNow.AddDate(0, 0, -7)
-	want := &JiraStats{StatsWindow: StatsWindow{Email: "abc@arbisoft.com", TimeFrame: "1w", From: from, To: fixedNow},
+	want := &JiraStats{StatsWindow: StatsWindow{Email: "abc@arbisoft.com", TimeFrame: "1w", From: fixedNow.AddDate(0, 0, -7), To: fixedNow},
 		IssuesResolved: 4, StoryPointsResolved: 7.5, IssuesCreated: 5, IssuesInProgress: 2, IssuesTodo: 3, AvgResolutionHours: 36.5,
-		ByType: []JiraTypeStats{{IssuesResolved: 4, StoryPoints: 7.5}}, ByTeam: []JiraTeamStats{{IssuesResolved: 4, StoryPoints: 7.5}}}
+		ByType: []JiraTypeStats{{IssueType: "BUG", IssuesResolved: 4, StoryPoints: 7.5}},
+		ByTeam: []JiraTeamStats{{Team: "Akina", IssuesResolved: 4, StoryPoints: 7.5}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Jira() = %+v, want %+v", got, want)
 	}
-	if len(db.queries) != 4 {
-		t.Fatalf("queries = %d, want 4", len(db.queries))
-	}
-	for _, q := range db.queries {
-		if !containsParam(q.params, "abc@arbisoft.com") || !containsParam(q.params, from) || !containsParam(q.params, fixedNow) {
-			t.Errorf("query %q params = %v, want the lowercased email and the window", q.sel, q.params)
-		}
-		if !strings.Contains(q.where+q.from, "jira:%") || !strings.Contains(q.where+q.from, "LOWER(a.email) = ?") {
-			t.Errorf("where = %q, want jira issues matched on the lowercased account email", q.where)
-		}
-	}
 }
 
-func TestStatsWithNoDataAreZeroAndNeverNull(t *testing.T) {
-	db := newFakeDB(t) // answers nothing: every slice stays empty
-	s := newService(t, db.db)
+func TestGitHubMapsTheRepositoryRows(t *testing.T) {
+	repoRows := []GitHubCommitGroupRow{{Name: "org/a", RepoCommits: 4, Contributors: 2, EngineerCommits: 1}}
+	teamRows := []GitHubCommitGroupRow{{Name: "Akina", RepoCommits: 10, Contributors: 5, EngineerCommits: 1}}
+	repos := &fakeRepos{
+		commits:      GitHubCommitCounts{Commits: 9, Additions: 120, Deletions: 30},
+		authored:     GitHubAuthoredCounts{PullRequestsOpened: 2, PullRequestsMerged: 1, AvgPrMergeHours: 4.5},
+		withCommits:  3,
+		reviews:      GitHubReviewCounts{Reviews: 6, ReviewComments: 4, PullRequestsReviewed: 5},
+		commitGroups: map[GitHubGroup][]GitHubCommitGroupRow{GroupByRepo: repoRows, GroupByTeam: teamRows},
+	}
 
-	jira, err := s.Jira("abc@arbisoft.com", Period{TimeFrame: "24h"})
-	if err != nil || jira.IssuesResolved != 0 || jira.IssuesCreated != 0 {
-		t.Errorf("Jira() = %+v, %v; want zeros", jira, err)
-	}
-	github, err := s.GitHub("abc@arbisoft.com", Period{TimeFrame: "24h"})
-	if err != nil || github.Commits != 0 || github.Reviews != 0 || github.ReviewComments != 0 || github.PullRequestsReviewed != 0 {
-		t.Errorf("GitHub() = %+v, %v; want zeros", github, err)
-	}
-	usage, err := s.AIUsage("abc@arbisoft.com", Period{TimeFrame: "24h"})
-	if err != nil || usage.Providers == nil || len(usage.Providers) != 0 || usage.Monthly == nil || len(usage.Monthly) != 0 {
-		t.Errorf("AIUsage() = %#v, %v; want empty, non-nil providers and monthly", usage, err)
-	}
-	cost, err := s.AICost("abc@arbisoft.com", Period{TimeFrame: "24h"})
-	if err != nil || cost.Models == nil || len(cost.Models) != 0 || cost.TotalEstimatedCostUSD != "0.00000000" {
-		t.Errorf("AICost() = %+v, %v; want empty models and a zero total", cost, err)
-	}
-}
-
-func TestGitHubMapsEveryQuery(t *testing.T) {
-	db := newFakeDB(t)
-	db.answers["COUNT(*) AS commits"] = map[string]interface{}{"Commits": int64(9), "Additions": int64(120), "Deletions": int64(30)}
-	db.answers["pull_requests_opened"] = map[string]interface{}{"PullRequestsOpened": int64(2), "PullRequestsMerged": int64(1)}
-	db.answers["pull_requests_with_commits"] = map[string]interface{}{"PullRequestsWithCommits": int64(3)}
-	db.answers["AS reviews"] = map[string]interface{}{"Reviews": int64(6)}
-
-	got, err := newService(t, db.db).GitHub("abc@arbisoft.com", Period{TimeFrame: "30d"})
+	got, err := newService(t, repos).GitHub("abc@arbisoft.com", Period{TimeFrame: "30d"})
 	if err != nil {
 		t.Fatalf("GitHub() error = %v", err)
 	}
-	if got.Commits != 9 || got.Additions != 120 || got.Deletions != 30 || got.PullRequestsOpened != 2 ||
-		got.PullRequestsMerged != 1 || got.PullRequestsWithCommits != 3 || got.Reviews != 6 {
-		t.Errorf("GitHub() = %+v", got)
-	}
-	for _, q := range db.queries {
-		if !strings.Contains(q.where+q.from, "github:%") {
-			t.Errorf("query %q isn't limited to GitHub", q.sel)
-		}
+
+	want := &GitHubStats{StatsWindow: StatsWindow{Email: "abc@arbisoft.com", TimeFrame: "30d", From: fixedNow.AddDate(0, 0, -30), To: fixedNow},
+		Commits: 9, Additions: 120, Deletions: 30, PullRequestsOpened: 2, PullRequestsMerged: 1, PullRequestsWithCommits: 3,
+		Reviews: 6, ReviewComments: 4, PullRequestsReviewed: 5, AvgPrMergeHours: 4.5,
+		ByRepo: []GitHubBreakdown{{Name: "org/a", Commits: 1, RepoCommits: 4, Contributors: 2, CommitSharePct: 25}},
+		ByTeam: []GitHubBreakdown{{Name: "Akina", Commits: 1, RepoCommits: 10, Contributors: 5, CommitSharePct: 10}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("GitHub() = %+v, want %+v", got, want)
 	}
 }
 
-func TestAIUsageAndCostUseWholeDays(t *testing.T) {
-	db := newFakeDB(t)
-	db.lists["active_days"] = []map[string]interface{}{
-		{"Provider": "claude", "ActiveDays": int64(2), "LinesAdded": int64(50)},
-		{"Provider": "cursor", "ActiveDays": int64(1), "Acceptances": int64(4)},
+func TestMergeBreakdown(t *testing.T) {
+	tests := []struct {
+		name    string
+		commits []GitHubCommitGroupRow
+		prs     []GitHubPullRequestGroupRow
+		want    []GitHubBreakdown
+	}{
+		{name: "no data is empty, not null", want: []GitHubBreakdown{}},
+		{
+			name: "commits and pull requests of a group merge, groups sort by name, shares use every contributor",
+			commits: []GitHubCommitGroupRow{
+				{Name: "org/b", RepoCommits: 3, Contributors: 1, EngineerCommits: 3},
+				{Name: "org/a", RepoCommits: 20, RepoLines: 1000, Contributors: 4, EngineerCommits: 5, EngineerLines: 250},
+			},
+			prs: []GitHubPullRequestGroupRow{
+				{Name: "org/a", RepoOpened: 8, RepoMerged: 4, EngineerOpened: 2, EngineerMerged: 1},
+				{Name: "org/c", RepoOpened: 1, EngineerOpened: 1},
+			},
+			want: []GitHubBreakdown{
+				{Name: "org/a", Commits: 5, LinesChanged: 250, PullRequestsOpened: 2, PullRequestsMerged: 1, RepoCommits: 20, RepoLinesChanged: 1000,
+					RepoPullRequestsMerged: 4, Contributors: 4, CommitSharePct: 25, LinesSharePct: 25, PullRequestsMergedSharePct: 25},
+				{Name: "org/b", Commits: 3, RepoCommits: 3, Contributors: 1, CommitSharePct: 100},
+				{Name: "org/c", PullRequestsOpened: 1},
+			},
+		},
 	}
-	db.answers["tool_edits_accepted"] = map[string]interface{}{"ToolEditsAccepted": int64(8), "ToolEditsRejected": int64(1)}
-	db.lists["AS estimated_cost_usd"] = []map[string]interface{}{
-		{"Provider": "claude", "Model": "claude-sonnet-5", "InputTokens": int64(10), "EstimatedCostUSD": "1.25000000"},
-	}
-	db.answers["total_estimated_cost_usd"] = map[string]interface{}{"TotalEstimatedCostUsd": "1.25000000"}
-	s := newService(t, db.db)
-
-	usage, err := s.AIUsage("abc@arbisoft.com", Period{TimeFrame: "24h"})
-	if err != nil {
-		t.Fatalf("AIUsage() error = %v", err)
-	}
-	if len(usage.Providers) != 2 || usage.Providers[0].LinesAdded != 50 || usage.ToolEditsAccepted != 8 || usage.ToolEditsRejected != 1 {
-		t.Errorf("AIUsage() = %+v", usage)
-	}
-	cost, err := s.AICost("abc@arbisoft.com", Period{TimeFrame: "24h"})
-	if err != nil {
-		t.Fatalf("AICost() error = %v", err)
-	}
-	if len(cost.Models) != 1 || cost.Models[0].EstimatedCostUSD != "1.25000000" || cost.TotalEstimatedCostUSD != "1.25000000" {
-		t.Errorf("AICost() = %+v", cost)
-	}
-	for _, q := range db.queries {
-		if !containsParam(q.params, "2026-11-09") || !containsParam(q.params, "2026-11-10") {
-			t.Errorf("query %q params = %v, want the day range 2026-11-09..2026-11-10", q.sel, q.params)
-		}
-	}
-}
-
-func TestQueryErrorsAreWrapped(t *testing.T) {
-	db := dalmocks.NewDal(t)
-	db.On("All", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.Default.New("connection refused"))
-
-	_, err := newService(t, db).GitHub("abc@arbisoft.com", Period{TimeFrame: "1d"})
-
-	if err == nil || !strings.Contains(err.Error(), "read github commits") {
-		t.Errorf("GitHub() error = %v, want it wrapped with the query it was running", err)
-	}
-}
-
-func containsParam(params []interface{}, want interface{}) bool {
-	for _, p := range params {
-		if reflect.DeepEqual(p, want) {
-			return true
-		}
-	}
-	return false
-}
-
-func TestSinceJoiningStartsAtTheFirstActivity(t *testing.T) {
-	joined := time.Date(2025, 3, 4, 9, 0, 0, 0, time.UTC)
-	db := newFakeDB(t)
-	db.lists["AS joined"] = []map[string]interface{}{{"Joined": &joined}}
-
-	got, err := newService(t, db.db).Jira("ABC@arbisoft.com", Period{Since: "joining"})
-	if err != nil {
-		t.Fatalf("Jira() error = %v", err)
-	}
-	if got.Since != "joining" || got.TimeFrame != "" || !got.From.Equal(joined) || !got.To.Equal(fixedNow) {
-		t.Errorf("window = %+v, want joining %v .. %v", got.StatsWindow, joined, fixedNow)
-	}
-	// The window is longer than a year, which only since=joining may do.
-	if got.To.Sub(got.From) <= maxRange {
-		t.Errorf("window = %v, want longer than the explicit range limit", got.To.Sub(got.From))
-	}
-}
-
-func TestSinceJoiningWithoutActivityIsAnEmptyWindow(t *testing.T) {
-	got, err := newService(t, newFakeDB(t).db).AICost("abc@arbisoft.com", Period{Since: "joining"})
-	if err != nil {
-		t.Fatalf("AICost() error = %v", err)
-	}
-	if !got.From.Equal(fixedNow) || !got.To.Equal(fixedNow) || got.TotalEstimatedCostUSD != zeroCost {
-		t.Errorf("AICost() = %+v, want an empty window at now and zero cost", got)
-	}
-}
-
-func TestSinceRejectsOtherValuesAndCombinations(t *testing.T) {
-	for name, p := range map[string]Period{
-		"unknown value": {Since: "start"},
-		"with tf":       {Since: "joining", TimeFrame: "1y"},
-		"with range":    {Since: "joining", From: "2026-11-01T00:00:00Z", To: "2026-11-08T00:00:00Z"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			db := newFakeDB(t)
-			_, err := newService(t, db.db).GitHub("abc@arbisoft.com", p)
-			if err == nil || err.GetType().GetHttpCode() != 400 || len(db.queries) != 0 {
-				t.Errorf("error = %v with %d queries, want a 400 before any query", err, len(db.queries))
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := mergeBreakdown(tc.commits, tc.prs); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("mergeBreakdown() = %+v, want %+v", got, tc.want)
 			}
 		})
-	}
-}
-
-func TestGitHubBreakdownComputesTheShareOfEveryContributor(t *testing.T) {
-	db := newFakeDB(t)
-	db.lists["AS repo_commits"] = []map[string]interface{}{
-		{"Name": "org/a", "RepoCommits": int64(20), "RepoLines": int64(1000), "Contributors": int64(4), "Commits": int64(5), "LineChanged": int64(250)},
-		{"Name": "org/b", "RepoCommits": int64(3), "RepoLines": int64(0), "Contributors": int64(1), "Commits": int64(3), "LineChanged": int64(0)},
-	}
-	db.lists["AS repo_opened"] = []map[string]interface{}{
-		{"Name": "org/a", "RepoOpened": int64(8), "RepoMerged": int64(4), "Opened": int64(2), "Merged": int64(1)},
-		{"Name": "org/c", "RepoOpened": int64(1), "RepoMerged": int64(0), "Opened": int64(1)},
-	}
-	db.answers["AS avg_pr_merge_hours"] = map[string]interface{}{"AvgPrMergeHours": 4.5}
-	db.answers["pull_requests_reviewed"] = map[string]interface{}{"Reviews": int64(6), "ReviewComments": int64(4), "PullRequestsReviewed": int64(3)}
-
-	got, err := newService(t, db.db).GitHub("abc@arbisoft.com", Period{TimeFrame: "1y"})
-	if err != nil {
-		t.Fatalf("GitHub() error = %v", err)
-	}
-	want := []GitHubBreakdown{
-		{Name: "org/a", Commits: 5, LinesChanged: 250, PullRequestsOpened: 2, PullRequestsMerged: 1, RepoCommits: 20, RepoLinesChanged: 1000,
-			RepoPullRequestsMerged: 4, Contributors: 4, CommitSharePct: 25, LinesSharePct: 25, PullRequestsMergedSharePct: 25},
-		{Name: "org/b", Commits: 3, RepoCommits: 3, Contributors: 1, CommitSharePct: 100},
-		{Name: "org/c", PullRequestsOpened: 1},
-	}
-	if !reflect.DeepEqual(got.ByRepo, want) || !reflect.DeepEqual(got.ByTeam, want) {
-		t.Errorf("ByRepo = %+v, ByTeam = %+v, want %+v", got.ByRepo, got.ByTeam, want)
-	}
-	if got.AvgPrMergeHours != 4.5 || got.PullRequestsReviewed != 3 || got.Reviews != 6 || got.ReviewComments != 4 {
-		t.Errorf("GitHub() = %+v", got)
 	}
 }
 
@@ -380,128 +358,130 @@ func TestSharePct(t *testing.T) {
 	}
 }
 
-func TestAIMonthlyTrendsAndActiveFlag(t *testing.T) {
-	db := newFakeDB(t)
-	db.lists["days_active"] = []map[string]interface{}{
-		{"Provider": "claude", "Month": "2026-10", "ActiveDays": int64(3), "Sessions": int64(9), "Suggestions": int64(640), "Acceptances": int64(210)},
-		{"Provider": "claude", "Month": "2026-11", "ActiveDays": int64(1)},
+func TestAIUsageMapsTheRepositoryRows(t *testing.T) {
+	repos := &fakeRepos{
+		providers: []AIProviderRow{{Provider: "copilot", ActiveDays: 2, Suggestions: 640, Acceptances: 210, CommitsByAI: 1}},
+		decisions: AIToolDecisionCounts{ToolEditsAccepted: 8, ToolEditsRejected: 1},
+		monthly:   []AIMonthlyRow{{Provider: "copilot", Month: "2026-10", ActiveDays: 2, Sessions: 9, Suggestions: 640, Acceptances: 210}},
 	}
-	db.lists["AS cost_usd"] = []map[string]interface{}{{"Month": "2026-10", "InputTokens": int64(5), "CostUSD": "2.50000000"}}
-	s := newService(t, db.db)
 
-	usage, err := s.AIUsage("abc@arbisoft.com", Period{TimeFrame: "30d"})
+	got, err := newService(t, repos).AIUsage("abc@arbisoft.com", Period{TimeFrame: "30d"})
 	if err != nil {
 		t.Fatalf("AIUsage() error = %v", err)
 	}
-	if len(usage.Monthly) != 2 || usage.Monthly[0].ActiveDays != 3 || usage.Monthly[0].Suggestions != 640 ||
-		usage.Monthly[0].Acceptances != 210 || !usage.ActiveInLastMonth {
-		t.Errorf("AIUsage() = %+v, want two months and active in the month the window ends", usage)
+
+	want := &AIUsageStats{StatsWindow: StatsWindow{Email: "abc@arbisoft.com", TimeFrame: "30d", From: fixedNow.AddDate(0, 0, -30), To: fixedNow},
+		Providers:         []AIProviderUsage{{Provider: "copilot", ActiveDays: 2, Suggestions: 640, Acceptances: 210, CommitsByAI: 1}},
+		ToolEditsAccepted: 8, ToolEditsRejected: 1,
+		Monthly: []AIMonthlyUsage{{Provider: "copilot", Month: "2026-10", ActiveDays: 2, Sessions: 9, Suggestions: 640, Acceptances: 210}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("AIUsage() = %+v, want %+v", got, want)
 	}
-	cost, err := s.AICost("abc@arbisoft.com", Period{TimeFrame: "30d"})
+}
+
+func TestAIUsageActiveInLastMonth(t *testing.T) {
+	tests := []struct {
+		name   string
+		months []string
+		want   bool
+	}{
+		{"no activity", nil, false},
+		{"only earlier months", []string{"2026-09", "2026-10"}, false},
+		{"activity in the month the window ends", []string{"2026-10", "2026-11"}, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repos := &fakeRepos{}
+			for _, m := range tc.months {
+				repos.monthly = append(repos.monthly, AIMonthlyRow{Provider: "claude", Month: m, ActiveDays: 1})
+			}
+			got, err := newService(t, repos).AIUsage("abc@arbisoft.com", Period{TimeFrame: "1y"})
+			if err != nil {
+				t.Fatalf("AIUsage() error = %v", err)
+			}
+			if got.ActiveInLastMonth != tc.want {
+				t.Errorf("ActiveInLastMonth = %v, want %v", got.ActiveInLastMonth, tc.want)
+			}
+		})
+	}
+}
+
+func TestAICostMapsTheRepositoryRows(t *testing.T) {
+	tests := []struct {
+		name, total, wantTotal string
+	}{
+		{"total from the repository", "1.25000000", "1.25000000"},
+		{"no total row is zero", "", zeroCost},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repos := &fakeRepos{
+				modelCosts:   []AIModelCostRow{{Provider: "claude", Model: "claude-sonnet-5", InputTokens: 10, EstimatedCostUSD: "1.25000000"}},
+				totalCost:    tc.total,
+				monthlyCosts: []AIMonthlyCostRow{{Month: "2026-11", InputTokens: 10, CostUSD: "1.25000000"}},
+			}
+			got, err := newService(t, repos).AICost("abc@arbisoft.com", Period{TimeFrame: "24h"})
+			if err != nil {
+				t.Fatalf("AICost() error = %v", err)
+			}
+			want := &AICostStats{StatsWindow: StatsWindow{Email: "abc@arbisoft.com", TimeFrame: "24h", From: fixedNow.Add(-24 * time.Hour), To: fixedNow},
+				Models:                []AIModelCost{{Provider: "claude", Model: "claude-sonnet-5", InputTokens: 10, EstimatedCostUSD: "1.25000000"}},
+				TotalEstimatedCostUSD: tc.wantTotal,
+				Monthly:               []AIMonthlyCost{{Month: "2026-11", InputTokens: 10, CostUSD: "1.25000000"}}}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("AICost() = %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
+func TestStatsWithNoDataAreZeroAndNeverNull(t *testing.T) {
+	s := newService(t, &fakeRepos{})
+
+	jira, err := s.Jira("abc@arbisoft.com", Period{TimeFrame: "24h"})
+	if err != nil || jira.ByType == nil || jira.ByTeam == nil || jira.IssuesResolved != 0 {
+		t.Errorf("Jira() = %+v, %v; want zeros and empty lists", jira, err)
+	}
+	github, err := s.GitHub("abc@arbisoft.com", Period{TimeFrame: "24h"})
+	if err != nil || github.ByRepo == nil || github.ByTeam == nil || github.Reviews != 0 {
+		t.Errorf("GitHub() = %+v, %v; want zeros and empty lists", github, err)
+	}
+	usage, err := s.AIUsage("abc@arbisoft.com", Period{TimeFrame: "24h"})
+	if err != nil || usage.Providers == nil || usage.Monthly == nil || len(usage.Providers)+len(usage.Monthly) != 0 {
+		t.Errorf("AIUsage() = %+v, %v; want empty, non-nil lists", usage, err)
+	}
+	cost, err := s.AICost("abc@arbisoft.com", Period{TimeFrame: "24h"})
+	if err != nil || cost.Models == nil || cost.Monthly == nil || cost.TotalEstimatedCostUSD != zeroCost {
+		t.Errorf("AICost() = %+v, %v; want empty lists and a zero total", cost, err)
+	}
+}
+
+func TestSinceJoiningStartsAtTheFirstActivity(t *testing.T) {
+	joined := time.Date(2025, 3, 4, 9, 0, 0, 0, time.UTC)
+	repos := &fakeRepos{joined: &joined}
+
+	got, err := newService(t, repos).Jira("ABC@arbisoft.com", Period{Since: "joining"})
+	if err != nil {
+		t.Fatalf("Jira() error = %v", err)
+	}
+	if got.Since != "joining" || got.TimeFrame != "" || !got.From.Equal(joined) || !got.To.Equal(fixedNow) {
+		t.Errorf("window = %+v, want joining %v .. %v", got.StatsWindow, joined, fixedNow)
+	}
+	// The window is longer than a year, which only since=joining may do.
+	if got.To.Sub(got.From) <= maxRange {
+		t.Errorf("window = %v, want longer than the explicit range limit", got.To.Sub(got.From))
+	}
+	if repos.calls[0].method != "FirstActivity" || repos.calls[0].email != "abc@arbisoft.com" {
+		t.Errorf("first call = %+v, want FirstActivity for the lowercased email", repos.calls[0])
+	}
+}
+
+func TestSinceJoiningWithoutActivityIsAnEmptyWindow(t *testing.T) {
+	got, err := newService(t, &fakeRepos{}).AICost("abc@arbisoft.com", Period{Since: "joining"})
 	if err != nil {
 		t.Fatalf("AICost() error = %v", err)
 	}
-	if len(cost.Monthly) != 1 || cost.Monthly[0].CostUSD != "2.50000000" {
-		t.Errorf("AICost().Monthly = %+v", cost.Monthly)
+	if !got.From.Equal(fixedNow) || !got.To.Equal(fixedNow) || got.TotalEstimatedCostUSD != zeroCost {
+		t.Errorf("AICost() = %+v, want an empty window at now and zero cost", got)
 	}
-}
-
-func TestGitHubReviewQueryCountsWorkOnOtherPeoplesPullRequests(t *testing.T) {
-	db := newFakeDB(t)
-
-	if _, err := newService(t, db.db).GitHub("ABC@arbisoft.com", Period{TimeFrame: "1w"}); err != nil {
-		t.Fatalf("GitHub() error = %v", err)
-	}
-
-	q, ok := findQuery(db.queries, "AS reviews")
-	if !ok {
-		t.Fatal("no query selects the reviews")
-	}
-	sql := q.sel + " FROM " + q.from + " WHERE " + q.where
-	for _, want := range []string{
-		"CASE WHEN pc.type = 'REVIEW' THEN pc.id END) AS reviews",
-		"CASE WHEN pc.type IN ('NORMAL', 'DIFF') THEN pc.id END) AS review_comments",
-		"COUNT(DISTINCT pc.pull_request_id) AS pull_requests_reviewed",
-		"pc.type IN ('REVIEW', 'NORMAL', 'DIFF')",
-		"JOIN pull_requests p ON p.id = pc.pull_request_id",
-		"LEFT JOIN accounts pa ON pa.id = p.author_id",
-		"(pa.email IS NULL OR LOWER(pa.email) <> ?)",
-	} {
-		if !strings.Contains(sql, want) {
-			t.Errorf("query %q doesn't contain %q", sql, want)
-		}
-	}
-	if got := countParam(q.params, "abc@arbisoft.com"); got != 2 {
-		t.Errorf("params = %v hold the lowercased email %d times, want 2", q.params, got)
-	}
-	from := fixedNow.AddDate(0, 0, -7)
-	if !containsParam(q.params, from) || !containsParam(q.params, fixedNow) {
-		t.Errorf("params = %v, want the window %v .. %v", q.params, from, fixedNow)
-	}
-}
-
-func TestGitHubReviewQueryErrorIsWrapped(t *testing.T) {
-	db := dalmocks.NewDal(t)
-	db.On("All", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
-		func(_ interface{}, clauses ...dal.Clause) errors.Error {
-			if strings.Contains(selectText(clauses), "review_comments") {
-				return errors.Default.New("connection refused")
-			}
-			return nil
-		})
-
-	_, err := newService(t, db).GitHub("abc@arbisoft.com", Period{TimeFrame: "1d"})
-
-	if err == nil || !strings.Contains(err.Error(), "read github reviews") {
-		t.Errorf("GitHub() error = %v, want it wrapped with the reviews query", err)
-	}
-}
-
-func TestAIMonthlySelectsSuggestionsAndAcceptances(t *testing.T) {
-	db := newFakeDB(t)
-
-	if _, err := newService(t, db.db).AIUsage("abc@arbisoft.com", Period{TimeFrame: "30d"}); err != nil {
-		t.Fatalf("AIUsage() error = %v", err)
-	}
-
-	q, ok := findQuery(db.queries, "days_active")
-	if !ok {
-		t.Fatal("no monthly query ran")
-	}
-	for _, want := range []string{"SUM(suggestions_count), 0) AS suggestions", "SUM(acceptance_count), 0) AS acceptances"} {
-		if !strings.Contains(q.sel, want) {
-			t.Errorf("monthly select %q doesn't contain %q", q.sel, want)
-		}
-	}
-}
-
-// findQuery returns the first recorded query whose SELECT contains fragment.
-func findQuery(queries []query, fragment string) (query, bool) {
-	for _, q := range queries {
-		if strings.Contains(q.sel, fragment) {
-			return q, true
-		}
-	}
-	return query{}, false
-}
-
-// countParam counts the params equal to want.
-func countParam(params []interface{}, want interface{}) int {
-	n := 0
-	for _, p := range params {
-		if reflect.DeepEqual(p, want) {
-			n++
-		}
-	}
-	return n
-}
-
-// selectText returns the SELECT expression among clauses, or "" without one.
-func selectText(clauses []dal.Clause) string {
-	for _, c := range clauses {
-		if data, ok := c.Data.(dal.DalClause); ok && c.Type == dal.SelectClause {
-			return data.Expr
-		}
-	}
-	return ""
 }

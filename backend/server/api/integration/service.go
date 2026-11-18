@@ -18,14 +18,12 @@ limitations under the License.
 package integration
 
 import (
-	"fmt"
 	"math"
 	"net/mail"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 )
 
@@ -34,21 +32,60 @@ const (
 	maxEmailLength = 320
 	// dayLayout formats the dates the daily AI tables store.
 	dayLayout = "2006-01-02"
+	// monthLayout formats the months the monthly AI rows carry.
+	monthLayout = "2006-01"
 	// zeroCost is the total for an engineer with no AI cost records.
 	zeroCost = "0.00000000"
 )
 
-// rowsReader is the one DAL method the service needs. dal.Dal satisfies it.
-type rowsReader interface {
-	All(dst interface{}, clauses ...dal.Clause) errors.Error
+// activityReader finds when an engineer was first active. ActivityRepository satisfies it.
+type activityReader interface {
+	FirstActivity(email string) (*time.Time, errors.Error)
 }
 
-var _ rowsReader = (dal.Dal)(nil)
+// jiraReader reads Jira issues. JiraRepository satisfies it.
+type jiraReader interface {
+	Assigned(email string, from, to time.Time) (JiraAssignedCounts, errors.Error)
+	Created(email string, from, to time.Time) (int64, errors.Error)
+	ResolvedByType(email string, from, to time.Time) ([]JiraTypeRow, errors.Error)
+	ResolvedByTeam(email string, from, to time.Time) ([]JiraTeamRow, errors.Error)
+}
 
-// StatsService reads an engineer's stats from the domain tables. It is safe for concurrent use.
+// githubReader reads GitHub work. GitHubRepository satisfies it.
+type githubReader interface {
+	Commits(email string, from, to time.Time) (GitHubCommitCounts, errors.Error)
+	Authored(email string, from, to time.Time) (GitHubAuthoredCounts, errors.Error)
+	PullRequestsWithCommits(email string, from, to time.Time) (int64, errors.Error)
+	Reviews(email string, from, to time.Time) (GitHubReviewCounts, errors.Error)
+	CommitsByGroup(email string, from, to time.Time, group GitHubGroup) ([]GitHubCommitGroupRow, errors.Error)
+	PullRequestsByGroup(email string, from, to time.Time, group GitHubGroup) ([]GitHubPullRequestGroupRow, errors.Error)
+}
+
+// aiReader reads AI activity and cost over an inclusive range of days. AIRepository satisfies it.
+type aiReader interface {
+	Providers(email, firstDay, lastDay string) ([]AIProviderRow, errors.Error)
+	ToolDecisions(email, firstDay, lastDay string) (AIToolDecisionCounts, errors.Error)
+	Monthly(email, firstDay, lastDay string) ([]AIMonthlyRow, errors.Error)
+	ModelCosts(email, firstDay, lastDay string) ([]AIModelCostRow, errors.Error)
+	TotalCost(email, firstDay, lastDay string) (string, errors.Error)
+	MonthlyCosts(email, firstDay, lastDay string) ([]AIMonthlyCostRow, errors.Error)
+}
+
+var (
+	_ activityReader = (*ActivityRepository)(nil)
+	_ jiraReader     = (*JiraRepository)(nil)
+	_ githubReader   = (*GitHubRepository)(nil)
+	_ aiReader       = (*AIRepository)(nil)
+)
+
+// StatsService turns an engineer's email and period into stats: it validates the input, resolves the window, reads
+// through the repositories and shapes the response. It is safe for concurrent use.
 type StatsService struct {
-	db  rowsReader
-	now func() time.Time
+	activity activityReader
+	jira     jiraReader
+	github   githubReader
+	ai       aiReader
+	now      func() time.Time
 }
 
 // Option configures a StatsService.
@@ -59,12 +96,12 @@ func WithClock(now func() time.Time) Option {
 	return func(s *StatsService) { s.now = now }
 }
 
-// NewStatsService returns a service that reads through db, which must not be nil.
-func NewStatsService(db rowsReader, opts ...Option) (*StatsService, errors.Error) {
-	if db == nil {
-		return nil, errors.Default.New("stats service: nil db")
+// NewStatsService returns a service that reads through the given repositories, none of which may be nil.
+func NewStatsService(activity activityReader, jira jiraReader, github githubReader, ai aiReader, opts ...Option) (*StatsService, errors.Error) {
+	if activity == nil || jira == nil || github == nil || ai == nil {
+		return nil, errors.Default.New("stats service: nil repository")
 	}
-	s := &StatsService{db: db, now: time.Now}
+	s := &StatsService{activity: activity, jira: jira, github: github, ai: ai, now: time.Now}
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -102,7 +139,7 @@ func (s *StatsService) sinceWindow(email string, p Period) (StatsWindow, errors.
 		return StatsWindow{}, errors.BadInput.New("give one of tf, since, or from and to")
 	}
 	to := s.now().UTC()
-	joined, err := s.joiningDate(email)
+	joined, err := s.activity.FirstActivity(email)
 	if err != nil {
 		return StatsWindow{}, err
 	}
@@ -111,32 +148,6 @@ func (s *StatsService) sinceWindow(email string, p Period) (StatsWindow, errors.
 		from = joined.UTC()
 	}
 	return StatsWindow{Email: email, Since: sinceJoining, From: from, To: to}, nil
-}
-
-// joiningDate returns the earliest Jira, GitHub or AI activity recorded for email, or nil when there is none.
-func (s *StatsService) joiningDate(email string) (*time.Time, errors.Error) {
-	var rows []struct{ Joined *time.Time }
-	if err := s.db.All(&rows,
-		dal.Select("MIN(activity) AS joined"),
-		dal.From(`(
-			SELECT CAST(i.created_date AS DATETIME) AS activity FROM issues i JOIN accounts a ON a.id = i.creator_id
-				WHERE i.id LIKE 'jira:%' AND LOWER(a.email) = ?
-			UNION ALL SELECT CAST(i.created_date AS DATETIME) FROM issues i JOIN accounts a ON a.id = i.assignee_id
-				WHERE i.id LIKE 'jira:%' AND LOWER(a.email) = ?
-			UNION ALL SELECT CAST(c.authored_date AS DATETIME) FROM commits c
-				WHERE LOWER(c.author_email) = ? AND EXISTS (SELECT 1 FROM repo_commits rc WHERE rc.commit_sha = c.sha AND rc.repo_id LIKE 'github:%')
-			UNION ALL SELECT CAST(p.created_date AS DATETIME) FROM pull_requests p JOIN accounts a ON a.id = p.author_id
-				WHERE p.id LIKE 'github:%' AND LOWER(a.email) = ?
-			UNION ALL SELECT CAST(date AS DATETIME) FROM ai_activities WHERE LOWER(user_email) = ?
-			UNION ALL SELECT CAST(date AS DATETIME) FROM ai_model_usages WHERE LOWER(user_email) = ?
-		) activities`, email, email, email, email, email, email),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read the engineer's first activity")
-	}
-	if len(rows) == 0 {
-		return nil, nil
-	}
-	return rows[0].Joined, nil
 }
 
 // normalizeEmail accepts a bare address only and lowercases it, because the stored emails are case-sensitive.
@@ -155,71 +166,33 @@ func (s *StatsService) Jira(email string, p Period) (*JiraStats, errors.Error) {
 	if err != nil {
 		return nil, err
 	}
-	var assigned []struct {
-		IssuesResolved      int64
-		StoryPointsResolved float64
-		IssuesInProgress    int64
-		IssuesTodo          int64
-		AvgResolutionHours  float64
+	assigned, err := s.jira.Assigned(w.Email, w.From, w.To)
+	if err != nil {
+		return nil, err
 	}
-	if err := s.db.All(&assigned,
-		dal.Select(`COALESCE(SUM(i.resolution_date >= ? AND i.resolution_date < ?), 0) AS issues_resolved,
-			COALESCE(SUM(CASE WHEN i.resolution_date >= ? AND i.resolution_date < ? THEN i.story_point END), 0) AS story_points_resolved,
-			COALESCE(SUM(i.status = 'IN_PROGRESS'), 0) AS issues_in_progress,
-			COALESCE(SUM(i.status = 'TODO'), 0) AS issues_todo,
-			COALESCE(AVG(CASE WHEN i.resolution_date >= ? AND i.resolution_date < ? THEN TIMESTAMPDIFF(MINUTE, i.created_date, i.resolution_date) END), 0) / 60 AS avg_resolution_hours`,
-			w.From, w.To, w.From, w.To, w.From, w.To),
-		dal.From("issues i JOIN accounts a ON a.id = i.assignee_id"),
-		dal.Where("i.id LIKE 'jira:%' AND LOWER(a.email) = ?", w.Email),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read jira issues assigned to the engineer")
+	created, err := s.jira.Created(w.Email, w.From, w.To)
+	if err != nil {
+		return nil, err
 	}
-	var created []struct{ IssuesCreated int64 }
-	if err := s.db.All(&created,
-		dal.Select("COUNT(*) AS issues_created"),
-		dal.From("issues i JOIN accounts a ON a.id = i.creator_id"),
-		dal.Where("i.id LIKE 'jira:%' AND LOWER(a.email) = ? AND i.created_date >= ? AND i.created_date < ?", w.Email, w.From, w.To),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read jira issues created by the engineer")
+	byType, err := s.jira.ResolvedByType(w.Email, w.From, w.To)
+	if err != nil {
+		return nil, err
 	}
-	var byType []JiraTypeStats
-	if err := s.db.All(&byType,
-		dal.Select(`COALESCE(NULLIF(i.type, ''), NULLIF(i.original_type, ''), 'UNKNOWN') AS issue_type,
-			COUNT(*) AS resolved_count, COALESCE(SUM(i.story_point), 0) AS points_total`),
-		dal.From("issues i JOIN accounts a ON a.id = i.assignee_id"),
-		dal.Where("i.id LIKE 'jira:%' AND LOWER(a.email) = ? AND i.resolution_date >= ? AND i.resolution_date < ?", w.Email, w.From, w.To),
-		dal.Groupby("issue_type"),
-		dal.Orderby("issue_type"),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read jira issues resolved by type")
+	byTeam, err := s.jira.ResolvedByTeam(w.Email, w.From, w.To)
+	if err != nil {
+		return nil, err
 	}
-	var byTeam []JiraTeamStats
-	if err := s.db.All(&byTeam,
-		dal.Select("t.team AS team, COUNT(*) AS resolved_count, COALESCE(SUM(t.story_point), 0) AS points_total"),
-		// DISTINCT first, because an issue can sit on several boards of the same project.
-		dal.From("(SELECT DISTINCT pm.project_name AS team, i.id, i.story_point FROM issues i"+
-			" JOIN accounts a ON a.id = i.assignee_id JOIN board_issues bi ON bi.issue_id = i.id"+
-			" JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'"+
-			" WHERE i.id LIKE 'jira:%' AND LOWER(a.email) = ? AND i.resolution_date >= ? AND i.resolution_date < ?) t",
-			w.Email, w.From, w.To),
-		dal.Groupby("t.team"),
-		dal.Orderby("t.team"),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read jira issues resolved by team")
-	}
-	// Aggregates return one row; an empty slice (for example from a fake) means zeros.
-	out := &JiraStats{StatsWindow: w, ByType: nonNil(byType), ByTeam: nonNil(byTeam)}
-	if len(assigned) > 0 {
-		out.AvgResolutionHours = assigned[0].AvgResolutionHours
-		out.IssuesResolved = assigned[0].IssuesResolved
-		out.StoryPointsResolved = assigned[0].StoryPointsResolved
-		out.IssuesInProgress = assigned[0].IssuesInProgress
-		out.IssuesTodo = assigned[0].IssuesTodo
-	}
-	if len(created) > 0 {
-		out.IssuesCreated = created[0].IssuesCreated
-	}
-	return out, nil
+	return &JiraStats{
+		StatsWindow:         w,
+		IssuesResolved:      assigned.IssuesResolved,
+		StoryPointsResolved: assigned.StoryPointsResolved,
+		IssuesCreated:       created,
+		IssuesInProgress:    assigned.IssuesInProgress,
+		IssuesTodo:          assigned.IssuesTodo,
+		AvgResolutionHours:  assigned.AvgResolutionHours,
+		ByType:              convert(byType, func(r JiraTypeRow) JiraTypeStats { return JiraTypeStats(r) }),
+		ByTeam:              convert(byTeam, func(r JiraTeamRow) JiraTeamStats { return JiraTeamStats(r) }),
+	}, nil
 }
 
 // GitHub returns the GitHub stats for email over the period.
@@ -228,151 +201,92 @@ func (s *StatsService) GitHub(email string, p Period) (*GitHubStats, errors.Erro
 	if err != nil {
 		return nil, err
 	}
-	var commits []struct{ Commits, Additions, Deletions int64 }
-	if err := s.db.All(&commits,
-		dal.Select("COUNT(*) AS commits, COALESCE(SUM(c.additions), 0) AS additions, COALESCE(SUM(c.deletions), 0) AS deletions"),
-		dal.From("commits c"),
-		dal.Where(`LOWER(c.author_email) = ? AND c.authored_date >= ? AND c.authored_date < ?
-			AND EXISTS (SELECT 1 FROM repo_commits rc WHERE rc.commit_sha = c.sha AND rc.repo_id LIKE 'github:%')`,
-			w.Email, w.From, w.To),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read github commits")
-	}
-	var authored []struct {
-		PullRequestsOpened, PullRequestsMerged int64
-		AvgPrMergeHours                        float64
-	}
-	if err := s.db.All(&authored,
-		dal.Select(`COALESCE(SUM(p.created_date >= ? AND p.created_date < ?), 0) AS pull_requests_opened,
-			COALESCE(SUM(p.merged_date >= ? AND p.merged_date < ?), 0) AS pull_requests_merged,
-			COALESCE(AVG(CASE WHEN p.merged_date >= ? AND p.merged_date < ? THEN TIMESTAMPDIFF(MINUTE, p.created_date, p.merged_date) END), 0) / 60 AS avg_pr_merge_hours`,
-			w.From, w.To, w.From, w.To, w.From, w.To),
-		dal.From("pull_requests p JOIN accounts a ON a.id = p.author_id"),
-		dal.Where("p.id LIKE 'github:%' AND LOWER(a.email) = ?", w.Email),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read github pull requests authored")
-	}
-	var withCommits []struct{ PullRequestsWithCommits int64 }
-	if err := s.db.All(&withCommits,
-		dal.Select("COUNT(DISTINCT prc.pull_request_id) AS pull_requests_with_commits"),
-		dal.From("pull_request_commits prc"),
-		dal.Where(`prc.pull_request_id LIKE 'github:%' AND LOWER(prc.commit_author_email) = ?
-			AND prc.commit_authored_date >= ? AND prc.commit_authored_date < ?`, w.Email, w.From, w.To),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read github pull requests with the engineer's commits")
-	}
-	var reviews []struct{ Reviews, ReviewComments, PullRequestsReviewed int64 }
-	if err := s.db.All(&reviews,
-		dal.Select(`COUNT(DISTINCT CASE WHEN pc.type = 'REVIEW' THEN pc.id END) AS reviews,
-			COUNT(DISTINCT CASE WHEN pc.type IN ('NORMAL', 'DIFF') THEN pc.id END) AS review_comments,
-			COUNT(DISTINCT pc.pull_request_id) AS pull_requests_reviewed`),
-		// Only pull requests someone else authored count: an author's replies in review threads on their own pull
-		// request are stored as reviews too. The author join is a LEFT JOIN so a pull request whose author has no
-		// email still counts: it isn't the engineer's.
-		dal.From(`pull_request_comments pc JOIN accounts a ON a.id = pc.account_id
-			JOIN pull_requests p ON p.id = pc.pull_request_id LEFT JOIN accounts pa ON pa.id = p.author_id`),
-		dal.Where(`pc.id LIKE 'github:%' AND pc.type IN ('REVIEW', 'NORMAL', 'DIFF') AND LOWER(a.email) = ?
-			AND pc.created_date >= ? AND pc.created_date < ? AND (pa.email IS NULL OR LOWER(pa.email) <> ?)`,
-			w.Email, w.From, w.To, w.Email),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read github reviews")
-	}
-	byRepo, err := s.githubBreakdown(w, "r.name", "JOIN repos r ON r.id = %s")
+	commits, err := s.github.Commits(w.Email, w.From, w.To)
 	if err != nil {
 		return nil, err
 	}
-	byTeam, err := s.githubBreakdown(w, "pm.project_name", "JOIN project_mapping pm ON pm.row_id = %s AND pm.`table` = 'repos'")
+	authored, err := s.github.Authored(w.Email, w.From, w.To)
 	if err != nil {
 		return nil, err
 	}
-	out := &GitHubStats{StatsWindow: w, ByRepo: byRepo, ByTeam: byTeam}
-	if len(commits) > 0 {
-		out.Commits, out.Additions, out.Deletions = commits[0].Commits, commits[0].Additions, commits[0].Deletions
+	withCommits, err := s.github.PullRequestsWithCommits(w.Email, w.From, w.To)
+	if err != nil {
+		return nil, err
 	}
-	if len(authored) > 0 {
-		out.PullRequestsOpened, out.PullRequestsMerged = authored[0].PullRequestsOpened, authored[0].PullRequestsMerged
-		out.AvgPrMergeHours = authored[0].AvgPrMergeHours
+	reviews, err := s.github.Reviews(w.Email, w.From, w.To)
+	if err != nil {
+		return nil, err
 	}
-	if len(withCommits) > 0 {
-		out.PullRequestsWithCommits = withCommits[0].PullRequestsWithCommits
+	byRepo, err := s.githubBreakdown(w, GroupByRepo)
+	if err != nil {
+		return nil, err
 	}
-	if len(reviews) > 0 {
-		out.Reviews, out.ReviewComments, out.PullRequestsReviewed = reviews[0].Reviews, reviews[0].ReviewComments, reviews[0].PullRequestsReviewed
+	byTeam, err := s.githubBreakdown(w, GroupByTeam)
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	return &GitHubStats{
+		StatsWindow:             w,
+		Commits:                 commits.Commits,
+		Additions:               commits.Additions,
+		Deletions:               commits.Deletions,
+		PullRequestsOpened:      authored.PullRequestsOpened,
+		PullRequestsMerged:      authored.PullRequestsMerged,
+		PullRequestsWithCommits: withCommits,
+		Reviews:                 reviews.Reviews,
+		ReviewComments:          reviews.ReviewComments,
+		PullRequestsReviewed:    reviews.PullRequestsReviewed,
+		AvgPrMergeHours:         authored.AvgPrMergeHours,
+		ByRepo:                  byRepo,
+		ByTeam:                  byTeam,
+	}, nil
 }
 
-// githubBreakdown splits the engineer's work by group, which is a SQL expression over the repository (r) or project
-// (pm) that joinFormat joins on the repo id it is given. Each group also carries the totals of every contributor, that
-// is every author in commits or pull_requests, so the engineer's share of the group can be worked out. Commits and
-// pull requests are listed once per group even when a project has several repos holding them.
-func (s *StatsService) githubBreakdown(w StatsWindow, group, joinFormat string) ([]GitHubBreakdown, errors.Error) {
-	var commits []struct {
-		Name                               string
-		RepoCommits, RepoLines             int64
-		Contributors, Commits, LineChanged int64
+// githubBreakdown merges the commit and pull request rows of each group into one entry, sorted by name, and works
+// out the engineer's share of each group.
+func (s *StatsService) githubBreakdown(w StatsWindow, group GitHubGroup) ([]GitHubBreakdown, errors.Error) {
+	commits, err := s.github.CommitsByGroup(w.Email, w.From, w.To, group)
+	if err != nil {
+		return nil, err
 	}
-	if err := s.db.All(&commits,
-		dal.Select(`t.name, COUNT(*) AS repo_commits, COALESCE(SUM(t.line_changed), 0) AS repo_lines, COUNT(DISTINCT t.email) AS contributors,
-			COALESCE(SUM(t.email = ?), 0) AS commits, COALESCE(SUM(CASE WHEN t.email = ? THEN t.line_changed END), 0) AS line_changed`, w.Email, w.Email),
-		dal.From("(SELECT DISTINCT "+group+" AS name, c.sha, LOWER(c.author_email) AS email,"+
-			" COALESCE(c.additions, 0) + COALESCE(c.deletions, 0) AS line_changed"+
-			" FROM commits c JOIN repo_commits rc ON rc.commit_sha = c.sha "+fmt.Sprintf(joinFormat, "rc.repo_id")+
-			" WHERE rc.repo_id LIKE 'github:%' AND c.authored_date >= ? AND c.authored_date < ?) t", w.From, w.To),
-		dal.Groupby("t.name"),
-		dal.Having("SUM(t.email = ?) > 0", w.Email),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read github commits by group")
+	prs, err := s.github.PullRequestsByGroup(w.Email, w.From, w.To, group)
+	if err != nil {
+		return nil, err
 	}
-	var prs []struct {
-		Name                   string
-		RepoOpened, RepoMerged int64
-		Opened, Merged         int64
-	}
-	if err := s.db.All(&prs,
-		dal.Select(`t.name, COALESCE(SUM(t.opened), 0) AS repo_opened, COALESCE(SUM(t.merged), 0) AS repo_merged,
-			COALESCE(SUM(t.opened AND t.email = ?), 0) AS opened, COALESCE(SUM(t.merged AND t.email = ?), 0) AS merged`, w.Email, w.Email),
-		// A pull request counts for its author whatever the email, so the totals include accounts that hide theirs.
-		dal.From("(SELECT DISTINCT "+group+" AS name, p.id, LOWER(a.email) AS email,"+
-			" (p.created_date >= ? AND p.created_date < ?) AS opened, (p.merged_date >= ? AND p.merged_date < ?) AS merged"+
-			" FROM pull_requests p LEFT JOIN accounts a ON a.id = p.author_id "+fmt.Sprintf(joinFormat, "p.base_repo_id")+
-			" WHERE p.id LIKE 'github:%') t", w.From, w.To, w.From, w.To),
-		dal.Groupby("t.name"),
-		dal.Having("SUM((t.opened OR t.merged) AND t.email = ?) > 0", w.Email),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read github pull requests by group")
-	}
-	byName := map[string]*GitHubBreakdown{}
-	var names []string
+	return mergeBreakdown(commits, prs), nil
+}
+
+// mergeBreakdown joins commit and pull request rows on the group name. A group with only one kind of work gets
+// zeros for the other.
+func mergeBreakdown(commits []GitHubCommitGroupRow, prs []GitHubPullRequestGroupRow) []GitHubBreakdown {
+	byName := make(map[string]*GitHubBreakdown, len(commits)+len(prs))
 	row := func(name string) *GitHubBreakdown {
 		if r, ok := byName[name]; ok {
 			return r
 		}
 		r := &GitHubBreakdown{Name: name}
 		byName[name] = r
-		names = append(names, name)
 		return r
 	}
 	for _, c := range commits {
 		r := row(c.Name)
-		r.Commits, r.LinesChanged = c.Commits, c.LineChanged
+		r.Commits, r.LinesChanged = c.EngineerCommits, c.EngineerLines
 		r.RepoCommits, r.RepoLinesChanged, r.Contributors = c.RepoCommits, c.RepoLines, c.Contributors
 	}
 	for _, p := range prs {
 		r := row(p.Name)
-		r.PullRequestsOpened, r.PullRequestsMerged = p.Opened, p.Merged
+		r.PullRequestsOpened, r.PullRequestsMerged = p.EngineerOpened, p.EngineerMerged
 		r.RepoPullRequestsMerged = p.RepoMerged
 	}
-	sort.Strings(names)
-	out := make([]GitHubBreakdown, 0, len(names))
-	for _, name := range names {
-		r := byName[name]
+	out := make([]GitHubBreakdown, 0, len(byName))
+	for _, r := range byName {
 		r.CommitSharePct = sharePct(r.Commits, r.RepoCommits)
 		r.LinesSharePct = sharePct(r.LinesChanged, r.RepoLinesChanged)
 		r.PullRequestsMergedSharePct = sharePct(r.PullRequestsMerged, r.RepoPullRequestsMerged)
 		out = append(out, *r)
 	}
-	return out, nil
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 // sharePct returns part as a percentage of total with one decimal, or 0 when total is 0.
@@ -383,12 +297,13 @@ func sharePct(part, total int64) float64 {
 	return math.Round(float64(part)*1000/float64(total)) / 10
 }
 
-// nonNil returns rows, or an empty slice so the JSON is [] and never null.
-func nonNil[T any](rows []T) []T {
-	if rows == nil {
-		return []T{}
+// convert maps rows with to, returning an empty slice for none so the JSON is [] and never null.
+func convert[R, D any](rows []R, to func(R) D) []D {
+	out := make([]D, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, to(r))
 	}
-	return rows
+	return out
 }
 
 // days returns the inclusive day range the daily AI tables use for the window.
@@ -402,75 +317,35 @@ func (s *StatsService) AIUsage(email string, p Period) (*AIUsageStats, errors.Er
 	if err != nil {
 		return nil, err
 	}
-	first, last := days(w)
-	var providers []AIProviderUsage
-	if err := s.db.All(&providers,
-		dal.Select(`provider, COUNT(DISTINCT date) AS active_days, COALESCE(SUM(num_sessions), 0) AS sessions,
-			COALESCE(SUM(suggestions_count), 0) AS suggestions, COALESCE(SUM(acceptance_count), 0) AS acceptances,
-			COALESCE(SUM(lines_added), 0) AS lines_added, COALESCE(SUM(lines_removed), 0) AS lines_removed,
-			COALESCE(SUM(commits_created), 0) AS commits_by_ai, COALESCE(SUM(prs_created), 0) AS pull_requests`),
-		dal.From("ai_activities"),
-		dal.Where("LOWER(user_email) = ? AND date >= ? AND date <= ?", w.Email, first, last),
-		dal.Groupby("provider"),
-		dal.Orderby("provider"),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read ai activities")
+	firstDay, lastDay := days(w)
+	providers, err := s.ai.Providers(w.Email, firstDay, lastDay)
+	if err != nil {
+		return nil, err
 	}
-	var decisions []struct{ ToolEditsAccepted, ToolEditsRejected int64 }
-	if err := s.db.All(&decisions,
-		dal.Select("COALESCE(SUM(accepted_count), 0) AS tool_edits_accepted, COALESCE(SUM(rejected_count), 0) AS tool_edits_rejected"),
-		dal.From("ai_tool_decisions"),
-		dal.Where("LOWER(user_email) = ? AND date >= ? AND date <= ?", w.Email, first, last),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read ai tool decisions")
+	decisions, err := s.ai.ToolDecisions(w.Email, firstDay, lastDay)
+	if err != nil {
+		return nil, err
 	}
-	var monthly []AIMonthlyUsage
-	if err := s.db.All(&monthly,
-		dal.Select(`provider, DATE_FORMAT(date, '%Y-%m') AS month, COUNT(DISTINCT date) AS days_active,
-			COALESCE(SUM(num_sessions), 0) AS sessions, COALESCE(SUM(suggestions_count), 0) AS suggestions,
-			COALESCE(SUM(acceptance_count), 0) AS acceptances`),
-		dal.From("ai_activities"),
-		dal.Where("LOWER(user_email) = ? AND date >= ? AND date <= ?", w.Email, first, last),
-		dal.Groupby("provider, month"),
-		dal.Orderby("month, provider"),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read ai monthly activity")
+	monthly, err := s.ai.Monthly(w.Email, firstDay, lastDay)
+	if err != nil {
+		return nil, err
 	}
-	out := &AIUsageStats{StatsWindow: w, Providers: nonNil(providers), Monthly: nonNil(monthly)}
-	lastMonth := w.To.Format("2006-01")
+	out := &AIUsageStats{
+		StatsWindow:       w,
+		Providers:         convert(providers, func(r AIProviderRow) AIProviderUsage { return AIProviderUsage(r) }),
+		ToolEditsAccepted: decisions.ToolEditsAccepted,
+		ToolEditsRejected: decisions.ToolEditsRejected,
+		Monthly:           convert(monthly, func(r AIMonthlyRow) AIMonthlyUsage { return AIMonthlyUsage(r) }),
+	}
+	lastMonth := w.To.Format(monthLayout)
 	for _, m := range out.Monthly {
 		if m.Month == lastMonth {
 			out.ActiveInLastMonth = true
+			break
 		}
-	}
-	if len(decisions) > 0 {
-		out.ToolEditsAccepted, out.ToolEditsRejected = decisions[0].ToolEditsAccepted, decisions[0].ToolEditsRejected
 	}
 	return out, nil
 }
-
-// aiCostRows is the per-model union both cost queries read: Claude from model usage records, and every other
-// provider from daily activity, which is where Cursor reports cost. Claude activity rows carry no cost, so
-// skipping them avoids counting anything twice. Costs are summed as DECIMAL so no float rounding reaches the API.
-const aiCostRows = `(
-	SELECT provider, model, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
-		SUM(cache_read_tokens) AS cache_read_tokens, SUM(cache_creation_tokens) AS cache_creation_tokens,
-		SUM(estimated_cost_usd) AS cost
-	FROM ai_model_usages WHERE LOWER(user_email) = ? AND date >= ? AND date <= ? GROUP BY provider, model
-	UNION ALL
-	SELECT provider, model, SUM(input_tokens), SUM(output_tokens), 0, 0, SUM(CAST(estimated_cost_usd AS DECIMAL(20,8)))
-	FROM ai_activities WHERE provider <> 'claude' AND LOWER(user_email) = ? AND date >= ? AND date <= ? GROUP BY provider, model
-) costs`
-
-// aiMonthlyCostRows is aiCostRows per UTC month instead of per model.
-const aiMonthlyCostRows = `(
-	SELECT DATE_FORMAT(date, '%Y-%m') AS month, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
-		SUM(estimated_cost_usd) AS cost
-	FROM ai_model_usages WHERE LOWER(user_email) = ? AND date >= ? AND date <= ? GROUP BY month
-	UNION ALL
-	SELECT DATE_FORMAT(date, '%Y-%m'), SUM(input_tokens), SUM(output_tokens), SUM(CAST(estimated_cost_usd AS DECIMAL(20,8)))
-	FROM ai_activities WHERE provider <> 'claude' AND LOWER(user_email) = ? AND date >= ? AND date <= ? GROUP BY DATE_FORMAT(date, '%Y-%m')
-) costs`
 
 // AICost returns the AI cost stats for email over the period, at day granularity.
 func (s *StatsService) AICost(email string, p Period) (*AICostStats, errors.Error) {
@@ -478,39 +353,26 @@ func (s *StatsService) AICost(email string, p Period) (*AICostStats, errors.Erro
 	if err != nil {
 		return nil, err
 	}
-	first, last := days(w)
-	params := []interface{}{w.Email, first, last, w.Email, first, last}
-	var models []AIModelCost
-	if err := s.db.All(&models,
-		dal.Select(`provider, model, COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(output_tokens), 0) AS output_tokens,
-			COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens, COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
-			CAST(CAST(COALESCE(SUM(cost), 0) AS DECIMAL(20,8)) AS CHAR) AS estimated_cost_usd`),
-		dal.From(aiCostRows, params...),
-		dal.Groupby("provider, model"),
-		dal.Orderby("provider, model"),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read ai model costs")
+	firstDay, lastDay := days(w)
+	models, err := s.ai.ModelCosts(w.Email, firstDay, lastDay)
+	if err != nil {
+		return nil, err
 	}
-	var total []struct{ TotalEstimatedCostUsd string }
-	if err := s.db.All(&total,
-		dal.Select("CAST(CAST(COALESCE(SUM(cost), 0) AS DECIMAL(20,8)) AS CHAR) AS total_estimated_cost_usd"),
-		dal.From(aiCostRows, params...),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read ai total cost")
+	total, err := s.ai.TotalCost(w.Email, firstDay, lastDay)
+	if err != nil {
+		return nil, err
 	}
-	var monthly []AIMonthlyCost
-	if err := s.db.All(&monthly,
-		dal.Select(`month, COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(output_tokens), 0) AS output_tokens,
-			CAST(CAST(COALESCE(SUM(cost), 0) AS DECIMAL(20,8)) AS CHAR) AS cost_usd`),
-		dal.From(aiMonthlyCostRows, params...),
-		dal.Groupby("month"),
-		dal.Orderby("month"),
-	); err != nil {
-		return nil, errors.Default.Wrap(err, "read ai monthly costs")
+	monthly, err := s.ai.MonthlyCosts(w.Email, firstDay, lastDay)
+	if err != nil {
+		return nil, err
 	}
-	out := &AICostStats{StatsWindow: w, Models: nonNil(models), Monthly: nonNil(monthly), TotalEstimatedCostUSD: zeroCost}
-	if len(total) > 0 && total[0].TotalEstimatedCostUsd != "" {
-		out.TotalEstimatedCostUSD = total[0].TotalEstimatedCostUsd
+	if total == "" {
+		total = zeroCost
 	}
-	return out, nil
+	return &AICostStats{
+		StatsWindow:           w,
+		Models:                convert(models, func(r AIModelCostRow) AIModelCost { return AIModelCost(r) }),
+		TotalEstimatedCostUSD: total,
+		Monthly:               convert(monthly, func(r AIMonthlyCostRow) AIMonthlyCost { return AIMonthlyCost(r) }),
+	}, nil
 }
