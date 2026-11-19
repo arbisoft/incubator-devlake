@@ -161,5 +161,7 @@ func All() []plugin.MigrationScript {
 		new(addAiPromptFailures),
 		new(addAiPromptFailuresPromptIndex),
 		new(addAiPromptToolsAndSessionHooks),
+		new(addAiCommits),
+		new(addDashboardDateIndexes),
 	}
 }

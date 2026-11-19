@@ -292,6 +292,8 @@ var storedEventAttributes = map[string]struct{}{
 	// Repository identity under OTEL_METRICS_INCLUDE_REPOSITORY, from the origin remote with
 	// credentials stripped.
 	repositoryURLAttribute: {}, "vcs.owner.name": {}, "vcs.repository.name": {}, "vcs.provider.name": {},
+	// Git head of the checkout, reported on tool_result after a commit.
+	headRevisionAttribute: {}, headNameAttribute: {}, "vcs.ref.head.type": {},
 	// user_prompt.
 	"prompt_length": {}, "command_name": {}, "command_source": {},
 	// api_request and api_error; error is kept only as a service message, and effort is the request's reasoning effort level.
