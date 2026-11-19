@@ -90,25 +90,6 @@
         }
       },
       {
-        "kind": "CustomVariable",
-        "spec": {
-          "name": "grouping",
-          "label": "Group by",
-          "current": {
-            "text": "Label",
-            "value": "Label"
-          },
-          "hide": "dontHide",
-          "skipUrlSync": false,
-          "query": "Label,Board,Milestone,Epic",
-          "valuesFormat": "csv",
-          "options": [],
-          "multi": false,
-          "includeAll": false,
-          "allowCustomValue": false
-        }
-      },
-      {
         "kind": "QueryVariable",
         "spec": {
           "name": "n_prs",
@@ -7931,7 +7912,28 @@
                               }
                             ]
                           }
-                        }
+                        },
+                        "variables": [
+                          {
+                            "kind": "CustomVariable",
+                            "spec": {
+                              "name": "grouping",
+                              "label": "Group by",
+                              "current": {
+                                "text": "Label",
+                                "value": "Label"
+                              },
+                              "hide": "dontHide",
+                              "skipUrlSync": false,
+                              "query": "Label,Board,Milestone,Epic",
+                              "valuesFormat": "csv",
+                              "options": [],
+                              "multi": false,
+                              "includeAll": false,
+                              "allowCustomValue": false
+                            }
+                          }
+                        ]
                       }
                     },
                     {
