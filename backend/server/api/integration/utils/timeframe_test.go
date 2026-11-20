@@ -94,17 +94,34 @@ func TestPeriodResolve(t *testing.T) {
 			t.Errorf("got (%v, %v, %q, %v)", from, to, tf, err)
 		}
 	})
+	t.Run("a year across February 29 is allowed", func(t *testing.T) {
+		leap := time.Date(2028, 3, 1, 0, 0, 0, 0, time.UTC)
+		from, _, _, err := Period{TimeFrame: "1y"}.Resolve(leap)
+		if err != nil || !from.Equal(time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC)) {
+			t.Errorf("got (%v, %v), want a 366-day window", from, err)
+		}
+	})
+	t.Run("tf drops fractions of a second", func(t *testing.T) {
+		from, to, _, err := Period{TimeFrame: "24h"}.Resolve(now.Add(123456789 * time.Nanosecond))
+		if err != nil || !to.Equal(now) || !from.Equal(now.Add(-24*time.Hour)) {
+			t.Errorf("got (%v, %v, %v), want whole seconds", from, to, err)
+		}
+	})
 	rejects := map[string]Period{
-		"nothing given":        {},
-		"tf and range":         {TimeFrame: "1w", From: "2026-11-01T00:00:00Z", To: "2026-11-08T00:00:00Z"},
-		"only from":            {From: "2026-11-01T00:00:00Z"},
-		"only to":              {To: "2026-11-08T00:00:00Z"},
-		"no offset":            {From: "2026-11-01T00:00:00", To: "2026-11-08T00:00:00Z"},
-		"date only":            {From: "2026-11-01", To: "2026-11-08"},
-		"to before from":       {From: "2026-11-08T00:00:00Z", To: "2026-11-01T00:00:00Z"},
-		"equal ends":           {From: "2026-11-01T00:00:00Z", To: "2026-11-01T00:00:00Z"},
-		"longer than one year": {From: "2025-01-01T00:00:00Z", To: "2026-11-01T00:00:00Z"},
-		"bad tf":               {TimeFrame: "1D"},
+		"nothing given":         {},
+		"tf and range":          {TimeFrame: "1w", From: "2026-11-01T00:00:00Z", To: "2026-11-08T00:00:00Z"},
+		"only from":             {From: "2026-11-01T00:00:00Z"},
+		"only to":               {To: "2026-11-08T00:00:00Z"},
+		"no offset":             {From: "2026-11-01T00:00:00", To: "2026-11-08T00:00:00Z"},
+		"date only":             {From: "2026-11-01", To: "2026-11-08"},
+		"to before from":        {From: "2026-11-08T00:00:00Z", To: "2026-11-01T00:00:00Z"},
+		"equal ends":            {From: "2026-11-01T00:00:00Z", To: "2026-11-01T00:00:00Z"},
+		"longer than one year":  {From: "2025-01-01T00:00:00Z", To: "2026-11-01T00:00:00Z"},
+		"bad tf":                {TimeFrame: "1D"},
+		"tf longer than a year": {TimeFrame: "999y"},
+		"tf of 2y":              {TimeFrame: "2y"},
+		"tf of 13M":             {TimeFrame: "13M"},
+		"tf of 367d":            {TimeFrame: "367d"},
 	}
 	for name, p := range rejects {
 		t.Run(name, func(t *testing.T) {

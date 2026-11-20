@@ -52,9 +52,9 @@ func ParseTimeFrame(value string) (TimeFrame, errors.Error) {
 // String returns the time frame as it was given, for example "24h".
 func (tf TimeFrame) String() string { return tf.raw }
 
-// Window returns the half-open interval [from, to) that ends at now, in UTC.
+// Window returns the half-open interval [from, to) that ends at now, in UTC and whole seconds like an explicit range.
 func (tf TimeFrame) Window(now time.Time) (from, to time.Time) {
-	to = now.UTC()
+	to = now.UTC().Truncate(time.Second)
 	switch tf.unit {
 	case 'h':
 		from = to.Add(-time.Duration(tf.amount) * time.Hour)
@@ -70,7 +70,8 @@ func (tf TimeFrame) Window(now time.Time) (from, to time.Time) {
 	return from, to
 }
 
-// MaxRange is the longest explicit range, the same limit the Integration Service applies.
+// MaxRange is the longest window, explicit or from tf. The Integration Service caps its ranges at 365 days, but a year
+// that includes February 29 is 366 days long, and the Integration Service's own 1y windows must pass.
 const MaxRange = 366 * 24 * time.Hour
 
 // Period is what the caller asked for: a time frame counted back from now, an explicit range, or everything since the
@@ -97,6 +98,9 @@ func (p Period) Resolve(now time.Time) (from, to time.Time, timeFrame string, er
 			return time.Time{}, time.Time{}, "", err
 		}
 		from, to = tf.Window(now)
+		if to.Sub(from) > MaxRange {
+			return time.Time{}, time.Time{}, "", errors.BadInput.New("tf can be at most one year, for example 1y, 12M or 365d")
+		}
 		return from, to, tf.String(), nil
 	case hasRange:
 		from, to, err = parseRange(p.From, p.To)
