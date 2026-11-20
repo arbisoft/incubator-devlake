@@ -69,6 +69,10 @@ type AIMonthlyCostRow struct {
 	CostUSD      string `gorm:"column:cost_usd"`
 }
 
+// Only the claude_otel plugin writes ai_model_usages and ai_tool_decisions, and it lowercases every email, so their
+// queries compare user_email as it is and can use its index. Several plugins write ai_activities without lowercasing,
+// so its queries compare LOWER(user_email). The column has no index there.
+
 // aiActivityWhere picks email's code edit activity over the days. Codex also stores code reviews and the reactions to
 // them in ai_activities, and those aren't the engineer's suggestions or acceptances. Every provider stores its edits
 // as CODE_EDIT.
@@ -95,7 +99,7 @@ const aiCostRows = `(
 		SUM(cache_creation_tokens) AS cache_creation_tokens,
 		SUM(estimated_cost_usd) AS cost
 	FROM ai_model_usages
-	WHERE LOWER(user_email) = ?
+	WHERE user_email = ?
 		AND date >= ?
 		AND date < ?
 	GROUP BY provider, model
@@ -121,7 +125,7 @@ const aiMonthlyCostRows = `(
 		SUM(output_tokens) AS output_tokens,
 		SUM(estimated_cost_usd) AS cost
 	FROM ai_model_usages
-	WHERE LOWER(user_email) = ?
+	WHERE user_email = ?
 		AND date >= ?
 		AND date < ?
 	GROUP BY month
@@ -183,7 +187,7 @@ func (r *AI) ToolDecisions(email, fromDay, toDay string) (AIToolDecisionCounts, 
 		dal.Select("COALESCE(SUM(accepted_count), 0) AS tool_edits_accepted, "+
 			"COALESCE(SUM(rejected_count), 0) AS tool_edits_rejected"),
 		dal.From("ai_tool_decisions"),
-		dal.Where("LOWER(user_email) = ? "+
+		dal.Where("user_email = ? "+
 			"AND date >= ? "+
 			"AND date < ?", email, fromDay, toDay),
 	); err != nil {
