@@ -37,7 +37,7 @@ type StatsWindow struct {
 // an engineer whose account has none gets zero counts.
 type JiraStats struct {
 	StatsWindow
-	// IssuesResolved counts issues assigned to the engineer and resolved in the window.
+	// IssuesResolved counts issues assigned to the engineer, resolved in the window and still DONE.
 	IssuesResolved int64 `json:"issuesResolved"`
 	// StoryPointsResolved sums the story points of those resolved issues.
 	StoryPointsResolved float64 `json:"storyPointsResolved"`

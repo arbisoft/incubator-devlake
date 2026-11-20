@@ -25,6 +25,7 @@ import (
 
 	"github.com/apache/incubator-devlake/core/config"
 	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/code"
@@ -293,5 +294,38 @@ func TestAIModelCostsLeavesOutEmptyModelsOnMySQL(t *testing.T) {
 	want := []AIModelCostRow{{Provider: "cursor", Model: "gpt-5", InputTokens: 1000, EstimatedCostUSD: "0.25000000"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ModelCosts() = %+v, want %+v", got, want)
+	}
+}
+
+func TestResolvedIssuesMustBeDoneOnMySQL(t *testing.T) {
+	tx := testTx(t)
+	const p = "jira:IntegrationRepoTest:"
+	created, resolved := day("2026-11-01"), day("2026-11-05")
+	points := 3.0
+	issue := func(id, status string) *ticket.Issue {
+		return &ticket.Issue{DomainEntity: entity(p + id), AssigneeId: p + "user", Status: status, CreatedDate: &created,
+			ResolutionDate: &resolved, StoryPoint: &points, Type: "BUG"}
+	}
+	insert(t, tx,
+		&crossdomain.Account{DomainEntity: entity(p + "user"), Email: dbTestUser},
+		issue("done", "DONE"),
+		issue("reopened", "IN_PROGRESS"), // reopened, but it kept its resolution date
+	)
+	r := mustRepo(t, func(db rowsReader) (*Issues, errors.Error) { return NewIssues(db, SourceJira) }, rowsReader(tx))
+	from, to := day("2026-11-01"), day("2026-11-10")
+
+	assigned, err := r.Assigned(dbTestUser, from, to)
+	if err != nil {
+		t.Fatalf("Assigned() error = %v", err)
+	}
+	if assigned.IssuesResolved != 1 || assigned.StoryPointsResolved != 3 || assigned.IssuesInProgress != 1 {
+		t.Errorf("Assigned() = %+v, want 1 resolved with 3 points and 1 in progress", assigned)
+	}
+	byType, err := r.ResolvedByType(dbTestUser, from, to)
+	if err != nil {
+		t.Fatalf("ResolvedByType() error = %v", err)
+	}
+	if want := []IssueTypeRow{{IssueType: "BUG", IssuesResolved: 1, StoryPoints: 3}}; !reflect.DeepEqual(byType, want) {
+		t.Errorf("ResolvedByType() = %+v, want %+v", byType, want)
 	}
 }

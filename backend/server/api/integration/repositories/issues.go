@@ -26,7 +26,7 @@ import (
 
 // AssignedCounts summarizes the issues assigned to an engineer.
 type AssignedCounts struct {
-	// IssuesResolved, StoryPointsResolved and AvgResolutionHours cover the issues resolved in the window.
+	// IssuesResolved, StoryPointsResolved and AvgResolutionHours cover the issues resolved in the window and DONE now.
 	IssuesResolved      int64
 	StoryPointsResolved float64
 	AvgResolutionHours  float64
@@ -48,6 +48,11 @@ type IssueTeamRow struct {
 	IssuesResolved int64   `gorm:"column:resolved_count"`
 	StoryPoints    float64 `gorm:"column:points_total"`
 }
+
+// resolvedIn picks the issues resolved in the window [?, ?). An issue counts only while it is DONE: one reopened after
+// it was resolved keeps its resolution date, but it is open again. A DONE issue with no resolution date can't be placed
+// in a window, so it doesn't count.
+const resolvedIn = "(i.status = 'DONE' AND i.resolution_date >= ? AND i.resolution_date < ?)"
 
 // Issues reads one issue tracker's issues from the domain tables: the issues whose ids start with its source, such
 // as jira. It is safe for concurrent use.
@@ -74,13 +79,13 @@ func NewIssues(db rowsReader, source string) (*Issues, errors.Error) {
 func (r *Issues) Assigned(email string, from, to time.Time) (AssignedCounts, errors.Error) {
 	var rows []AssignedCounts
 	if err := r.db.All(&rows,
-		dal.Select(`COALESCE(SUM(i.resolution_date >= ? AND i.resolution_date < ?), 0) AS issues_resolved,
-			COALESCE(SUM(CASE WHEN i.resolution_date >= ? AND i.resolution_date < ?
+		dal.Select(`COALESCE(SUM(`+resolvedIn+`), 0) AS issues_resolved,
+			COALESCE(SUM(CASE WHEN `+resolvedIn+`
 				THEN i.story_point END), 0) AS story_points_resolved,
 			COALESCE(SUM(i.status = 'IN_PROGRESS'), 0) AS issues_in_progress,
 			COALESCE(SUM(i.status = 'TODO'), 0) AS issues_todo,
 			COALESCE(
-				AVG(CASE WHEN i.resolution_date >= ? AND i.resolution_date < ?
+				AVG(CASE WHEN `+resolvedIn+`
 				THEN TIMESTAMPDIFF(MINUTE, i.created_date, i.resolution_date) END), 0
 				) / 60 AS avg_resolution_hours`,
 			from, to, from, to, from, to),
@@ -121,8 +126,7 @@ func (r *Issues) ResolvedByType(email string, from, to time.Time) ([]IssueTypeRo
 		dal.From("issues i JOIN accounts a ON a.id = i.assignee_id"),
 		dal.Where("i.id LIKE ? "+
 			"AND LOWER(a.email) = ? "+
-			"AND i.resolution_date >= ? "+
-			"AND i.resolution_date < ?", r.idLike, email, from, to),
+			"AND "+resolvedIn, r.idLike, email, from, to),
 		dal.Groupby("issue_type"),
 		dal.Orderby("issue_type"),
 	); err != nil {
@@ -145,7 +149,7 @@ func (r *Issues) ResolvedByTeam(email string, from, to time.Time) ([]IssueTeamRo
 			" JOIN accounts a ON a.id = i.assignee_id"+
 			" JOIN board_issues bi ON bi.issue_id = i.id"+
 			" JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'"+
-			" WHERE i.id LIKE ? AND LOWER(a.email) = ? AND i.resolution_date >= ? AND i.resolution_date < ?) t",
+			" WHERE i.id LIKE ? AND LOWER(a.email) = ? AND "+resolvedIn+") t",
 			r.idLike, email, from, to),
 		dal.Groupby("t.team"),
 		dal.Orderby("t.team"),
