@@ -211,9 +211,9 @@ func CheckAuthorizationHeader(c *gin.Context, logger log.Logger, db dal.Dal, api
 		})
 		return false
 	}
-	matched, matchErr := regexp.MatchString(apiKey.AllowedPath, path)
+	matched, matchErr := pathAllowed(apiKey.AllowedPath, path)
 	if matchErr != nil {
-		logger.Error(err, "regexp match path error")
+		logger.Error(matchErr, "regexp match path error")
 		c.Abort()
 		c.JSON(http.StatusInternalServerError, &apiBody{
 			Success: false,
@@ -247,4 +247,10 @@ func CheckAuthorizationHeader(c *gin.Context, logger log.Logger, db dal.Dal, api
 	// resetting c.Keys when rerouting from /rest/... to /plugins/...
 	c.Request = shared.SetRestAuthUser(c.Request, user)
 	return true
+}
+
+// pathAllowed reports whether an API key's allowed path covers the whole of path. The pattern is anchored at both
+// ends, so a pattern such as "/stats/.+" can't also match "/x/stats/y", and "^/(is_valid|stats/.+)$" works as written.
+func pathAllowed(allowedPath, path string) (bool, error) {
+	return regexp.MatchString("^(?:"+allowedPath+")$", path)
 }
