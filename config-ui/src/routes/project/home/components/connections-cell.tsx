@@ -36,9 +36,9 @@ export const ConnectionsCell = ({ entries, buttonRef }: ConnectionsCellProps) =>
     <Popover trigger={POPOVER_TRIGGERS} content={<ConnectionsPopover details={details} />}>
       <TriggerButton type="button" ref={buttonRef} aria-label={COPY.connectionsLabel(details.map(({ name }) => name))}>
         <IconRow aria-hidden>
-          {visible.map(({ key, icon }) => (
+          {visible.map(({ key, icon, logo }) => (
             <IconLabel key={key}>
-              <PluginIcon icon={icon} size="sm" />
+              <PluginIcon icon={icon} size="sm" logo={logo} />
             </IconLabel>
           ))}
           {hidden.length > 0 && <MoreCount>{COPY.moreConnections(hidden.length)}</MoreCount>}

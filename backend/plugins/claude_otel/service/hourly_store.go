@@ -50,8 +50,14 @@ func (c *rawConverter) applyHourlyUpdates(tx dal.Transaction, updates []factUpda
 		if err != nil {
 			return err
 		}
-		if err := upsertHourlyFact(tx, update, value, update.observedAt); err != nil {
-			return classifyStorageError(fmt.Errorf("write hourly Claude Code OTel facts: %w", err))
+		for _, fact := range pointFacts(update) {
+			// An unchanged cumulative session count starts no session.
+			if fact.fact == hourlySessionStartFact && value.value.Sign() == 0 {
+				continue
+			}
+			if err := upsertHourlyFact(tx, fact, value, fact.observedAt); err != nil {
+				return classifyStorageError(fmt.Errorf("write hourly Claude Code OTel facts: %w", err))
+			}
 		}
 	}
 	return nil
@@ -193,9 +199,11 @@ func upsertHourlyFact(tx dal.Transaction, update factUpdate, value metricNumber,
 func hourlyFactTarget(update factUpdate) (string, []string, []interface{}) {
 	switch update.fact {
 	case hourlyModelUsageFact:
-		return models.OtelHourlyModelUsageTable, []string{"model", "query_source"}, []interface{}{update.model, update.query}
+		return models.OtelHourlyModelUsageTable, []string{"model", "query_source", "effort", "agent_name", "skill_name"}, []interface{}{update.model, update.query, update.effort, update.agent, update.skill}
 	case hourlyToolUsageFact:
-		return models.OtelHourlyToolUsageTable, []string{"tool_name", "language"}, []interface{}{update.tool, update.language}
+		return models.OtelHourlyToolUsageTable, []string{"tool_name", "language", "decision_source"}, []interface{}{update.tool, update.language, update.decisionSource}
+	case hourlySessionStartFact:
+		return models.OtelHourlySessionStartsTable, []string{"session_id", "start_type"}, []interface{}{update.sessionID, update.startType}
 	default:
 		return models.OtelHourlyActivityTable, nil, nil
 	}

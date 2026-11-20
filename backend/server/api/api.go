@@ -77,6 +77,10 @@ func InjectCustomService(pipelineNotifier services.PipelineNotificationService, 
 // @license.name Apache-2.0
 // @host localhost:8080
 // @BasePath /
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
+// @description A DevLake API key as "Bearer <API key>". Routes that need it are called under /rest/...
 func CreateAndRunApiServer() {
 	// Setup and run the server
 	Init()

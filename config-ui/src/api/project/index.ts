@@ -21,11 +21,18 @@ import type { IProject } from '@/types';
 import { request } from '@/utils';
 
 import type { KeywordParams, SortParams } from '../types';
+import { toSearchParams } from '../utils';
 
-export type ListParams = Pagination & KeywordParams & SortParams<'name' | 'createdAt' | 'lastRunAt'>;
+export type ListParams = Pagination &
+  KeywordParams &
+  SortParams<'name' | 'createdAt' | 'lastRunAt'> & {
+    connection?: string[];
+    lastRunStatus?: string[];
+    namesOnly?: boolean;
+  };
 
 export const list = (data: ListParams, signal?: AbortSignal): Promise<{ count: number; projects: IProject[] }> =>
-  request('/projects', { data, signal });
+  request('/projects', { data: toSearchParams(data), signal });
 
 export const get = (name: string, signal?: AbortSignal): Promise<IProject> =>
   request(`/projects/${encodeName(name)}`, { signal });

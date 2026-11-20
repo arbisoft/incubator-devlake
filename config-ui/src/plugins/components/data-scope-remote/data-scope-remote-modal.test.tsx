@@ -31,7 +31,7 @@ vi.mock('antd', async (importOriginal) =>
 );
 
 vi.mock('@/api', () => ({ default: { scope: { batch: vi.fn() } } }));
-vi.mock('@/plugins/utils', () => ({ getPluginConfig: () => ({ icon: () => null }) }));
+vi.mock('@/plugins/utils', () => ({ getConnectorVisual: () => ({ icon: () => null }) }));
 
 vi.mock('./data-scope-remote', () => ({
   DataScopeRemote: ({ onChangeSelectedScope }: DataScopeRemoteProps) => (

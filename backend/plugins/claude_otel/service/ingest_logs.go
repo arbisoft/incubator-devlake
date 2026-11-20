@@ -52,10 +52,10 @@ var contentAttributes = map[string]struct{}{
 	"body_ref":   {},
 }
 
-// toolResultContentAttributes are content only on tool_result events, where the full
-// error message can echo file contents. On api_error the error is a service message.
-var toolResultContentAttributes = map[string]struct{}{
-	"error": {},
+// eventContentAttributes are attributes that carry content on specific events: a tool_result or compaction error can echo files or model output, while an api_error error is a service message.
+var eventContentAttributes = map[string]map[string]struct{}{
+	eventToolResult: {"error": {}},
+	eventCompaction: {"error": {}},
 }
 
 // toolParameterKeys are the tool_parameters fields kept. The others, such as full_command,
@@ -149,8 +149,8 @@ func stripContentAttributes(request *collectorlogs.ExportLogsServiceRequest) {
 		for _, record := range resourceLogRecords(resourceLogs) {
 			record.Attributes = filterToolParameters(normalizePromptText(withoutAttributes(record.GetAttributes(), contentAttributes)))
 			normalizeRepositoryAttributes(record.GetAttributes())
-			if logEventName(record) == eventToolResult {
-				record.Attributes = withoutAttributes(record.GetAttributes(), toolResultContentAttributes)
+			if content, found := eventContentAttributes[logEventName(record)]; found {
+				record.Attributes = withoutAttributes(record.GetAttributes(), content)
 			}
 		}
 	}

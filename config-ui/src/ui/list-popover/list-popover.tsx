@@ -16,9 +16,21 @@
  *
  */
 
-import { Select } from 'antd';
-import styled from 'styled-components';
+import { useTheme } from 'styled-components';
 
-export const TypeSelect = styled(Select)`
-  width: ${({ theme }) => theme.layout.sortSelectWidth}px;
-`;
+import { ListPopoverBody, ListPopoverCount, ListPopoverHead, ListPopoverList } from './styled';
+import type { ListPopoverProps } from './types';
+
+export const ListPopover = ({ title, count, width, children, footer }: ListPopoverProps) => {
+  const { layout } = useTheme();
+  return (
+    <ListPopoverBody $width={width ?? layout.listPopoverWidth}>
+      <ListPopoverHead>
+        {title}
+        <ListPopoverCount>{count}</ListPopoverCount>
+      </ListPopoverHead>
+      <ListPopoverList>{children}</ListPopoverList>
+      {footer}
+    </ListPopoverBody>
+  );
+};

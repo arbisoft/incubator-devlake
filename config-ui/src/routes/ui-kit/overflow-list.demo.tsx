@@ -29,19 +29,30 @@ const MAX_VISIBLE = 2;
 export const OverflowListDemo = () => (
   <DemoSection id={SECTION.OVERFLOW_LIST} title={COPY.sections.overflowList}>
     <DemoCase label={COPY.cases.default}>
-      <OverflowList items={toItems(text.items.slice(0, MAX_VISIBLE))} max={MAX_VISIBLE} moreLabel={text.more} />
+      <OverflowList
+        title={text.title}
+        items={toItems(text.items.slice(0, MAX_VISIBLE))}
+        max={MAX_VISIBLE}
+        moreLabel={text.more}
+      />
     </DemoCase>
     <DemoCase label={COPY.cases.manyItems}>
-      <OverflowList items={toItems(text.items)} max={MAX_VISIBLE} moreLabel={text.more} />
+      <OverflowList title={text.title} items={toItems(text.items)} max={MAX_VISIBLE} moreLabel={text.more} />
     </DemoCase>
     <DemoCase label={COPY.cases.longText}>
       <Narrow>
-        <OverflowList items={toItems([text.longItem, ...text.items])} max={MAX_VISIBLE} moreLabel={text.more} />
+        <OverflowList
+          title={text.title}
+          items={toItems([text.longItem, ...text.items])}
+          max={MAX_VISIBLE}
+          moreLabel={text.more}
+        />
       </Narrow>
     </DemoCase>
     <DemoCase label={COPY.overflowList.inline}>
       <Narrow>
         <OverflowList
+          title={text.title}
           items={text.items.map((name) => ({
             key: name,
             node: <StatusBadge tone={STATUS_TONE.NEUTRAL} label={name} variant={STATUS_BADGE_VARIANT.CHIP} />,

@@ -17,7 +17,7 @@
  */
 
 import { isValidElement } from 'react';
-import { matchRoutes } from 'react-router-dom';
+import { matchRoutes, type ShouldRevalidateFunctionArgs } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
 import { BLUEPRINT_VIEW, PATHS, PROJECT_TAB } from '@/config';
@@ -26,6 +26,7 @@ import {
   adminFeaturesLoader,
   BlueprintDetailPage,
   layoutLoader,
+  layoutShouldRevalidate,
   ParamRedirect,
   ProjectDetailPage,
   SettingsActivity,
@@ -121,5 +122,30 @@ describe('API keys route', () => {
     const matches = matchRoutes(routes, PATHS.APIKEYS()) ?? [];
     expect(adminFeaturesLoader).toBeTypeOf('function');
     expect(matches.some((match) => match.route.loader === adminFeaturesLoader)).toBe(true);
+  });
+});
+
+describe('layout revalidation', () => {
+  const revalidate = (from: string, to: string, formMethod?: string) =>
+    layoutShouldRevalidate({
+      currentUrl: new URL(`http://localhost${from}`),
+      nextUrl: new URL(`http://localhost${to}`),
+      formMethod,
+      defaultShouldRevalidate: true,
+    } as ShouldRevalidateFunctionArgs);
+
+  it.each([
+    ['/projects', '/projects?keyword=a', undefined, false],
+    ['/projects', '/blueprints', undefined, true],
+    ['/projects?keyword=a', '/projects?keyword=a', undefined, true],
+    ['/projects', '/projects?keyword=a', 'POST', true],
+  ])('skips layout reloads only for search changes on the same page (%s to %s, %s)', (from, to, method, expected) => {
+    expect(revalidate(from, to, method)).toBe(expected);
+  });
+
+  it('wires the revalidation rule onto the layout route', () => {
+    const matches = matchRoutes(routes, PATHS.PROJECTS()) ?? [];
+    const layout = matches.find((match) => match.route.loader === layoutLoader);
+    expect(layout?.route.shouldRevalidate).toBe(layoutShouldRevalidate);
   });
 });
