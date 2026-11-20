@@ -69,6 +69,21 @@ type AIMonthlyCostRow struct {
 	CostUSD      string `gorm:"column:cost_usd"`
 }
 
+// aiActivityWhere picks email's code edit activity over the days. Codex also stores code reviews and the reactions to
+// them in ai_activities, and those aren't the engineer's suggestions or acceptances. Every provider stores its edits
+// as CODE_EDIT.
+const aiActivityWhere = "LOWER(user_email) = ? " +
+	"AND type = 'CODE_EDIT' " +
+	"AND date >= ? " +
+	"AND date < ?"
+
+// aiActiveDays counts the days with some activity. Cursor writes a row for every day of a team member, idle or not,
+// so a row alone doesn't mean the engineer used the tool that day.
+const aiActiveDays = `COUNT(DISTINCT CASE WHEN COALESCE(num_sessions, 0) + COALESCE(suggestions_count, 0)
+		+ COALESCE(acceptance_count, 0) + COALESCE(lines_added, 0) + COALESCE(lines_removed, 0)
+		+ COALESCE(commits_created, 0) + COALESCE(prs_created, 0) + COALESCE(input_tokens, 0)
+		+ COALESCE(output_tokens, 0) > 0 THEN date END)`
+
 // aiCostRows is the per-model union both cost queries read: Claude from model usage records, and every other
 // provider from daily activity, which is where Cursor reports cost. Claude activity rows carry no cost, so
 // skipping them avoids counting anything twice. Costs are summed as DECIMAL so no float rounding reaches the API.
@@ -137,12 +152,12 @@ func NewAI(db rowsReader) (*AI, errors.Error) {
 	return &AI{db: db}, nil
 }
 
-// Providers lists email's activity per provider over the days, sorted by provider.
+// Providers lists email's activity per provider with an active day in the range, sorted by provider.
 func (r *AI) Providers(email, fromDay, toDay string) ([]AIProviderRow, errors.Error) {
 	var rows []AIProviderRow
 	if err := r.db.All(&rows,
 		dal.Select(`provider,
-			COUNT(DISTINCT date) AS active_days,
+			`+aiActiveDays+` AS active_days,
 			COALESCE(SUM(num_sessions), 0) AS sessions,
 			COALESCE(SUM(suggestions_count), 0) AS suggestions,
 			COALESCE(SUM(acceptance_count), 0) AS acceptances,
@@ -151,10 +166,9 @@ func (r *AI) Providers(email, fromDay, toDay string) ([]AIProviderRow, errors.Er
 			COALESCE(SUM(commits_created), 0) AS commits_by_ai,
 			COALESCE(SUM(prs_created), 0) AS pull_requests`),
 		dal.From("ai_activities"),
-		dal.Where("LOWER(user_email) = ? "+
-			"AND date >= ? "+
-			"AND date < ?", email, fromDay, toDay),
+		dal.Where(aiActivityWhere, email, fromDay, toDay),
 		dal.Groupby("provider"),
+		dal.Having("active_days > 0"),
 		dal.Orderby("provider"),
 	); err != nil {
 		return nil, errors.Default.Wrap(err, "read ai activities")
@@ -178,21 +192,20 @@ func (r *AI) ToolDecisions(email, fromDay, toDay string) (AIToolDecisionCounts, 
 	return singleRow(rows), nil
 }
 
-// Monthly lists email's activity per provider and UTC month over the days, oldest month first.
+// Monthly lists email's activity per provider and UTC month with an active day, oldest month first.
 func (r *AI) Monthly(email, fromDay, toDay string) ([]AIMonthlyRow, errors.Error) {
 	var rows []AIMonthlyRow
 	if err := r.db.All(&rows,
 		dal.Select(`provider,
 			DATE_FORMAT(date, '%Y-%m') AS month,
-			COUNT(DISTINCT date) AS active_days,
+			`+aiActiveDays+` AS active_days,
 			COALESCE(SUM(num_sessions), 0) AS sessions,
 			COALESCE(SUM(suggestions_count), 0) AS suggestions,
 			COALESCE(SUM(acceptance_count), 0) AS acceptances`),
 		dal.From("ai_activities"),
-		dal.Where("LOWER(user_email) = ? "+
-			"AND date >= ? "+
-			"AND date < ?", email, fromDay, toDay),
+		dal.Where(aiActivityWhere, email, fromDay, toDay),
 		dal.Groupby("provider, month"),
+		dal.Having("active_days > 0"),
 		dal.Orderby("month, provider"),
 	); err != nil {
 		return nil, errors.Default.Wrap(err, "read ai monthly activity")
@@ -200,7 +213,8 @@ func (r *AI) Monthly(email, fromDay, toDay string) ([]AIMonthlyRow, errors.Error
 	return rows, nil
 }
 
-// ModelCosts lists email's token use and cost per provider and model over the days, sorted.
+// ModelCosts lists email's token use and cost per provider and model over the days, sorted. A model with no cost and
+// no tokens is left out: Cursor's daily rows and Codex's rows name a model but carry neither.
 func (r *AI) ModelCosts(email, fromDay, toDay string) ([]AIModelCostRow, errors.Error) {
 	var rows []AIModelCostRow
 	if err := r.db.All(&rows,
@@ -212,6 +226,7 @@ func (r *AI) ModelCosts(email, fromDay, toDay string) ([]AIModelCostRow, errors.
 			CAST(CAST(COALESCE(SUM(cost), 0) AS DECIMAL(20,8)) AS CHAR) AS estimated_cost_usd`),
 		dal.From(aiCostRows, costParams(email, fromDay, toDay)...),
 		dal.Groupby("provider, model"),
+		dal.Having("SUM(cost) > 0 OR SUM(input_tokens) + SUM(output_tokens) > 0"),
 		dal.Orderby("provider, model"),
 	); err != nil {
 		return nil, errors.Default.Wrap(err, "read ai model costs")

@@ -219,7 +219,7 @@ func TestAIMonthlyOnMySQL(t *testing.T) {
 	tx := testTx(t)
 	activity := func(id, provider, email, date string, sessions, suggestions, acceptances int) *ai.AiActivity {
 		return &ai.AiActivity{DomainEntity: entity("IntegrationRepoTest:" + id), Provider: provider, UserEmail: email, Date: day(date),
-			NumSessions: sessions, SuggestionsCount: suggestions, AcceptanceCount: acceptances}
+			Type: "CODE_EDIT", NumSessions: sessions, SuggestionsCount: suggestions, AcceptanceCount: acceptances}
 	}
 	insert(t, tx,
 		activity("1", "copilot", dbTestUser, "2026-10-20", 2, 100, 30),
@@ -230,7 +230,12 @@ func TestAIMonthlyOnMySQL(t *testing.T) {
 		activity("6", "cursor", dbTestOther, "2026-11-03", 9, 99, 99),
 		activity("7", "cursor", dbTestUser, "2026-09-30", 9, 99, 99), // before the first day
 		activity("8", "cursor", dbTestUser, "2026-11-10", 9, 99, 99), // on toDay, which the range leaves out
+		activity("9", "cursor", dbTestUser, "2026-11-04", 0, 0, 0),   // an idle day
+		activity("10", "cursor", dbTestUser, "2026-10-05", 0, 0, 0),  // an idle month
 	)
+	reaction := activity("11", "codex", dbTestUser, "2026-11-03", 0, 3, 1)
+	reaction.Type = "CODE_REVIEW_RESPONSE"
+	insert(t, tx, reaction)
 	r := mustRepo(t, NewAI, rowsReader(tx))
 
 	monthly, err := r.Monthly(dbTestUser, "2026-10-01", "2026-11-10")
@@ -267,5 +272,26 @@ func TestAIMonthlyOnMySQL(t *testing.T) {
 		if s.Sessions != p.Sessions || s.Suggestions != p.Suggestions || s.Acceptances != p.Acceptances {
 			t.Errorf("%s months sum to %+v, want the provider total %+v", p.Provider, s, p)
 		}
+	}
+}
+
+func TestAIModelCostsLeavesOutEmptyModelsOnMySQL(t *testing.T) {
+	tx := testTx(t)
+	row := func(id, provider, model string, tokens int64, cost float64) *ai.AiActivity {
+		return &ai.AiActivity{DomainEntity: entity("IntegrationRepoTest:" + id), Provider: provider, UserEmail: dbTestUser,
+			Date: day("2026-11-03"), Type: "CODE_EDIT", Model: model, InputTokens: tokens, EstimatedCostUsd: cost}
+	}
+	insert(t, tx,
+		row("c1", "cursor", "claude-4-sonnet", 0, 0), // a daily row naming the most used model
+		row("c2", "cursor", "gpt-5", 1000, 0.25),
+		row("c3", "codex", "", 0, 0),
+	)
+	got, err := mustRepo(t, NewAI, rowsReader(tx)).ModelCosts(dbTestUser, "2026-11-01", "2026-11-10")
+	if err != nil {
+		t.Fatalf("ModelCosts() error = %v", err)
+	}
+	want := []AIModelCostRow{{Provider: "cursor", Model: "gpt-5", InputTokens: 1000, EstimatedCostUSD: "0.25000000"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ModelCosts() = %+v, want %+v", got, want)
 	}
 }
