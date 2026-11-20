@@ -80,6 +80,21 @@ type PullRequestGroupRow struct {
 	EngineerMerged int64
 }
 
+// notMerge leaves out merge commits. Their lines are the whole merged branch, because gitextractor diffs a merge only
+// against its first parent, so counting them would credit the merger with everyone's work on the branch. A commit
+// with no parents recorded counts.
+const notMerge = "(SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = c.sha) < 2"
+
+// The same repository can be collected under two connections, which gives each pull request and comment two ids. So
+// the queries count pull requests by prKey, and comments by toolID.
+
+// prKey identifies a pull request whichever connection collected it: its url, or its id when it has no url.
+const prKey = "COALESCE(NULLIF(p.url, ''), p.id)"
+
+// toolID is the git tool's own id of a pull request comment. A domain id is "<source>:<Model>:<connection id>:<tool
+// id>", and the tool id is the same under every connection.
+const toolID = "SUBSTRING_INDEX(pc.id, ':', -1)"
+
 // Code reads one git tool's work from the domain tables: the commits, pull requests and reviews whose ids start with
 // its source, such as github. The tables are the same for every git tool DevLake collects. It is safe for
 // concurrent use.
@@ -102,8 +117,8 @@ func NewCode(db rowsReader, source string) (*Code, errors.Error) {
 	return &Code{db: db, source: source, idLike: like}, nil
 }
 
-// Commits summarizes the commits email authored in the window in the source's repositories. Commits match on the
-// commit author email, so they don't depend on the account's email.
+// Commits summarizes the commits email authored in the window in the source's repositories, leaving out merge
+// commits. Commits match on the commit author email, so they don't depend on the account's email.
 func (r *Code) Commits(email string, from, to time.Time) (CommitCounts, errors.Error) {
 	var rows []CommitCounts
 	if err := r.db.All(&rows,
@@ -114,6 +129,7 @@ func (r *Code) Commits(email string, from, to time.Time) (CommitCounts, errors.E
 		dal.Where(`LOWER(c.author_email) = ?
 			AND c.authored_date >= ?
 			AND c.authored_date < ?
+			AND `+notMerge+`
 			AND EXISTS (SELECT 1
 						FROM repo_commits rc
 						WHERE rc.commit_sha = c.sha AND rc.repo_id LIKE ?)`,
@@ -135,8 +151,10 @@ func (r *Code) Authored(email string, from, to time.Time) (AuthoredCounts, error
 				THEN TIMESTAMPDIFF(MINUTE, p.created_date, p.merged_date) END), 0
 				) / 60 AS avg_pr_merge_hours`,
 			from, to, from, to, from, to),
-		dal.From("pull_requests p JOIN accounts a ON a.id = p.author_id"),
-		dal.Where("p.id LIKE ? AND LOWER(a.email) = ?", r.idLike, email),
+		dal.From(`(SELECT DISTINCT `+prKey+` AS pr, p.created_date, p.merged_date
+			FROM pull_requests p
+			JOIN accounts a ON a.id = p.author_id
+			WHERE p.id LIKE ? AND LOWER(a.email) = ?) p`, r.idLike, email),
 	); err != nil {
 		return AuthoredCounts{}, errors.Default.Wrap(err, "read "+r.source+" pull requests authored")
 	}
@@ -147,8 +165,8 @@ func (r *Code) Authored(email string, from, to time.Time) (AuthoredCounts, error
 func (r *Code) PullRequestsWithCommits(email string, from, to time.Time) (int64, errors.Error) {
 	var rows []struct{ PullRequestsWithCommits int64 }
 	if err := r.db.All(&rows,
-		dal.Select("COUNT(DISTINCT prc.pull_request_id) AS pull_requests_with_commits"),
-		dal.From("pull_request_commits prc"),
+		dal.Select("COUNT(DISTINCT "+prKey+") AS pull_requests_with_commits"),
+		dal.From("pull_request_commits prc JOIN pull_requests p ON p.id = prc.pull_request_id"),
 		dal.Where(`prc.pull_request_id LIKE ?
 			AND LOWER(prc.commit_author_email) = ?
 			AND prc.commit_authored_date >= ?
@@ -165,9 +183,9 @@ func (r *Code) PullRequestsWithCommits(email string, from, to time.Time) (int64,
 func (r *Code) Reviews(email string, from, to time.Time) (ReviewCounts, errors.Error) {
 	var rows []ReviewCounts
 	if err := r.db.All(&rows,
-		dal.Select(`COUNT(DISTINCT CASE WHEN pc.type = 'REVIEW' THEN pc.id END) AS reviews,
-			COUNT(DISTINCT CASE WHEN pc.type IN ('NORMAL', 'DIFF') THEN pc.id END) AS review_comments,
-			COUNT(DISTINCT pc.pull_request_id) AS pull_requests_reviewed`),
+		dal.Select(`COUNT(DISTINCT CASE WHEN pc.type = 'REVIEW' THEN `+toolID+` END) AS reviews,
+			COUNT(DISTINCT CASE WHEN pc.type IN ('NORMAL', 'DIFF') THEN `+toolID+` END) AS review_comments,
+			COUNT(DISTINCT `+prKey+`) AS pull_requests_reviewed`),
 		dal.From(`pull_request_comments pc
 			JOIN accounts a ON a.id = pc.account_id
 			JOIN pull_requests p ON p.id = pc.pull_request_id
@@ -186,8 +204,9 @@ func (r *Code) Reviews(email string, from, to time.Time) (ReviewCounts, errors.E
 }
 
 // CommitsByGroup lists, per group with a commit in the window, email's commits and lines changed next to every
-// author's. It lists groups where email has no commits too, so the caller can show the totals of a group where the
-// engineer only has pull requests. A commit sits once in a group even when several of the group's repos hold it.
+// author's, leaving out merge commits. It lists groups where email has no commits too, so the caller can show the
+// totals of a group where the engineer only has pull requests. A commit sits once in a group even when several of the
+// group's repos hold it.
 func (r *Code) CommitsByGroup(email string, from, to time.Time, group Group) ([]CommitGroupRow, errors.Error) {
 	g, ok := groupSQL[group]
 	if !ok {
@@ -205,7 +224,8 @@ func (r *Code) CommitsByGroup(email string, from, to time.Time, group Group) ([]
 			" COALESCE(c.additions, 0) + COALESCE(c.deletions, 0) AS lines_changed"+
 			" FROM commits c"+
 			" JOIN repo_commits rc ON rc.commit_sha = c.sha "+fmt.Sprintf(g.joinFormat, "rc.repo_id")+
-			" WHERE rc.repo_id LIKE ? AND c.authored_date >= ? AND c.authored_date < ?) t", r.idLike, from, to),
+			" WHERE rc.repo_id LIKE ? AND c.authored_date >= ? AND c.authored_date < ? AND "+notMerge+") t",
+			r.idLike, from, to),
 		dal.Groupby("t.name"),
 		dal.Orderby("t.name"),
 	); err != nil {
@@ -227,7 +247,7 @@ func (r *Code) PullRequestsByGroup(email string, from, to time.Time, group Group
 		dal.Select(`t.name, COALESCE(SUM(t.merged), 0) AS repo_merged,
 			COALESCE(SUM(t.opened AND t.email = ?), 0) AS engineer_opened,
 			COALESCE(SUM(t.merged AND t.email = ?), 0) AS engineer_merged`, email, email),
-		dal.From("(SELECT DISTINCT "+g.name+" AS name, p.id, LOWER(a.email) AS email,"+
+		dal.From("(SELECT DISTINCT "+g.name+" AS name, "+prKey+" AS pr, LOWER(a.email) AS email,"+
 			" (p.created_date >= ? AND p.created_date < ?) AS opened, "+
 			"(p.merged_date >= ? AND p.merged_date < ?) AS merged"+
 			" FROM pull_requests p "+

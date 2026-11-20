@@ -61,7 +61,7 @@ func testTx(t *testing.T) dal.Transaction {
 	db := dalgorm.NewDalgorm(gormDB)
 	for _, table := range []interface{}{
 		&crossdomain.Account{}, &crossdomain.ProjectMapping{}, &code.PullRequest{}, &code.PullRequestComment{},
-		&code.PullRequestCommit{}, &code.Commit{}, &code.RepoCommit{}, &code.Repo{}, &ticket.Issue{}, &ticket.BoardIssue{},
+		&code.PullRequestCommit{}, &code.Commit{}, &code.CommitParent{}, &code.RepoCommit{}, &code.Repo{}, &ticket.Issue{}, &ticket.BoardIssue{},
 		&ai.AiActivity{}, &ai.AiModelUsage{}, &ai.AiToolDecision{},
 	} {
 		if !db.HasTable(table) {
@@ -345,5 +345,77 @@ func TestIDLikeMatchesAnUnderscoreLiterallyOnMySQL(t *testing.T) {
 	}
 	if got.Commits != 1 {
 		t.Errorf("Commits() = %d, want 1: git_hub must not match gitxhub", got.Commits)
+	}
+}
+
+func TestCodeCountsARepoUnderTwoConnectionsOnceOnMySQL(t *testing.T) {
+	tx := testTx(t)
+	in := day("2026-11-05")
+	const url = "https://github.com/org/dup-test/pull/7"
+	rows := []interface{}{
+		&code.Commit{Sha: "duptest-1", AuthorEmail: dbTestUser, AuthoredDate: in, CommittedDate: in, Additions: 4},
+		&code.Commit{Sha: "duptest-merge", AuthorEmail: dbTestUser, AuthoredDate: in, CommittedDate: in, Additions: 900},
+		&code.CommitParent{CommitSha: "duptest-merge", ParentCommitSha: "duptest-1"},
+		&code.CommitParent{CommitSha: "duptest-merge", ParentCommitSha: "duptest-other"},
+	}
+	// Connections 1 and 2 collect the same repository, so every pull request and comment is stored twice.
+	for _, conn := range []string{"1", "2"} {
+		p := "github:IntegrationRepoTest:" + conn + ":"
+		rows = append(rows,
+			&code.Repo{DomainEntity: entity(p + "repo"), Name: "org/dup-test"},
+			&code.RepoCommit{RepoId: p + "repo", CommitSha: "duptest-1"},
+			&code.RepoCommit{RepoId: p + "repo", CommitSha: "duptest-merge"},
+			&crossdomain.Account{DomainEntity: entity(p + "user"), Email: dbTestUser},
+			&code.PullRequest{DomainEntity: entity(p + "mine"), Url: url, BaseRepoId: p + "repo", AuthorId: p + "user", CreatedDate: in, MergedDate: &in},
+			&code.PullRequestCommit{PullRequestId: p + "mine", CommitSha: "duptest-1", CommitAuthorEmail: dbTestUser, CommitAuthoredDate: in},
+			&code.PullRequest{DomainEntity: entity(p + "theirs"), Url: url + "8", BaseRepoId: p + "repo", AuthorId: p + "nobody", CreatedDate: in},
+			// Two inline comments sent together in one review share a time, but they are two comments.
+			&code.PullRequestComment{DomainEntity: entity("github:GithubPrComment:" + conn + ":501"), PullRequestId: p + "theirs", AccountId: p + "user", CreatedDate: in, Type: "DIFF"},
+			&code.PullRequestComment{DomainEntity: entity("github:GithubPrComment:" + conn + ":502"), PullRequestId: p + "theirs", AccountId: p + "user", CreatedDate: in, Type: "DIFF"},
+			&code.PullRequestComment{DomainEntity: entity("github:GithubPrReview:" + conn + ":601"), PullRequestId: p + "theirs", AccountId: p + "user", CreatedDate: in, Type: "REVIEW"},
+		)
+	}
+	insert(t, tx, rows...)
+	r := codeRepo(t, rowsReader(tx), SourceGitHub)
+	from, to := day("2026-11-01"), day("2026-11-10")
+
+	commits, err := r.Commits(dbTestUser, from, to)
+	if err != nil {
+		t.Fatalf("Commits() error = %v", err)
+	}
+	if want := (CommitCounts{Commits: 1, Additions: 4}); commits != want {
+		t.Errorf("Commits() = %+v, want %+v without the merge commit", commits, want)
+	}
+	authored, err := r.Authored(dbTestUser, from, to)
+	if err != nil {
+		t.Fatalf("Authored() error = %v", err)
+	}
+	if authored.PullRequestsOpened != 1 || authored.PullRequestsMerged != 1 {
+		t.Errorf("Authored() = %+v, want 1 opened and 1 merged", authored)
+	}
+	withCommits, err := r.PullRequestsWithCommits(dbTestUser, from, to)
+	if err != nil || withCommits != 1 {
+		t.Errorf("PullRequestsWithCommits() = (%d, %v), want 1", withCommits, err)
+	}
+	reviews, err := r.Reviews(dbTestUser, from, to)
+	if err != nil {
+		t.Fatalf("Reviews() error = %v", err)
+	}
+	if want := (ReviewCounts{Reviews: 1, ReviewComments: 2, PullRequestsReviewed: 1}); reviews != want {
+		t.Errorf("Reviews() = %+v, want %+v", reviews, want)
+	}
+	byRepo, err := r.CommitsByGroup(dbTestUser, from, to, GroupByRepo)
+	if err != nil {
+		t.Fatalf("CommitsByGroup() error = %v", err)
+	}
+	if want := []CommitGroupRow{{Name: "org/dup-test", RepoCommits: 1, RepoLines: 4, Contributors: 1, EngineerCommits: 1, EngineerLines: 4}}; !reflect.DeepEqual(byRepo, want) {
+		t.Errorf("CommitsByGroup() = %+v, want %+v", byRepo, want)
+	}
+	prs, err := r.PullRequestsByGroup(dbTestUser, from, to, GroupByRepo)
+	if err != nil {
+		t.Fatalf("PullRequestsByGroup() error = %v", err)
+	}
+	if want := []PullRequestGroupRow{{Name: "org/dup-test", RepoMerged: 1, EngineerOpened: 1, EngineerMerged: 1}}; !reflect.DeepEqual(prs, want) {
+		t.Errorf("PullRequestsByGroup() = %+v, want %+v", prs, want)
 	}
 }
