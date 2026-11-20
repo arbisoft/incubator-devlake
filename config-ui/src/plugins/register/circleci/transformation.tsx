@@ -20,13 +20,12 @@ import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Tag, Input } from 'antd';
 
 import { ExternalLink, HelpTooltip } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+import type { CircleCITransformationValues } from './types';
+
+type Props = TransformationProps<CircleCITransformationValues>;
 
 export const CircleCITransformation = ({ entities, transformation, setTransformation }: Props) => {
   const { token } = theme.useToken();
@@ -63,8 +62,8 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
+  transformation: CircleCITransformationValues;
+  onChangeTransformation: (next: CircleCITransformationValues) => void;
 }) =>
   [
     {

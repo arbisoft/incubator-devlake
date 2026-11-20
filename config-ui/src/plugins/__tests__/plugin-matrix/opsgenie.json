@@ -1,0 +1,53 @@
+{
+  "plugin": "opsgenie",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.opsgenie.com/",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Opsgenie Instance Location (us or eu)*United StatesEuropeOpsgenie API Key*Learn how to create a Atlassian Opsgenie personal API KeyProxyAdd a proxy if you cannot access Opsgenie directly.Custom Rate LimitBy default, DevLake uses 6,000 requests/hour for data collection for Opsgenie. But you can adjust the collection speed by setting up your desirable rate limit. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "https://api.opsgenie.com/",
+      "token": "v1",
+      "proxy": "v2",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": null,
+  "consoleErrors": [],
+  "requests": []
+}

@@ -42,7 +42,6 @@ export const STAGE_STATE = {
 
 export const FILTER_PARAM = { BLUEPRINT: 'blueprintId' } as const;
 export const BLUEPRINT_OPTIONS_LIMIT = 100;
-export const BLUEPRINT_SEARCH_DEBOUNCE_MS = 300;
 export const BLUEPRINT_TYPE_ALL = 'ALL';
 export const LOGS_FILE_NAME = 'logging.tar.gz';
 const HTTP_NOT_FOUND = '404' as const;
@@ -115,6 +114,8 @@ export const COPY = {
     cancelled: 'Cancelled',
     subtasks: (finished: number, total: number) => `${finished} of ${total} subtasks`,
     rerun: 'Rerun task',
+    githubPermissionHint:
+      'GitHub refused part of this collection. Check that the token has Read access to Actions, Contents, Deployments, Discussions, Issues, Metadata and Pull requests for these repositories.',
   },
   detail: { title: (id: string | number) => `Pipeline ${id} details` },
   loading: 'Loading pipeline',
@@ -148,3 +149,11 @@ export const TASK_CELL = {
   FAILED: 'failed',
   CANCELLED: 'cancelled',
 } as const;
+
+export const TASK_FAILURE_HINTS = [
+  {
+    plugins: ['github', 'github_graphql'],
+    pattern: /graphql query got error|Resource not accessible/i,
+    hint: COPY.task.githubPermissionHint,
+  },
+] as const;

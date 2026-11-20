@@ -39,10 +39,10 @@ import { useEffect } from 'react';
 import { Block } from '@/components';
 
 interface Props {
-  initialValue: string;
-  value: string;
-  error: string;
-  setValue: (value: string) => void;
+  initialValue?: string;
+  value?: string;
+  error: unknown;
+  setValue: (value?: string) => void;
   setError: (value: string) => void;
 }
 

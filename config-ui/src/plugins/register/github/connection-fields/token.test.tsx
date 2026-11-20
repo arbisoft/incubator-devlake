@@ -68,7 +68,9 @@ describe('GitHub token feedback', () => {
     fireEvent.change(input, { target: { value: 'github_pat_example' } });
 
     expect(screen.getByText(/Select the intended resource owner and repositories/)).toBeTruthy();
-    expect(screen.getByText(/Actions, Contents, Discussions, Issues, Metadata and Pull requests/)).toBeTruthy();
+    expect(
+      screen.getByText(/Actions, Contents, Deployments, Discussions, Issues, Metadata and Pull requests/),
+    ).toBeTruthy();
 
     fireEvent.blur(input);
     await waitFor(() => expect(screen.getByText(COPY.fineGrainedSuccess)).toBeTruthy());

@@ -19,33 +19,42 @@
 import { CloseOutlined, PlusOutlined } from '@ant-design/icons';
 import { useDebounce } from 'ahooks';
 import { Input, Button } from 'antd';
+import axios from 'axios';
 import { useEffect, useState } from 'react';
 
 import API from '@/api';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { operator } from '@/utils';
+
+import type { JiraTransformationValues } from '../types';
 
 import * as S from './styled';
 
-interface Props {
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+let nextRowId = 0;
+const newRowId = () => {
+  nextRowId += 1;
+  return `row-${nextRowId}`;
+};
+
+type Props = Pick<TransformationProps<JiraTransformationValues>, 'transformation' | 'setTransformation'>;
+
+type Row = { id: string; pattern: string; regex: string };
 
 export const RemoteLink = ({ transformation, setTransformation }: Props) => {
-  const [index, setInedx] = useState<number>();
+  const [focusedId, setFocusedId] = useState<string>();
   const [pattern, setPattern] = useState('');
   const [error, setError] = useState('');
-  const [links, setLinks] = useState<Array<{ pattern: string; regex: string }>>(
-    transformation.remotelinkRepoPattern ?? [],
+  const [rows, setRows] = useState<Row[]>(() =>
+    (transformation.remotelinkRepoPattern ?? []).map((link) => ({ id: newRowId(), ...link })),
   );
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     setTransformation({
       ...transformation,
-      remotelinkRepoPattern: links.filter((link) => link.regex),
+      remotelinkRepoPattern: rows.filter((row) => row.regex).map(({ pattern, regex }) => ({ pattern, regex })),
     });
-  }, [links]);
+  }, [rows]);
 
   const debouncedPattern = useDebounce(pattern, { wait: 500 });
 
@@ -56,9 +65,9 @@ export const RemoteLink = ({ transformation, setTransformation }: Props) => {
     });
 
     if (success) {
-      setLinks(links.map((link, i) => (i === index ? { ...res, pattern } : link)));
+      setRows(rows.map((row) => (row.id === focusedId ? { ...row, pattern, regex: res.regex } : row)));
     } else {
-      setError(res?.response?.data?.message ?? '');
+      setError(axios.isAxiosError<{ message?: string }>(res) ? (res.response?.data?.message ?? '') : '');
     }
   };
 
@@ -69,44 +78,41 @@ export const RemoteLink = ({ transformation, setTransformation }: Props) => {
   }, [debouncedPattern]);
 
   const handleAddLink = () => {
-    const newValue = [...links, { pattern: '', regex: '' }];
-    setLinks(newValue);
+    setRows([...rows, { id: newRowId(), pattern: '', regex: '' }]);
   };
 
-  const handleDeleteLink = (index: number) => {
-    const newValue = links.filter((_, i) => i !== index);
-    setLinks(newValue);
+  const handleDeleteLink = (id: string) => {
+    setRows(rows.filter((row) => row.id !== id));
   };
 
   return (
     <S.RemoteLinkWrapper>
-      {links.map((link, i) => (
-        <div key={i} className="input">
+      {rows.map((row) => (
+        <div key={row.id} className="input">
           <div className="inner">
             <Input
-              key={i}
               placeholder="E.g. https://gitlab.com/{namespace}/{repo_name}/-/commit/{commit_sha}"
-              value={index === i ? pattern : link.pattern}
+              value={row.id === focusedId ? pattern : row.pattern}
               onChange={(e) => {
                 setPattern(e.target.value);
                 setError('');
               }}
               onFocus={() => {
-                setInedx(i);
-                setPattern(link.pattern);
+                setFocusedId(row.id);
+                setPattern(row.pattern);
                 setError('');
               }}
             />
-            {links.length > 1 && (
+            {rows.length > 1 && (
               <Button
                 type="primary"
                 loading={generating}
                 icon={<CloseOutlined />}
-                onClick={() => handleDeleteLink(i)}
+                onClick={() => handleDeleteLink(row.id)}
               />
             )}
           </div>
-          {index === i && error && <div className="error">{error}</div>}
+          {row.id === focusedId && error && <div className="error">{error}</div>}
         </div>
       ))}
       <Button type="primary" loading={generating} icon={<PlusOutlined />} onClick={() => handleAddLink()}>

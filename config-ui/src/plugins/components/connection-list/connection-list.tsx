@@ -37,7 +37,7 @@ import { COPY, CONNECTION_FILTER, DEFAULT_PAGE_SIZE, FIRST_PAGE, PAGE_SIZES } fr
 import { Root } from './styled';
 import type { ConnectionFilter, ConnectionListProps, ConnectionSortKey } from './types';
 import { useRepoCounts } from './use-repo-counts';
-import { buildFilterTabs, filterConnections, pageOf, sortConnections } from './utils';
+import { buildFilterTabs, filterConnections, getScopeTitle, pageOf, sortConnections } from './utils';
 
 type EditState = { open: boolean; id?: ID };
 
@@ -71,6 +71,7 @@ const PluginConnections = ({ plugin, onCreate }: ConnectionListProps) => {
   const rows = useMemo(() => pageOf(matching, page, pageSize), [matching, page, pageSize]);
 
   const columns = getColumns({
+    scopeTitle: getScopeTitle(plugin),
     counts,
     onLoadCount: load,
     onDetails: ({ id }) => navigate(PATHS.CONNECTION(plugin, id)),

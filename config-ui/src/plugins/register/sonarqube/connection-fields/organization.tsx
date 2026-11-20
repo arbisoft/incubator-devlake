@@ -20,15 +20,14 @@ import { Input } from 'antd';
 import { useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';
+import type { ConnectionFieldRenderProps } from '@/types';
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  errors: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+import type { SonarQubeConnectionValues } from '../types';
+
+type Props = Pick<
+  ConnectionFieldRenderProps<SonarQubeConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'errors' | 'setValues' | 'setErrors'
+>;
 
 export const Organization = ({ initialValues, values, setValues, setErrors }: Props) => {
   const { endpoint } = values;

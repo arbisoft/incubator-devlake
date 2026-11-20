@@ -19,7 +19,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { NO_SCOPE_CONFIG } from './constants';
-import { toScopeConfigRows } from './utils';
+import { nextScopeConfigName, toScopeConfigRows } from './utils';
 
 const CONFIGS = [
   { id: 1, name: 'one' },
@@ -37,5 +37,27 @@ describe('toScopeConfigRows', () => {
 
   it('puts a "no scope config" row first when a config is already associated', () => {
     expect(toScopeConfigRows(CONFIGS, true)).toEqual([{ ...NO_SCOPE_CONFIG }, ...CONFIGS]);
+  });
+});
+
+describe('nextScopeConfigName', () => {
+  it('keeps the base name when it is unused', () => {
+    expect(nextScopeConfigName('Acme config', ['other'])).toBe('Acme config');
+  });
+
+  it('adds 2 when the base name is taken', () => {
+    expect(nextScopeConfigName('Acme config', ['Acme config'])).toBe('Acme config 2');
+  });
+
+  it('adds 3 when the base name and 2 are taken', () => {
+    expect(nextScopeConfigName('Acme config', ['Acme config', 'Acme config 2'])).toBe('Acme config 3');
+  });
+
+  it('reuses 2 when only the base name and 3 are taken', () => {
+    expect(nextScopeConfigName('Acme config', ['Acme config', 'Acme config 3'])).toBe('Acme config 2');
+  });
+
+  it('compares names case-sensitively', () => {
+    expect(nextScopeConfigName('Acme config', ['acme config'])).toBe('Acme config');
   });
 });

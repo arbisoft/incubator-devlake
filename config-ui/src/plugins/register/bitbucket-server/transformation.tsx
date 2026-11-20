@@ -18,18 +18,18 @@
 
 import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Form, Input } from 'antd';
+import type { CheckboxChangeEvent } from 'antd/lib/checkbox';
 import { useMemo, useState, useEffect } from 'react';
 
 import { ExternalLink, HelpTooltip } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+import type { BitbucketServerTransformationValues } from './types';
 
-const ALL_STATES = ['new', 'open', 'resolved', 'closed', 'on hold', 'wontfix', 'duplicate', 'invalid'];
+type Props = TransformationProps<BitbucketServerTransformationValues>;
+
+const allStates = ['new', 'open', 'resolved', 'closed', 'on hold', 'wontfix', 'duplicate', 'invalid'];
 
 export const BitbucketServerTransformation = ({ entities, transformation, setTransformation }: Props) => {
   const [useCustom, setUseCustom] = useState(false);
@@ -49,11 +49,11 @@ export const BitbucketServerTransformation = ({ entities, transformation, setTra
       ...(transformation.issueStatusDone ? transformation.issueStatusDone.split(',') : []),
       ...(transformation.issueStatusOther ? transformation.issueStatusOther.split(',') : []),
     ];
-    return ALL_STATES.filter((it) => !disabledOptions.includes(it)).map((it) => ({ label: it, value: it }));
+    return allStates.filter((it) => !disabledOptions.includes(it)).map((it) => ({ label: it, value: it }));
   }, [transformation]);
 
-  const handleChangeUseCustom = (e: React.FormEvent<HTMLInputElement>) => {
-    const checked = (e.target as HTMLInputElement).checked;
+  const handleChangeUseCustom = (e: CheckboxChangeEvent) => {
+    const { checked } = e.target;
 
     if (!checked) {
       setTransformation({
@@ -98,21 +98,20 @@ export const BitbucketServerTransformation = ({ entities, transformation, setTra
 const renderCollapseItems = ({
   entities,
   panelStyle,
-  options,
   transformation,
   onChangeTransformation,
-  useCustom,
-  onChangeUseCustom,
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
   options: Array<{ label: string; value: string }>;
-  transformation: any;
-  onChangeTransformation: any;
+  transformation: BitbucketServerTransformationValues;
+  onChangeTransformation: (next: BitbucketServerTransformationValues) => void;
   useCustom: boolean;
-  onChangeUseCustom: any;
-}) =>
-  [
+  onChangeUseCustom: (e: CheckboxChangeEvent) => void;
+}) => {
+  const { prType, prComponent, refdiff } = transformation;
+
+  return [
     {
       key: 'CODEREVIEW',
       label: 'Code Review',
@@ -134,7 +133,7 @@ const renderCollapseItems = ({
           >
             <Input
               placeholder="type: ([a-zA-Z0-9_-]+)"
-              value={transformation.prType ?? ''}
+              value={prType ?? ''}
               onChange={(e) => onChangeTransformation({ ...transformation, prType: e.target.value })}
             />
           </Form.Item>
@@ -148,7 +147,7 @@ const renderCollapseItems = ({
           >
             <Input
               placeholder="component: ([a-zA-Z0-9_-]+)"
-              value={transformation.prComponent ?? ''}
+              value={prComponent ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -176,7 +175,7 @@ const renderCollapseItems = ({
             <Input
               style={{ margin: '0 8px', width: 60 }}
               placeholder="10"
-              value={transformation.refdiff?.tagsLimit ?? ''}
+              value={refdiff?.tagsLimit ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -191,7 +190,7 @@ const renderCollapseItems = ({
             <Input
               style={{ margin: '0 8px', width: 200 }}
               placeholder="(regex)$"
-              value={transformation.refdiff?.tagsPattern ?? ''}
+              value={refdiff?.tagsPattern ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -208,3 +207,4 @@ const renderCollapseItems = ({
       ),
     },
   ].filter((it) => entities.includes(it.key) || it.key === 'ADDITIONAL');
+};

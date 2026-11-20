@@ -25,6 +25,7 @@ export type IconButtonProps = {
   label: string;
   tone?: (typeof ICON_BUTTON_TONE)[keyof typeof ICON_BUTTON_TONE];
   disabled?: boolean;
+  disabledReason?: string;
   loading?: boolean;
   buttonRef?: Ref<HTMLButtonElement>;
   onClick: () => void;

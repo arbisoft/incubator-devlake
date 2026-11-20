@@ -21,7 +21,8 @@ import { Button } from 'antd';
 import { useState } from 'react';
 
 import API from '@/api';
-import { useRefreshData } from '@/hooks';
+import { selectConnection } from '@/features/connections';
+import { useAppSelector, useRefreshData } from '@/hooks';
 import { buildListEmpty, DataTable, MODAL_WIDTH, useRefreshVersion } from '@/ui';
 
 import { ConnectionModal } from '../connection-modal';
@@ -30,7 +31,7 @@ import { ScopeConfigForm } from '../scope-config-form';
 import { COPY } from './constants';
 import { Stack, Toolbar } from './styled';
 import type { ScopeConfigListProps, ScopeConfigRow } from './types';
-import { toScopeConfigRows } from './utils';
+import { nextScopeConfigName, toScopeConfigRows } from './utils';
 
 const COLUMNS = [{ title: COPY.nameColumn, dataIndex: 'name', key: 'name' }];
 
@@ -43,6 +44,7 @@ export const ScopeConfigList = ({
 }: ScopeConfigListProps) => {
   const [adding, setAdding] = useState(false);
   const { version, refresh } = useRefreshVersion();
+  const connectionName = useAppSelector((state) => selectConnection(state, `${plugin}-${connectionId}`))?.name;
 
   const { ready, data, error } = useRefreshData<ScopeConfigRow[]>(
     (signal) => API.scopeConfig.list(plugin, connectionId, signal),
@@ -93,7 +95,10 @@ export const ScopeConfigList = ({
         <ScopeConfigForm
           plugin={plugin}
           connectionId={connectionId}
-          defaultName={COPY.defaultName((data ?? []).length)}
+          defaultName={nextScopeConfigName(
+            COPY.defaultName(connectionName),
+            (data ?? []).map((row) => row.name),
+          )}
           onCancel={() => setAdding(false)}
           onSubmit={handleCreated}
         />

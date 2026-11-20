@@ -80,6 +80,11 @@ describe('getNavItems', () => {
     });
   });
 
+  it('shows API Keys to an administrator and when access is disabled, but not to a member or a failed lookup', () => {
+    [ADMIN, { enabled: false }].forEach((access) => expect(visibleKeys(access)).toContain(NAV_KEY.API_KEYS));
+    [MEMBER, null].forEach((access) => expect(visibleKeys(access)).not.toContain(NAV_KEY.API_KEYS));
+  });
+
   it('lists Users, Authentication and Recent Activities under Settings, in that order', () => {
     const items = getNavItems({ access: ADMIN, copyrightHide: false });
     const settings = items.find((item) => item.key === NAV_KEY.SETTINGS);
@@ -146,6 +151,7 @@ describe('active item', () => {
     [PATHS.PROJECT_BLUEPRINT_CONNECTION('x', 'github-1'), NAV_KEY.PROJECTS],
     [PATHS.CONNECTIONS(), NAV_KEY.CONNECTIONS],
     [PATHS.CONNECTION('github', 1), NAV_KEY.CONNECTIONS],
+    [PATHS.OTEL(), NAV_KEY.CONNECTIONS],
     [PATHS.BLUEPRINTS(), NAV_KEY.BLUEPRINTS],
     [PATHS.BLUEPRINT(3), NAV_KEY.BLUEPRINTS],
     [PATHS.BLUEPRINT_CONNECTION(3, 'github', 1), NAV_KEY.BLUEPRINTS],
@@ -159,7 +165,7 @@ describe('active item', () => {
   });
 
   it('highlights nothing for a path outside the sidebar, or Users when Settings is hidden', () => {
-    expect(activeKey(PATHS.OTEL())).toBeUndefined();
+    expect(activeKey(PATHS.DB_MIGRATE())).toBeUndefined();
     expect(activeKey(PATHS.SETTINGS_USERS(), MEMBER)).toBeUndefined();
   });
 

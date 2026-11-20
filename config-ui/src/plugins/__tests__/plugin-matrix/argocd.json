@@ -1,0 +1,80 @@
+{
+  "plugin": "argocd",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Provide the ArgoCD server API endpoint. E.g. https://argocd.example.com/api/v1Bearer Token*Provide your ArgoCD API token for authentication. Learn how to generate a tokenProxyAdd a proxy if you cannot access ArgoCD directly.Custom Rate LimitBy default, DevLake uses 3,000 requests/hour for data collection for ArgoCD. You can adjust the collection speed by setting your desired rate limit.",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "token": "v2",
+      "proxy": "v3",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "component": "ArgoCDTransformation",
+      "envNamePattern": "(?i)prod(.*)",
+      "deploymentPattern": "",
+      "productionPattern": ""
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(?i)prod(.*)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": ".*"
+      },
+      {
+        "tag": "input",
+        "type": "text"
+      }
+    ],
+    "text": "CI/CDDeploymentDORAUse Regular Expressions to define how DevLake identifies deployments and production environments from ArgoCD sync operations to measure DORA metrics.Environment DetectionAn ArgoCD sync operation is a 'Production Deployment' when the application name matches*Optional FiltersDeployment Pattern (filter sync operations by application name)Production Pattern (additional pattern for production detection)Note: ArgoCD limits deployment history to the last 10 sync operations by default (controlled by revisionHistoryLimit). Consider increasing this value in your ArgoCD application settings for better historical metrics.",
+    "typed": {
+      "component": "ArgoCDTransformation",
+      "envNamePattern": "v0",
+      "deploymentPattern": "v1",
+      "productionPattern": "v2"
+    }
+  },
+  "consoleErrors": [],
+  "requests": []
+}

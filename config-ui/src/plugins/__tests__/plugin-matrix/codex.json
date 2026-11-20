@@ -1,0 +1,65 @@
+{
+  "plugin": "codex",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.openai.com/v1",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 1000
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Codex project ID (optional)"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      },
+      {
+        "tag": "input",
+        "role": "spinbutton"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Provide the OpenAI Codex instance API endpoint.Project IDOptional. Used to pre-populate the data scope.API Key*Enter your OpenAI API key from OpenAI Platform.ProxyAdd a proxy if you cannot access OpenAI Codex directly.Custom Rate LimitBy default, DevLake uses 1,000 requests/hour for Codex data collection. Adjust this value to throttle collection speed. requests/hour",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "token": "v3",
+      "proxy": "v4",
+      "rateLimitPerHour": 1000,
+      "projectId": "v2"
+    }
+  },
+  "scopeConfig": {
+    "mounted": {},
+    "controls": [],
+    "text": "",
+    "typed": {}
+  },
+  "consoleErrors": [],
+  "requests": []
+}

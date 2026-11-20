@@ -104,8 +104,16 @@ export const COMPOSITES_COPY = {
   overflowList: {
     more: (count: number) => `+${count} more`,
     items: ['arbisoft-app-devlake', 'corey-systems', 'hirestream-platform', 'sophia-web', 'fixalert-mobile'],
+    title: 'Projects',
     inline: 'Inline chips',
     longItem: 'a-connection-with-an-extraordinarily-long-name-that-has-to-be-clipped-inside-the-cell',
+  },
+  listPopover: {
+    title: 'Projects',
+    items: ['arbisoft-app-devlake', 'corey-systems', 'hirestream-platform', 'sophia-web', 'fixalert-mobile'],
+    long: 'Long list that scrolls',
+    manyItems: (count: number) => `Project ${count}`,
+    footer: 'Edit projects',
   },
   formModal: {
     open: 'Open',
@@ -178,7 +186,7 @@ export const COMPOSITES_COPY = {
   brandBlock: {
     note: 'Always on the dark sidebar background.',
     customTitle: 'Acme Analytics',
-    versionLine: 'Version v1.0.2@3a9c1f2',
+    versionLine: 'Version v1.0.2-arbisoft.14@3a9c1f2d8b7e4c6a',
   },
   accountBlock: {
     name: 'Jane Admin',

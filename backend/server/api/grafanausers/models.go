@@ -29,6 +29,7 @@ const (
 	ErrCodeUserSSOManaged = "GRAFANA_USER_SSO_MANAGED"
 	ErrCodeLastAdmin      = "GRAFANA_LAST_ADMIN"
 	ErrCodePasswordShort  = "GRAFANA_PASSWORD_TOO_SHORT"
+	ErrCodePasswordWeak   = "GRAFANA_PASSWORD_WEAK"
 	ErrCodePasswordBad    = "GRAFANA_PASSWORD_REJECTED"
 	ErrCodeProjectMissing = "PROJECT_NOT_FOUND"
 	ErrCodePartial        = "GRAFANA_PARTIAL"
@@ -37,7 +38,7 @@ const (
 	maxPageSize           = 100
 	globalSearchPageSize  = 1000
 	maxGlobalSearchPages  = 1000
-	// Same limits as the local password rule in server/api/auth/local_password.go.
+	// Length limits match server/api/auth/local_password.go; the character classes match Grafana's password policy.
 	passwordMinimumCharacters = 15
 	passwordMaximumBytes      = 1024
 	adminRequiredMessage      = "administrator role required"

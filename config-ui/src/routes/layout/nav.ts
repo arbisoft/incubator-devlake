@@ -35,14 +35,15 @@ import {
 import { createElement } from 'react';
 
 import { LINKS, PATHS } from '@/config';
-import { canManageAccess } from '@/routes/settings/guard';
+import { canManageAccess, canManageAdminFeatures } from '@/routes/settings/guard';
 import { NAV_ITEM_KIND, type NavItem } from '@/ui';
 
-import { ACCESS_NAV_KEYS, COPY, COPYRIGHT_HIDDEN_NAV_KEYS, NAV_KEY } from './constants';
+import { ACCESS_NAV_KEYS, ADMIN_NAV_KEYS, COPY, COPYRIGHT_HIDDEN_NAV_KEYS, NAV_KEY } from './constants';
 import type { NavVisibility } from './types';
 
 const isNavKeyVisible = (key: string, { access, copyrightHide }: NavVisibility) => {
   if (ACCESS_NAV_KEYS.includes(key)) return canManageAccess(access);
+  if (ADMIN_NAV_KEYS.includes(key)) return canManageAdminFeatures(access);
   return !(copyrightHide && COPYRIGHT_HIDDEN_NAV_KEYS.includes(key));
 };
 
@@ -63,6 +64,7 @@ export const getNavItems = (visibility: NavVisibility): NavItem[] => {
       label: COPY.nav.connections,
       icon: createElement(ApiOutlined),
       path: PATHS.CONNECTIONS(),
+      matchPaths: [PATHS.OTEL()],
     },
     {
       kind: NAV_ITEM_KIND.ROUTE,
@@ -95,6 +97,7 @@ export const getNavItems = (visibility: NavVisibility): NavItem[] => {
       label: COPY.nav.apiKeys,
       icon: createElement(KeyOutlined),
       path: PATHS.APIKEYS(),
+      visible: visible(NAV_KEY.API_KEYS),
     },
     {
       kind: NAV_ITEM_KIND.ROUTE,

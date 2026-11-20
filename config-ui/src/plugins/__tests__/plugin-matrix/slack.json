@@ -1,0 +1,53 @@
+{
+  "plugin": "slack",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://slack.com/api/",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Slack*Slack CloudSlack Server (to be supported)If you are using Slack Cloud, you do not need to enter the endpoint URL, which is https://slack.com/api/.Slack Bot Token*Create a Slack App with the necessary permissions and use the Bot User OAuth Token (starts with xoxb-).ProxyAdd a proxy if you cannot access Slack directly.Custom Rate LimitBy default, DevLake uses 3,000 requests/hour for data collection for Slack. You can adjust the collection speed by setting a custom rate limit. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "https://slack.com/api/",
+      "token": "v1",
+      "proxy": "v2",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": null,
+  "consoleErrors": [],
+  "requests": []
+}

@@ -42,10 +42,15 @@ const (
 	// email columns in the hourly, event and ai_* tables.
 	identityColumnLength = 255
 	// Hourly fact dimension widths, from models.OtelHourlyModelUsage and
-	// OtelHourlyToolUsage. The ai_* columns they roll up into are as wide.
+	// OtelHourlyToolUsage. The ai_* columns model and tool roll up into are as wide.
 	modelDimensionLength       = 255
 	querySourceDimensionLength = 64
 	toolDimensionLength        = 100 // tool_name and language
+	effortDimensionLength      = 16
+	// 64 keeps the model usage primary key under 3,072 bytes; names that share 64 characters share a row.
+	attributionDimensionLength    = 64
+	decisionSourceDimensionLength = 32
+	startTypeDimensionLength      = 16
 )
 
 // skipKind is the unit a batch skipped for bad data. A resource group is skipped for bad
@@ -287,11 +292,35 @@ func (p *batchPreparer) prepareDatapoint(
 		startNanos:     point.GetStartTimeUnixNano(),
 		timeNanos:      point.GetTimeUnixNano(),
 	}
+	switch mapping.fact {
+	case hourlyModelUsageFact:
+		update.effort = truncate(attributeString(pointAttrs, "effort"), effortDimensionLength)
+		update.agent = truncate(attributeString(pointAttrs, "agent.name"), attributionDimensionLength)
+		update.skill = truncate(attributeString(pointAttrs, "skill.name"), attributionDimensionLength)
+	case hourlyToolUsageFact:
+		update.decisionSource = truncate(attributeString(pointAttrs, "source"), decisionSourceDimensionLength)
+	}
+	if metric.GetName() == metricSessionCount {
+		update.sessionID = sessionStartID(pointAttrs, resourceAttrs)
+		update.startType = truncate(attributeString(pointAttrs, "start_type"), startTypeDimensionLength)
+	}
 	if mapping.fact == hourlyModelUsageFact && update.model == "" {
 		return factUpdate{}, permanentConversionError(errorInvalidDimension, "metric %s is missing model", metric.GetName())
 	}
 	update.seriesHash = metricSeriesHash(connection.ID, scope, metric, resourceAttrs, point)
 	return update, nil
+}
+
+// sessionStartID returns the session.id attribute, or "" when it is missing or too long to store whole.
+func sessionStartID(pointAttrs, resourceAttrs []*commonv1.KeyValue) string {
+	id := attributeString(pointAttrs, "session.id")
+	if id == "" {
+		id = attributeString(resourceAttrs, "session.id")
+	}
+	if utf8.RuneCountInString(id) > eventIDColumnLength {
+		return ""
+	}
+	return id
 }
 
 // otlpSignal names one OTLP signal's resource and record in attribution errors.

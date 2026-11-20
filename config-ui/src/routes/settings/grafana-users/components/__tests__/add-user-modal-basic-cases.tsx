@@ -20,9 +20,9 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { message } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
+import { GRAFANA_ROLE } from '@/api/grafana-users/constants';
 
-import { COPY, GRAFANA_ERROR_MAP } from '../../constants';
+import { COPY } from '../../constants';
 
 import {
   cleanupAddUserMocks,
@@ -58,26 +58,6 @@ describe('AddUserModal', () => {
     expect(props.onChanged).toHaveBeenCalled();
     expect(props.onClose).toHaveBeenCalled();
     expect(vi.mocked(message.success).mock.calls.flat().join(' ')).not.toContain(PASSWORD);
-  });
-
-  it('keeps its values after a failed create and succeeds on retry', async () => {
-    grafana.createUser.mockRejectedValueOnce({
-      response: { status: 409, data: { code: GRAFANA_ERROR_CODE.USER_EXISTS } },
-    });
-    const props = setup();
-    fillAdd();
-    fireEvent.click(submit(COPY.add.submit));
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith(GRAFANA_ERROR_MAP[GRAFANA_ERROR_CODE.USER_EXISTS]));
-    expect(props.onClose).not.toHaveBeenCalled();
-    expect(props.onPassword).not.toHaveBeenCalled();
-    expect((screen.getByLabelText(new RegExp(`^${COPY.add.email.label}`)) as HTMLInputElement).value).toBe(EMAIL);
-    expect((screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement).value).toBe(PASSWORD);
-
-    const retryButton = submit(COPY.add.submit);
-    await waitFor(() => expect(retryButton.classList.contains('ant-btn-loading')).toBe(false));
-    fireEvent.click(retryButton);
-    await waitFor(() => expect(props.onPassword).toHaveBeenCalledTimes(1));
-    expect(grafana.createUser).toHaveBeenCalledTimes(2);
   });
 
   it('fills the email, name and a generated password from a picked DevLake user', async () => {

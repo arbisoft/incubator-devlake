@@ -1,0 +1,55 @@
+{
+  "plugin": "tempo",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.tempo.io/4",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Tempo API v4 base URLToken*ProxyAdd a proxy if you cannot access Tempo directly.Custom Rate LimitMaximum number of API requests per hour. Leave blank for default.",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "token": "v2",
+      "proxy": "v3",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {},
+    "controls": [],
+    "text": "",
+    "typed": {}
+  },
+  "consoleErrors": [],
+  "requests": []
+}

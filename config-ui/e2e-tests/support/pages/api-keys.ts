@@ -31,6 +31,11 @@ export class ApiKeysPage extends BasePage implements Screen {
     return urlEndingWith(PATHS.keys);
   }
 
+  // Where a session barred from API keys lands: the root redirect target.
+  get barredLandingPattern(): RegExp {
+    return urlEndingWith(PATHS.projects);
+  }
+
   get ready(): Locator {
     return this.page.getByRole('button', { name: COPY.newKey });
   }

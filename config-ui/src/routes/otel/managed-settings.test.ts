@@ -58,9 +58,13 @@ describe('buildManagedSettings', () => {
     expect(BASE).toEqual(snapshot);
   });
 
-  it('disables the metrics exporter and drops the export interval', () => {
+  it('disables the metrics exporter, drops the export interval and repository attribution', () => {
     const env = shapedEnv(withoutOption(SETTINGS_OPTION.METRICS));
-    expect(env).toEqual({ ...omit(BASE.env, 'OTEL_METRIC_EXPORT_INTERVAL'), OTEL_METRICS_EXPORTER: 'none' });
+    expect(env).toEqual({
+      ...omit(BASE.env, 'OTEL_METRIC_EXPORT_INTERVAL'),
+      OTEL_METRICS_EXPORTER: 'none',
+      OTEL_METRICS_INCLUDE_REPOSITORY: 'false',
+    });
   });
 
   it.each([
@@ -83,15 +87,31 @@ describe('buildManagedSettings', () => {
     });
   });
 
-  it('writes events children off while events are off', () => {
+  it('writes events children off while events are off, keeping repository attribution', () => {
     const env = shapedEnv(withoutOption(SETTINGS_OPTION.LOGS));
     expect(env).toEqual({
       ...BASE.env,
       OTEL_LOGS_EXPORTER: 'none',
       OTEL_LOG_USER_PROMPTS: '0',
       OTEL_LOG_TOOL_DETAILS: '0',
-      OTEL_METRICS_INCLUDE_REPOSITORY: 'false',
     });
+  });
+
+  it('keeps repository attribution in a metrics-only snippet', () => {
+    const env = shapedEnv({ ...DEFAULT_SETTINGS_SELECTION, logs: false });
+    expect(env.OTEL_METRICS_INCLUDE_REPOSITORY).toBe(BASE.env.OTEL_METRICS_INCLUDE_REPOSITORY);
+    expect(env.OTEL_METRICS_INCLUDE_REPOSITORY).not.toBe('false');
+  });
+
+  it('turns repository attribution off with metrics, even when it stays selected', () => {
+    const env = shapedEnv(withoutOption(SETTINGS_OPTION.METRICS));
+    expect(env.OTEL_METRICS_INCLUDE_REPOSITORY).toBe('false');
+  });
+
+  it('does not tie repository attribution to events in an events-only snippet', () => {
+    const env = shapedEnv({ ...DEFAULT_SETTINGS_SELECTION, metrics: false });
+    expect(env.OTEL_METRICS_EXPORTER).toBe('none');
+    expect(env.OTEL_LOG_USER_PROMPTS).toBe(BASE.env.OTEL_LOG_USER_PROMPTS);
   });
 
   it('returns undefined when no signal is on', () => {
@@ -123,13 +143,12 @@ describe('hasSingleSignal', () => {
 describe('estimateStorage', () => {
   it.each([
     ['default', DEFAULT_SETTINGS_SELECTION, { rawMb: 73, monthlyMb: 21 }],
-    ['events off', withoutOption(SETTINGS_OPTION.LOGS), { rawMb: 20, monthlyMb: 1 }],
+    ['events off', withoutOption(SETTINGS_OPTION.LOGS), { rawMb: 30, monthlyMb: 4 }],
     [
-      'events off with repository still selected',
-      { ...withoutOption(SETTINGS_OPTION.LOGS), repository: true },
-      { rawMb: 20, monthlyMb: 1 },
+      'metrics off with repository still selected',
+      { ...withoutOption(SETTINGS_OPTION.METRICS), repository: true },
+      { rawMb: 43, monthlyMb: 17 },
     ],
-    ['metrics off', withoutOption(SETTINGS_OPTION.METRICS), { rawMb: 53, monthlyMb: 20 }],
   ])('estimates storage for the selected signals (%s)', (_name, selection, expected) => {
     expect(estimateStorage(selection)).toEqual(expected);
   });

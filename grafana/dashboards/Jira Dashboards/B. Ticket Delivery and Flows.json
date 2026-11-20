@@ -54,21 +54,20 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "text"
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
+                "color": "text",
+                "value": null
               }
             ]
-          }
+          },
+          "unit": "d"
         },
         "overrides": []
       },
@@ -124,7 +123,7 @@
           }
         }
       ],
-      "title": "Mean Issue Lead Time in days",
+      "title": "Issue lead time (p50 / p85 / p95)",
       "type": "stat"
     },
     {
@@ -218,7 +217,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT $__timeGroup(s.started_date, $interval) as time, \n  COUNT(1) as committed, \n  SUM(CASE WHEN i.resolution_date IS NOT NULL\n\t\tAND i.resolution_date >= s.started_date \n\t\tAND i.resolution_date <= s.ended_date\n\t\tTHEN 1 ELSE 0 END) AS Delivered\nFROM sprint_issues si \nJOIN sprints s ON s.id = si.sprint_id \nJOIN issues i ON i.id = si.issue_id \nWHERE s.id LIKE 'jira:%'\n  AND $__timeFilter(s.started_date)\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = si.issue_id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n  )\nGROUP BY time",
+          "rawSql": "SELECT GREATEST($__timeGroup(s.started_date, $interval), $__timeFrom()) as time, \n  COUNT(1) as committed, \n  SUM(CASE WHEN i.resolution_date IS NOT NULL\n\t\tAND i.resolution_date >= s.started_date \n\t\tAND i.resolution_date <= s.ended_date\n\t\tTHEN 1 ELSE 0 END) AS Delivered\nFROM sprint_issues si \nJOIN sprints s ON s.id = si.sprint_id \nJOIN issues i ON i.id = si.issue_id \nWHERE s.id LIKE 'jira:%'\n  AND $__timeFilter(s.started_date)\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = si.issue_id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n  )\nGROUP BY time",
           "refId": "A",
           "sql": {
             "columns": [
@@ -300,7 +299,23 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Closed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
@@ -333,7 +348,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT time, SUM(Opened) as Opened, SUM(Closed) as Closed\nFROM\n(\n  SELECT $__timeGroup(i.created_date, $interval)   AS time,\n    COUNT(i.id) AS Opened,\n    0 AS Closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id and bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time\n  UNION\n  SELECT $__timeGroup(i.resolution_date, $interval)   AS time,\n    0 AS Opened,\n    COUNT(i.id) AS Closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND i.resolution_date IS NOT NULL\n    AND $__timeFilter(i.resolution_date)\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id and bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time\n) base\nGROUP BY time",
+          "rawSql": "SELECT time, SUM(Opened) as Opened, SUM(Closed) as Closed\nFROM\n(\n  SELECT GREATEST($__timeGroup(i.created_date, $interval), $__timeFrom())   AS time,\n    COUNT(i.id) AS Opened,\n    0 AS Closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id and bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time\n  UNION\n  SELECT GREATEST($__timeGroup(i.resolution_date, $interval), $__timeFrom())   AS time,\n    0 AS Opened,\n    COUNT(i.id) AS Closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND i.resolution_date IS NOT NULL\n    AND $__timeFilter(i.resolution_date)\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id and bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time\n) base\nGROUP BY time",
           "refId": "A",
           "sql": {
             "columns": [
@@ -403,7 +418,23 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Closed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -445,7 +476,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT DATE_FORMAT(ts, '%b %y') as `Month`, sum(opened) as `Opened`, sum(closed) as `Closed`\nFROM (\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    count(*) as opened,\n    0 as closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND EXISTS (\n      SELECT 1 FROM board_issues bi\n      WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY ts\n  UNION\n  SELECT DATE_FORMAT(i.resolution_date, '%Y-%m-01') as ts,\n    0 as opened,\n    count(*) as closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.resolution_date) \n    AND EXISTS (\n      SELECT 1 FROM board_issues bi\n      WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY ts\n) base\nGROUP BY ts\nORDER BY ts",
+          "rawSql": "SELECT DATE_FORMAT(ts, '%b %Y') as `Month`, sum(opened) as `Opened`, sum(closed) as `Closed`\nFROM (\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    count(*) as opened,\n    0 as closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND EXISTS (\n      SELECT 1 FROM board_issues bi\n      WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY ts\n  UNION\n  SELECT DATE_FORMAT(i.resolution_date, '%Y-%m-01') as ts,\n    0 as opened,\n    count(*) as closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.resolution_date) \n    AND EXISTS (\n      SELECT 1 FROM board_issues bi\n      WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY ts\n) base\nGROUP BY ts\nORDER BY ts",
           "refId": "A",
           "sql": {
             "columns": [
@@ -523,7 +554,23 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "In Progress"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
@@ -610,7 +657,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -624,7 +672,9 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "d",
+          "decimals": 1
         },
         "overrides": [
           {
@@ -777,7 +827,9 @@
                 "color": "green"
               }
             ]
-          }
+          },
+          "unit": "d",
+          "decimals": 1
         },
         "overrides": []
       },
@@ -854,7 +906,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "text"
           },
           "mappings": [],
           "noValue": "No Data",
@@ -862,7 +915,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "text",
+                "value": null
               }
             ]
           }
@@ -916,18 +970,16 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "text"
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
+                "color": "text",
+                "value": null
               }
             ]
           }
@@ -996,7 +1048,7 @@
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "query": "SELECT p.project_name AS __text, p.project_name AS __value FROM (\nselect DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\n) p\nUNION ALL\nSELECT '(no projects with Jira data)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\n)\nORDER BY __text",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -1018,7 +1070,7 @@
         "multi": true,
         "name": "board_id",
         "options": [],
-        "query": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
+        "query": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nUNION ALL\nSELECT '(no Jira boards)--__none__' FROM DUAL WHERE NOT EXISTS (\nSELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nORDER BY text",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"

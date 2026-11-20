@@ -178,7 +178,7 @@ func TestGithubConnAccessTokenAuth_RejectsInvalidResponses(t *testing.T) {
 		body       string
 		wantErrMsg string
 	}{
-		{name: "unauthorized", status: http.StatusUnauthorized, body: `{}`},
+		{name: "unauthorized", status: http.StatusUnauthorized, body: `{}`, wantErrMsg: "GitHub rejected the token (401). Check that it is correct and not expired."},
 		{name: "forbidden", status: http.StatusForbidden, body: `{}`},
 		{name: "malformed user response", status: http.StatusOK, body: `{`},
 		{name: "empty login", status: http.StatusOK, body: `{"login":""}`, wantErrMsg: "invalid token"},

@@ -1,0 +1,57 @@
+{
+  "plugin": "plane",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.plane.so",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0,
+      "workspaceSlug": ""
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. acme-team"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Plane API base URL. Use the cloud default or your self-hosted Plane endpoint.API Key*Workspace-scoped Plane API key used for authentication.Workspace Slug*The workspace slug from your Plane URL, for example `acme-team` in `/workspaces/acme-team/`.ProxyAdd a proxy if you cannot access Plane directly.Custom Rate LimitMaximum number of API requests per hour. Leave blank for default.",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "token": "v2",
+      "proxy": "v4",
+      "rateLimitPerHour": 0,
+      "workspaceSlug": "v3"
+    }
+  },
+  "scopeConfig": null,
+  "consoleErrors": [],
+  "requests": []
+}

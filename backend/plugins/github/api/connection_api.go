@@ -209,7 +209,7 @@ func testGithubConnAccessTokenAuth(ctx context.Context, conn models.GithubConn) 
 		return nil, errors.BadInput.Wrap(err, "verify token failed")
 	}
 	if res.StatusCode == http.StatusUnauthorized {
-		return nil, errors.HttpStatus(http.StatusBadRequest).New("StatusUnauthorized error when testing connection")
+		return nil, errors.BadInput.New("GitHub rejected the token (401). Check that it is correct and not expired.")
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, errors.HttpStatus(res.StatusCode).New("unexpected status code while testing connection")

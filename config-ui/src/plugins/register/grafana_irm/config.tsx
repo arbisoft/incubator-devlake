@@ -23,7 +23,7 @@ import Icon from './assets/icon.svg';
 export const GrafanaIrmConfig: IPluginConfig = {
   plugin: 'grafana_irm',
   name: 'Grafana IRM',
-  icon: () => <img src={Icon} style={{ width: '100%', height: '100%' }} />,
+  icon: () => <img alt="" src={Icon} style={{ width: '100%', height: '100%' }} />,
   sort: 21,
   isBeta: true,
   connection: {

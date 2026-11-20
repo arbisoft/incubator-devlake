@@ -18,10 +18,13 @@
 
 import { ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { CompanyId } from './connection-fields';
+import type { TapdConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<TapdConnectionValues>;
 
 export const TAPDConfig: IPluginConfig = {
   plugin: 'tapd',
@@ -56,7 +59,7 @@ export const TAPDConfig: IPluginConfig = {
         label: 'API Token',
         placeholder: 'Your API Token',
       },
-      ({ initialValues, values, errors, setValues, setErrors }: any) => (
+      ({ initialValues, values, errors, setValues, setErrors }: RenderProps) => (
         <CompanyId
           key="companyId"
           initialValue={initialValues.companyId}

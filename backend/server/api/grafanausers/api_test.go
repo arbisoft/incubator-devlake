@@ -289,6 +289,7 @@ func TestWriteRoutesReturnCodedErrors(t *testing.T) {
 		{http.MethodPatch, "/access/grafana/users/4", `{"name":"x"}`, ErrCodeUserProtected, http.StatusForbidden},
 		{http.MethodPatch, "/access/grafana/users/3", `{"name":"x"}`, ErrCodeUserSSOManaged, http.StatusConflict},
 		{http.MethodPut, "/access/grafana/users/2/password", `{"password":"short"}`, ErrCodePasswordShort, http.StatusBadRequest},
+		{http.MethodPut, "/access/grafana/users/2/password", `{"password":"abcdefghijklmnopq"}`, ErrCodePasswordWeak, http.StatusBadRequest},
 		{http.MethodPut, "/access/grafana/users/2/projects", `{"projectNames":["nope"]}`, ErrCodeProjectMissing, http.StatusBadRequest},
 		{http.MethodPost, "/access/grafana/users", `{"email":"alice@example.com","name":"A","role":"Viewer","password":"` + testPassword + `"}`, ErrCodeUserExists, http.StatusConflict},
 		{http.MethodDelete, "/access/grafana/orphans/alice@example.com", ``, ErrCodeUserExists, http.StatusConflict},

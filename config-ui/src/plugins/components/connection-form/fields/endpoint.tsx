@@ -24,7 +24,7 @@ import { Block } from '@/components';
 type VersionType = 'cloud' | 'server';
 
 interface Props {
-  subLabel?: string;
+  subLabel?: React.ReactNode;
   disabled?: boolean;
   name: string;
   multipleVersions?: Record<VersionType, string>;

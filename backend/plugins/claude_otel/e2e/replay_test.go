@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"math/big"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -38,14 +39,15 @@ import (
 )
 
 const (
-	dateLayout             = "2006-01-02"
-	resourcesSkippedCode   = "resources_skipped"
-	hourlyActivityOrder    = "connection_id, user_key, hour_start"
-	hourlyModelOrder       = "connection_id, user_key, hour_start, model, query_source"
-	hourlyToolOrder        = "connection_id, user_key, hour_start, tool_name, language"
-	canonicalActivityOrder = "workspace_key, user_key, date, type, interface_type"
-	canonicalModelOrder    = "workspace_key, user_key, date, model"
-	canonicalToolOrder     = "workspace_key, user_key, date, tool_name"
+	dateLayout              = "2006-01-02"
+	resourcesSkippedCode    = "resources_skipped"
+	hourlyActivityOrder     = "connection_id, user_key, hour_start"
+	hourlyModelOrder        = "connection_id, user_key, hour_start, model, query_source, effort, agent_name, skill_name"
+	hourlyToolOrder         = "connection_id, user_key, hour_start, tool_name, language, decision_source"
+	hourlySessionStartOrder = "connection_id, user_key, hour_start, session_id, start_type"
+	canonicalActivityOrder  = "workspace_key, user_key, date, type, interface_type"
+	canonicalModelOrder     = "workspace_key, user_key, date, model"
+	canonicalToolOrder      = "workspace_key, user_key, date, tool_name"
 )
 
 var e2eUser = &common.User{Name: "E2E", Email: "e2e@example.com"}
@@ -66,7 +68,7 @@ func newWorld(t *testing.T) *world {
 	for _, table := range models.GetTablesInfo() {
 		tester.FlushTabler(table)
 	}
-	for _, table := range []dal.Tabler{&ai.AiActivity{}, &ai.AiModelUsage{}, &ai.AiToolDecision{}, &ai.AiSourcePreference{}, &ai.AiPrompt{}, &ai.AiPromptSkill{}, &ai.AiPermissionModeChange{}, &crossdomain.Account{}} {
+	for _, table := range []dal.Tabler{&ai.AiActivity{}, &ai.AiModelUsage{}, &ai.AiToolDecision{}, &ai.AiSourcePreference{}, &ai.AiPrompt{}, &ai.AiPromptSkill{}, &ai.AiPromptFailure{}, &ai.AiPermissionModeChange{}, &ai.AiPromptTool{}, &ai.AiSessionHook{}, &crossdomain.Account{}} {
 		tester.FlushTabler(table)
 	}
 	now := time.Now().UTC()
@@ -113,22 +115,24 @@ func clearVolatile(v reflect.Value) {
 
 // facts is every hourly and canonical row one connection produced.
 type facts struct {
-	Activity   []models.OtelHourlyActivity
-	Model      []models.OtelHourlyModelUsage
-	Tool       []models.OtelHourlyToolUsage
-	AiActivity []ai.AiActivity
-	AiModel    []ai.AiModelUsage
-	AiTool     []ai.AiToolDecision
+	Activity     []models.OtelHourlyActivity
+	Model        []models.OtelHourlyModelUsage
+	Tool         []models.OtelHourlyToolUsage
+	SessionStart []models.OtelHourlySessionStart
+	AiActivity   []ai.AiActivity
+	AiModel      []ai.AiModelUsage
+	AiTool       []ai.AiToolDecision
 }
 
 func (w *world) factsOf(connectionID uint64) facts {
 	return facts{
-		Activity:   snapshot[models.OtelHourlyActivity](w, hourlyActivityOrder, "connection_id = ?", connectionID),
-		Model:      snapshot[models.OtelHourlyModelUsage](w, hourlyModelOrder, "connection_id = ?", connectionID),
-		Tool:       snapshot[models.OtelHourlyToolUsage](w, hourlyToolOrder, "connection_id = ?", connectionID),
-		AiActivity: snapshot[ai.AiActivity](w, canonicalActivityOrder, "source_connection_id = ?", connectionID),
-		AiModel:    snapshot[ai.AiModelUsage](w, canonicalModelOrder, "source_connection_id = ?", connectionID),
-		AiTool:     snapshot[ai.AiToolDecision](w, canonicalToolOrder, "source_connection_id = ?", connectionID),
+		Activity:     snapshot[models.OtelHourlyActivity](w, hourlyActivityOrder, "connection_id = ?", connectionID),
+		Model:        snapshot[models.OtelHourlyModelUsage](w, hourlyModelOrder, "connection_id = ?", connectionID),
+		Tool:         snapshot[models.OtelHourlyToolUsage](w, hourlyToolOrder, "connection_id = ?", connectionID),
+		SessionStart: snapshot[models.OtelHourlySessionStart](w, hourlySessionStartOrder, "connection_id = ?", connectionID),
+		AiActivity:   snapshot[ai.AiActivity](w, canonicalActivityOrder, "source_connection_id = ?", connectionID),
+		AiModel:      snapshot[ai.AiModelUsage](w, canonicalModelOrder, "source_connection_id = ?", connectionID),
+		AiTool:       snapshot[ai.AiToolDecision](w, canonicalToolOrder, "source_connection_id = ?", connectionID),
 	}
 }
 
@@ -136,9 +140,22 @@ func requireFilled(t *testing.T, f facts) {
 	require.NotEmpty(t, f.Activity)
 	require.NotEmpty(t, f.Model)
 	require.NotEmpty(t, f.Tool)
+	require.NotEmpty(t, f.SessionStart)
 	require.NotEmpty(t, f.AiActivity)
 	require.NotEmpty(t, f.AiModel)
 	require.NotEmpty(t, f.AiTool)
+	require.True(t, slices.ContainsFunc(f.Model, func(row models.OtelHourlyModelUsage) bool { return row.Effort != "" }))
+	require.True(t, slices.ContainsFunc(f.Model, func(row models.OtelHourlyModelUsage) bool { return row.AgentName != "" }))
+	require.True(t, slices.ContainsFunc(f.Tool, func(row models.OtelHourlyToolUsage) bool { return row.DecisionSource != "" }))
+	require.True(t, slices.ContainsFunc(f.SessionStart, func(row models.OtelHourlySessionStart) bool { return row.SessionId != "" }))
+	var starts, sessions int64
+	for _, row := range f.SessionStart {
+		starts += row.StartCount
+	}
+	for _, row := range f.Activity {
+		sessions += row.SessionCount
+	}
+	require.Equal(t, sessions, starts)
 }
 
 // userKeys lists the distinct developers across every row of the set.
@@ -151,6 +168,9 @@ func (f facts) userKeys() map[string]struct{} {
 		keys[row.UserKey] = struct{}{}
 	}
 	for _, row := range f.Tool {
+		keys[row.UserKey] = struct{}{}
+	}
+	for _, row := range f.SessionStart {
 		keys[row.UserKey] = struct{}{}
 	}
 	for _, row := range f.AiActivity {
@@ -175,6 +195,9 @@ func (f facts) organizations() map[string]struct{} {
 		orgs[*row.OrganizationId] = struct{}{}
 	}
 	for _, row := range f.Tool {
+		orgs[*row.OrganizationId] = struct{}{}
+	}
+	for _, row := range f.SessionStart {
 		orgs[*row.OrganizationId] = struct{}{}
 	}
 	for _, row := range f.AiActivity {
@@ -226,10 +249,13 @@ func (w *world) requireReplaysCompleted() []models.OtelReplayRequest {
 
 // logFacts is every event and prompt row the log converter wrote for one connection.
 type logFacts struct {
-	Events []models.OtelEvent
-	Prompt []ai.AiPrompt
-	Skill  []ai.AiPromptSkill
-	Mode   []ai.AiPermissionModeChange
+	Events  []models.OtelEvent
+	Prompt  []ai.AiPrompt
+	Skill   []ai.AiPromptSkill
+	Failure []ai.AiPromptFailure
+	Mode    []ai.AiPermissionModeChange
+	Tool    []ai.AiPromptTool
+	Hook    []ai.AiSessionHook
 }
 
 // requireLogsOn asserts the connection has events, and the organization has prompts, for one user on one UTC day.
@@ -238,14 +264,33 @@ func (w *world) requireLogsOn(connectionID uint64, org string, who actor, day ti
 	next := day.AddDate(0, 0, 1)
 	require.Positive(w.t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND event_timestamp >= ? AND event_timestamp < ?", connectionID, org, who.logUserKey(), day, next), "%s %s", who.name, day.Format(dateLayout))
 	require.Positive(w.t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", org, who.logUserKey(), day, next), "%s %s", who.name, day.Format(dateLayout))
+	// A converted prompt carries the effort its main-thread request reported, or its only
+	// request's, and NULL when its requests reported none.
+	for _, prompt := range snapshot[ai.AiPrompt](w, "prompt_id", "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", org, who.logUserKey(), day, next) {
+		require.Equal(w.t, fxPromptEffort(who.promptSeed(w.t, prompt.PromptId)), promptEffort(w.t, prompt), prompt.PromptId)
+	}
+}
+
+// promptEffort is the prompt's effort, or "" when it is NULL. It fails on a stored empty
+// effort, which would read as a level rather than as no effort.
+func promptEffort(t *testing.T, prompt ai.AiPrompt) string {
+	t.Helper()
+	if prompt.Effort == nil {
+		return ""
+	}
+	require.NotEmpty(t, *prompt.Effort, "%s stored an empty effort instead of NULL", prompt.PromptId)
+	return *prompt.Effort
 }
 
 func (w *world) logFactsOf(connectionID uint64, org string) logFacts {
 	return logFacts{
-		Events: snapshot[models.OtelEvent](w, "event_key", "connection_id = ?", connectionID),
-		Prompt: snapshot[ai.AiPrompt](w, "workspace_key, prompt_id", "workspace_key = ?", org),
-		Skill:  snapshot[ai.AiPromptSkill](w, "workspace_key, prompt_id, skill_name", "workspace_key = ?", org),
-		Mode:   snapshot[ai.AiPermissionModeChange](w, "workspace_key, session_id, changed_at", "workspace_key = ?", org),
+		Events:  snapshot[models.OtelEvent](w, "event_key", "connection_id = ?", connectionID),
+		Prompt:  snapshot[ai.AiPrompt](w, "workspace_key, prompt_id", "workspace_key = ?", org),
+		Skill:   snapshot[ai.AiPromptSkill](w, "workspace_key, prompt_id, skill_name", "workspace_key = ?", org),
+		Failure: snapshot[ai.AiPromptFailure](w, "workspace_key, prompt_id, id", "workspace_key = ?", org),
+		Mode:    snapshot[ai.AiPermissionModeChange](w, "workspace_key, session_id, changed_at", "workspace_key = ?", org),
+		Tool:    snapshot[ai.AiPromptTool](w, "workspace_key, prompt_id, tool_name, mcp_server_name", "workspace_key = ?", org),
+		Hook:    snapshot[ai.AiSessionHook](w, "workspace_key, session_id, hook_source, hook_event, hook_name", "workspace_key = ?", org),
 	}
 }
 
@@ -312,6 +357,7 @@ func TestRebindAndReplayRebuildsOnlyTheReboundTeam(t *testing.T) {
 	require.Zero(t, w.count(&models.OtelHourlyActivity{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
 	require.Zero(t, w.count(&models.OtelHourlyModelUsage{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
 	require.Zero(t, w.count(&models.OtelHourlyToolUsage{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
+	require.Zero(t, w.count(&models.OtelHourlySessionStart{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
 	require.Zero(t, w.count(&ai.AiActivity{}, "user_key = ? AND workspace_key = ?", stray.userKey(), orgW))
 	require.Zero(t, w.count(&ai.AiModelUsage{}, "user_key = ? AND workspace_key = ?", stray.userKey(), orgW))
 	require.Zero(t, w.count(&ai.AiToolDecision{}, "user_key = ? AND workspace_key = ?", stray.userKey(), orgW))
@@ -481,7 +527,7 @@ func TestRebindRevokedConnectionRecoversItsLivePeriod(t *testing.T) {
 	afterRevoked := w.factsOf(revoked.ID)
 	requireFilled(t, afterRevoked)
 	require.Equal(t, beforeSuccessor, w.factsOf(successor.ID))
-	for _, table := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}} {
+	for _, table := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}, &models.OtelHourlySessionStart{}} {
 		require.Positive(t, w.count(table, "connection_id = ? AND hour_start >= ? AND hour_start < ?", revoked.ID, w.day(-2), w.day(-1)))
 		require.Zero(t, w.count(table, "connection_id = ? AND hour_start >= ?", revoked.ID, revokedAt))
 		require.Zero(t, w.count(table, "connection_id = ? AND hour_start < ?", successor.ID, revokedAt))
@@ -502,6 +548,7 @@ func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
 	for _, set := range []logFacts{beforeB, beforeC} {
 		require.NotEmpty(t, set.Events)
 		require.NotEmpty(t, set.Prompt)
+		require.NotEmpty(t, set.Failure)
 	}
 
 	w.rebind(fixture.a, orgR, w.replayDates(-2, 0))
@@ -513,9 +560,17 @@ func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
 			w.requireLogsOn(fixture.a.ID, orgR, who, w.day(offset))
 		}
 	}
-	require.Equal(t, int64(120), w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ?", fixture.a.ID, orgR))
+	want := expectLogs(baseLayout, 3, func(who actor) bool { return who.team == "alpha" && who.org == orgR })
+	require.Equal(t, int64(want.events), w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ?", fixture.a.ID, orgR))
 	require.Equal(t, beforeB, w.logFactsOf(fixture.b.ID, orgB))
 	require.Equal(t, beforeC, w.logFactsOf(fixture.c.ID, orgC))
+	reboundR := w.logFactsOf(fixture.a.ID, orgR)
+	require.NotEmpty(t, reboundR.Failure)
+	failureKinds := make(map[string]int)
+	for _, failure := range reboundR.Failure {
+		failureKinds[failure.FailureKind]++
+	}
+	require.Equal(t, map[string]int{ai.FailureKindToolError: want.toolErrors, ai.FailureKindApiError: want.apiErrors}, failureKinds)
 
 	requests := w.requireReplaysCompleted()
 	require.Len(t, requests, 2)
@@ -527,4 +582,14 @@ func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
 	var detail struct{ Queued []uint64 }
 	require.NoError(t, json.Unmarshal([]byte(*audits[0].Detail), &detail))
 	require.Equal(t, []uint64{requests[0].ID, requests[1].ID}, detail.Queued)
+
+	// Replaying the rebound team's completed days again rebuilds the same rows.
+	_, err := service.CreateOtelReplay(e2eUser, &service.OtelReplayInput{OtelReplayRange: w.replayDates(-2, -1)})
+	require.NoError(t, err)
+	w.drainNow()
+	replays := w.requireReplaysCompleted()
+	require.Len(t, replays, len(requests)+2)
+	require.Equal(t, models.OtelReplayKindLogs, replays[len(replays)-1].Kind)
+	require.Positive(t, replays[len(replays)-1].ReplayedBatches)
+	require.Equal(t, reboundR, w.logFactsOf(fixture.a.ID, orgR))
 }

@@ -1,0 +1,94 @@
+{
+  "plugin": "bamboo",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "",
+      "username": "",
+      "password": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Username"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Password"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Provide the Bamboo instance API endpoint.Username*Password*ProxyAdd a proxy if you cannot access Bamboo directly.Custom Rate LimitBy default, DevLake uses dynamic rate limit for optimized data collection for Bamboo. But you can adjust the collection speed by entering a fixed value. Please note: the rate limit setting applies to all tokens you have entered above. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "username": "v2",
+      "password": "v3",
+      "proxy": "v4",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "envNamePattern": "(?i)prod(.*)",
+      "deploymentPattern": "",
+      "productionPattern": ""
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "checkbox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(?i)prod(.*)"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(deploy|push-image)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "prod(.*)"
+      }
+    ],
+    "text": "CI/CDDeploymentDORAUse Regular Expression to define Deployments in DevLake in order to measure DORA metrics. Learn moreConvert a Bamboo Deployment to a DevLake DeploymentIf its environment name matches, this deployment is a ‘Production Deployment’Convert a Bamboo Plan Build to a DevLake Deployment when its name or one of its job builds’ namesmatches.If the name also matches, this Deployment is a ‘Production Deployment’",
+    "typed": {
+      "envNamePattern": "v0",
+      "deploymentPattern": "v1",
+      "productionPattern": "v2"
+    }
+  },
+  "consoleErrors": [],
+  "requests": []
+}

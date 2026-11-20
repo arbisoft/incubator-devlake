@@ -20,14 +20,12 @@ import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Tag, Form, Input } from 'antd';
 
 import { ExternalLink } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
 
-interface Props {
-  entities: string[];
-  connectionId: ID;
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+import type { AsanaTransformationValues } from './types';
+
+type Props = TransformationProps<AsanaTransformationValues>;
 
 export const AsanaTransformation = ({ entities, transformation, setTransformation }: Props) => {
   const { token } = theme.useToken();

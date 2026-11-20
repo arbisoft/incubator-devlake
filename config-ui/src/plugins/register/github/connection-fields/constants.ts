@@ -32,11 +32,11 @@ export const COPY = {
   classicInvalidScopes: 'Please check the field(s) `repo:status`, `repo_deployment`, `read:user`, `read:org`.',
   classicPrivateRepositories: 'If you want to collect private repositories, please check the field `repo`.',
   fineGrainedSuccess:
-    'Connection valid. Repository permissions have not been verified. Ensure the selected repositories have Read access to Actions, Contents, Discussions, Issues, Metadata and Pull requests.',
+    'Connection valid. Repository permissions have not been verified. Ensure the selected repositories have Read access to Actions, Contents, Deployments, Discussions, Issues, Metadata and Pull requests.',
   fineGrainedAuthError: 'Authentication failed. Check that the token is valid and has not expired or been revoked.',
   tokenTestFailed: 'The token could not be tested. Check the connection and try again.',
   fineGrainedGuidance:
-    'Select the intended resource owner and repositories. Grant Read access to Actions, Contents, Discussions, Issues, Metadata and Pull requests. Organizations may require approval. Read and write access also satisfies the Read requirement; Metadata is normally included automatically.',
+    'Select the intended resource owner and repositories. Grant Read access to Actions, Contents, Deployments, Discussions, Issues, Metadata and Pull requests. Organizations may require approval. Read and write access also satisfies the Read requirement; Metadata is normally included automatically.',
   savedTokensLoadFailed: 'Could not load saved token results. Enter a token and test it again.',
   anotherToken: 'Another Token',
   removeToken: 'Remove token',

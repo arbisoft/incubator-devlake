@@ -16,13 +16,15 @@
  *
  */
 
+import { EditOutlined, KeyOutlined } from '@ant-design/icons';
+
 import { ACCESS_STATUS, type AccessStatus } from '@/api/access/constants';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaErrorCode } from '@/api/grafana-users/types';
 import { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
 import type { ConfirmConfig } from '@/ui/types';
 
-export const MAX_VISIBLE_PROJECTS = 5;
+export const MAX_VISIBLE_PROJECTS = 2;
 
 export const GRAFANA_USER_COLUMN = {
   USER: 'user',
@@ -44,16 +46,35 @@ export const GRAFANA_ROW_ACTION = { ENABLE: 'enable', DISABLE: 'disable', DELETE
 
 export const GRAFANA_MENU_ACTION = { DETAILS: 'details', PASSWORD: 'password' } as const;
 
+export const MENU_ACTION_ICON = {
+  [GRAFANA_MENU_ACTION.DETAILS]: EditOutlined,
+  [GRAFANA_MENU_ACTION.PASSWORD]: KeyOutlined,
+} as const;
+
 export const PASSWORD_MIN_LENGTH = 15;
 export const GENERATED_PASSWORD_LENGTH = 24;
-// No 0, O, 1, l or I, so a shared password can be read aloud or typed from a screen.
-export const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+// Left out of generated passwords so a shared one can be read aloud or typed from a screen; symbols also skip quotes, backslash and space.
+const AMBIGUOUS_CHARACTERS = '0O1lI';
+const LATIN_LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+const withoutAmbiguous = (characters: string) =>
+  [...characters].filter((character) => !AMBIGUOUS_CHARACTERS.includes(character)).join('');
+export const PASSWORD_CHARACTER_GROUPS = {
+  UPPER: withoutAmbiguous(LATIN_LETTERS.toUpperCase()),
+  LOWER: withoutAmbiguous(LATIN_LETTERS),
+  DIGIT: withoutAmbiguous('0123456789'),
+  SYMBOL: '!#$%*+-=?@^_',
+};
+export const PASSWORD_ALPHABET = Object.values(PASSWORD_CHARACTER_GROUPS).join('');
+// Same classes as Grafana's password policy; a symbol is anything that is not a letter or digit.
+export const PASSWORD_CHARACTER_CLASSES = [/\p{Lu}/u, /\p{Ll}/u, /\p{N}/u, /[^\p{L}\p{N}]/u] as const;
 
-export const SEARCH_DEBOUNCE_MS = 300;
 export const DEVLAKE_USER_SEARCH_PAGE_SIZE = 25;
 export const PROJECT_SEARCH_PAGE_SIZE = 50;
 
 const SET_PASSWORD_LABEL = 'Set password';
+const EDIT_PROJECTS_LABEL = 'Edit projects';
+const PASSWORD_CLASSES_TEXT = 'an uppercase letter, a lowercase letter, a digit and a symbol';
+const PASSWORD_RULE_TEXT = `at least ${PASSWORD_MIN_LENGTH} characters, with ${PASSWORD_CLASSES_TEXT}`;
 
 export const GRAFANA_ROLE_OPTIONS = Object.values(GRAFANA_ROLE).map((role) => ({ value: role, label: role }));
 
@@ -75,13 +96,12 @@ const ERROR_COPY: Record<GrafanaErrorCode, string> = {
   [GRAFANA_ERROR_CODE.USER_SSO_MANAGED]:
     'This account signs in with SSO, so its name, email and password are managed by the identity provider.',
   [GRAFANA_ERROR_CODE.LAST_ADMIN]: 'This is the last Grafana admin. Make someone else an Admin first.',
-  [GRAFANA_ERROR_CODE.PASSWORD_TOO_SHORT]: 'The password must be at least 15 characters.',
+  [GRAFANA_ERROR_CODE.PASSWORD_TOO_SHORT]: `The password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
+  [GRAFANA_ERROR_CODE.PASSWORD_WEAK]: `The password needs ${PASSWORD_CLASSES_TEXT}.`,
   [GRAFANA_ERROR_CODE.PASSWORD_REJECTED]: 'Grafana rejected this password. Try a longer or more varied one.',
   [GRAFANA_ERROR_CODE.PROJECT_NOT_FOUND]: 'One of the selected projects no longer exists. Refresh and try again.',
   [GRAFANA_ERROR_CODE.PARTIAL]: "The account was created, but its role or projects weren't saved. Retry to finish.",
 };
-
-export const GRAFANA_ERROR_MAP: Record<string, string> = { ...ERROR_COPY };
 
 export const GRAFANA_FLOW_ERRORS = {
   ROLE: withErrors({
@@ -89,7 +109,6 @@ export const GRAFANA_FLOW_ERRORS = {
   }),
   STATUS: withErrors({
     [GRAFANA_ERROR_CODE.USER_PROTECTED]: "Grafana server administrators can't be disabled here.",
-    [GRAFANA_ERROR_CODE.LAST_ADMIN]: 'This is the last Grafana admin. Make someone else an Admin first.',
   }),
   DELETE: withErrors({
     [GRAFANA_ERROR_CODE.USER_PROTECTED]: "Grafana server administrators can't be deleted here.",
@@ -125,6 +144,7 @@ export const COPY = {
     [ACCESS_STATUS.DISABLED]: 'Disabled',
   } as Record<AccessStatus, string>,
   sso: { tag: 'SSO', label: 'Signed in with SSO' },
+  noProjects: 'No projects',
   moreProjects: (count: number) => `+${count}`,
   empty: {
     title: 'No Grafana users yet',
@@ -146,22 +166,21 @@ export const COPY = {
     addUser: 'Add user',
     enable: 'Enable',
     disable: 'Disable',
-    editDetails: 'Edit details',
-    setPassword: SET_PASSWORD_LABEL,
     review: 'Review',
     close: 'Close',
     columnLabel: 'Actions',
     roleFor: (email: string) => `Role for ${email}`,
     roleLocked: 'Grafana server administrators keep their role.',
     editProjectsFor: (email: string) => `Edit projects for ${email}`,
-    moreFor: (email: string) => `More actions for ${email}`,
+    editDetailsFor: (email: string) => `Edit details for ${email}`,
+    setPasswordFor: (email: string) => `Set password for ${email}`,
     enableFor: (email: string) => `Enable ${email}`,
     disableFor: (email: string) => `Disable ${email}`,
     deleteFor: (email: string) => `Delete ${email}`,
   },
   password: {
     label: 'Password',
-    rule: 'At least 15 characters.',
+    rule: `Use ${PASSWORD_RULE_TEXT}.`,
     generate: 'Generate',
     copy: 'Copy password',
     oneTime: {
@@ -176,7 +195,7 @@ export const COPY = {
     title: 'Add Grafana user',
     submit: 'Add user',
     retry: 'Retry',
-    disabledReason: 'Enter a valid email, a name and a password of at least 15 characters.',
+    disabledReason: `Enter a valid email, a name and a password of ${PASSWORD_RULE_TEXT}.`,
     fillFrom: { label: 'Fill from DevLake user', placeholder: 'Search DevLake users', empty: 'No DevLake users found' },
     email: { label: 'Email', placeholder: 'person@company.com' },
     invalidEmail: 'Enter a valid email address.',
@@ -199,7 +218,7 @@ export const COPY = {
     },
   },
   projects: {
-    title: 'Edit projects',
+    title: EDIT_PROJECTS_LABEL,
     submit: 'Save',
     description: (email: string) => `Choose the projects ${email} can open in Grafana.`,
     label: 'Projects',
@@ -210,7 +229,7 @@ export const COPY = {
   setPassword: {
     title: SET_PASSWORD_LABEL,
     submit: SET_PASSWORD_LABEL,
-    disabledReason: 'Enter a password of at least 15 characters.',
+    disabledReason: `Enter a password of ${PASSWORD_RULE_TEXT}.`,
     description: (email: string) => `Choose a new password for ${email}.`,
   },
   confirm: {

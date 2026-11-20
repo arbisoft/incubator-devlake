@@ -26,7 +26,7 @@ export interface ITask {
   pipelineCol: number;
   beganAt: string | null;
   finishedAt: string | null;
-  options: any;
+  options: Record<string, unknown>;
   message: string;
   errorName: string;
   progressDetail?: {

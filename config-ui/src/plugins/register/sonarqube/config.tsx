@@ -17,10 +17,13 @@
  */
 
 import { DOC_URL } from '@/release';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { Organization } from './connection-fields/organization';
+import type { SonarQubeConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<SonarQubeConnectionValues>;
 
 export const SonarQubeConfig: IPluginConfig = {
   plugin: 'sonarqube',
@@ -43,7 +46,7 @@ export const SonarQubeConfig: IPluginConfig = {
         cloudName: 'SonarCloud',
         subLabel: 'The URL should be `http://<sonarqube-host>:<port>/api/`',
       },
-      ({ type, initialValues, values, errors, setValues, setErrors }: any) => (
+      ({ type, initialValues, values, errors, setValues, setErrors }: RenderProps) => (
         <Organization
           key="organization"
           type={type}

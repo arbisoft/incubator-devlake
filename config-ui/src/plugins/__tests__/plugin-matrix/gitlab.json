@@ -1,0 +1,92 @@
+{
+  "plugin": "gitlab",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://gitlab.com/api/v4/",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.GitLab*GitLab CloudGitLab Server (v11+)If you are using GitLab Cloud, you do not need to enter the endpoint URL, which is https://gitlab.com/api/v4/.Personal Access Token*Learn how to create a personal access tokenProxyAdd a proxy if you cannot access GitLab directly.Custom Rate LimitBy default, DevLake uses dynamic rate limit around 12,000 requests/hour for optimized data collection for GitLab. But you can adjust the collection speed by entering a fixed value. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "https://gitlab.com/api/v4/",
+      "token": "v1",
+      "proxy": "v2",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "envNamePattern": "(?i)prod(.*)",
+      "deploymentPattern": "",
+      "productionPattern": "",
+      "prSizeExcludedFileExtensions": []
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "checkbox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(?i)prod(.*)"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(deploy|push-image)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "prod(.*)"
+      }
+    ],
+    "text": "CI/CDDeploymentDORAUse Regular Expression to define Deployments in DevLake in order to measure DORA metrics. Learn moreConvert a GitLab Deployment to a DevLake DeploymentIf its environment name matches, this deployment is a ‘Production Deployment’Convert a GitLab Pipeline as a DevLake Deployment when:Its branch/tag name or one of its jobs matches*If the name also matches, this deployment is a ‘Production Deployment’Code Review",
+    "typed": {
+      "envNamePattern": "v0",
+      "deploymentPattern": "v1",
+      "productionPattern": "v2",
+      "prSizeExcludedFileExtensions": []
+    }
+  },
+  "consoleErrors": [],
+  "requests": []
+}

@@ -16,21 +16,19 @@
  *
  */
 
-import type { RadioChangeEvent } from 'antd';
-import { Radio, Input } from 'antd';
+import { Input, Radio, type RadioChangeEvent } from 'antd';
 import { useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
+import type { ConnectionFieldRenderProps } from '@/types';
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  errors: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+import type { BitbucketConnectionValues } from '../types';
+
+type Props = Pick<
+  ConnectionFieldRenderProps<BitbucketConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'errors' | 'setValues' | 'setErrors'
+>;
 
 export const Auth = ({ type, initialValues, values, setValues, setErrors }: Props) => {
   useEffect(() => {
@@ -49,6 +47,9 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
       auth: required ? '' : 'auth is required',
     });
   }, [values, type, initialValues.endpoint]);
+
+  const { endpoint, usesApiToken, username, password } = values;
+  const credentialName = usesApiToken ? 'API Token' : 'App Password';
 
   const handleChangeEndpoint = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues({
@@ -83,16 +84,11 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
         description="Provide the Bitbucket instance API endpoint. For Bitbucket Cloud, use https://api.bitbucket.org/2.0/. Please note that the endpoint URL should end with /."
         required
       >
-        <Input
-          placeholder="https://api.bitbucket.org/2.0/"
-          value={values.endpoint}
-          onChange={handleChangeEndpoint}
-          disabled
-        />
+        <Input placeholder="https://api.bitbucket.org/2.0/" value={endpoint} onChange={handleChangeEndpoint} disabled />
       </Block>
 
       <Block title="Credential Type" required>
-        <Radio.Group value={values.usesApiToken ? 'apiToken' : 'appPassword'} onChange={handleChangeMethod}>
+        <Radio.Group value={usesApiToken ? 'apiToken' : 'appPassword'} onChange={handleChangeMethod}>
           <Radio value="apiToken">API Token (Recommended)</Radio>
           <Radio value="appPassword">App Password (Deprecated)</Radio>
         </Radio.Group>
@@ -101,26 +97,26 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
       <Block
         title="Username"
         description={
-          values.usesApiToken
+          usesApiToken
             ? 'Your Atlassian account email address (e.g., user@example.com)'
             : 'Your Bitbucket username (found at bitbucket.org/account/settings/)'
         }
         required
       >
         <Input
-          placeholder={values.usesApiToken ? 'user@example.com' : 'Your Bitbucket Username'}
-          value={values.username}
+          placeholder={usesApiToken ? 'user@example.com' : 'Your Bitbucket Username'}
+          value={username}
           onChange={handleChangeUsername}
         />
       </Block>
 
       <Block
-        title={values.usesApiToken ? 'API Token' : 'App Password'}
+        title={usesApiToken ? 'API Token' : 'App Password'}
         description={
           <ExternalLink
-            link={values.usesApiToken ? DOC_URL.PLUGIN.BITBUCKET.API_TOKEN : DOC_URL.PLUGIN.BITBUCKET.APP_PASSWORD}
+            link={usesApiToken ? DOC_URL.PLUGIN.BITBUCKET.API_TOKEN : DOC_URL.PLUGIN.BITBUCKET.APP_PASSWORD}
           >
-            {values.usesApiToken
+            {usesApiToken
               ? 'Learn about how to create an API Token'
               : 'Learn about how to create an App Password (deprecated)'}
           </ExternalLink>
@@ -128,8 +124,8 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
         required
       >
         <Input.Password
-          placeholder={type === 'update' ? '********' : `Your ${values.usesApiToken ? 'API Token' : 'App Password'}`}
-          value={values.password}
+          placeholder={type === 'update' ? '********' : `Your ${credentialName}`}
+          value={password}
           onChange={handleChangePassword}
         />
       </Block>

@@ -16,10 +16,13 @@
  *
  */
 
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { Endpoint } from './connection-fields';
+import type { YouTrackConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<YouTrackConnectionValues>;
 
 export const YoutrackConfig: IPluginConfig = {
   plugin: 'youtrack',
@@ -36,7 +39,7 @@ export const YoutrackConfig: IPluginConfig = {
     showTestResultMessage: true,
     fields: [
       'name',
-      ({ type, initialValues, values, errors, setValues, setErrors }: any) => (
+      ({ type, initialValues, values, errors, setValues, setErrors }: RenderProps) => (
         <Endpoint
           key="endpoint"
           type={type}

@@ -17,10 +17,13 @@
  */
 
 import { DOC_URL } from '@/release';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { DBUrl } from './connection-fields';
+import type { ZentaoConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<ZentaoConnectionValues>;
 
 export const ZenTaoConfig: IPluginConfig = {
   plugin: 'zentao',
@@ -39,7 +42,7 @@ export const ZenTaoConfig: IPluginConfig = {
       },
       'username',
       'password',
-      ({ initialValues, values, setValues }: any) => (
+      ({ initialValues, values, setValues }: RenderProps) => (
         <DBUrl
           initialValue={initialValues.dbUrl}
           value={values.dbUrl}

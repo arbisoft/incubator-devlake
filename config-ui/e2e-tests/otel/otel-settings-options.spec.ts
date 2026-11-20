@@ -93,8 +93,11 @@ test.describe.serial('Claude Code OTel managed settings options', () => {
         OTEL_LOGS_EXPORTER: 'none',
         OTEL_LOG_USER_PROMPTS: '0',
         OTEL_LOG_TOOL_DETAILS: '0',
-        OTEL_METRICS_INCLUDE_REPOSITORY: 'false',
       });
+    await expect
+      .poll(async () => (await options.settings()).env.OTEL_METRICS_INCLUDE_REPOSITORY)
+      .toBe(createdEnv.OTEL_METRICS_INCLUDE_REPOSITORY);
+    await expect(options.option(OTEL_OPTION_COPY.repository.label)).toBeVisible();
     await expect(options.option(OTEL_OPTION_COPY.promptText.label)).not.toBeVisible();
     await expect(options.option(OTEL_OPTION_COPY.toolDetails.label)).not.toBeVisible();
     await expect(options.option(OTEL_OPTION_COPY.metrics.label)).toBeDisabled();
@@ -116,7 +119,10 @@ test.describe.serial('Claude Code OTel managed settings options', () => {
       .toBe(true);
 
     await options.option(OTEL_OPTION_COPY.metrics.label).uncheck();
-    await expect.poll(async () => (await options.settings()).env).toMatchObject({ OTEL_METRICS_EXPORTER: 'none' });
+    await expect
+      .poll(async () => (await options.settings()).env)
+      .toMatchObject({ OTEL_METRICS_EXPORTER: 'none', OTEL_METRICS_INCLUDE_REPOSITORY: 'false' });
+    await expect(options.option(OTEL_OPTION_COPY.repository.label)).not.toBeVisible();
     await expect.poll(async () => (await options.settings()).env).not.toHaveProperty('OTEL_METRIC_EXPORT_INTERVAL');
 
     await snippet.close();

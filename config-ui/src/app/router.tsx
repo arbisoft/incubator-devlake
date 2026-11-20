@@ -27,6 +27,7 @@ import {
   ErrorPage,
   Layout,
   layoutLoader,
+  layoutShouldRevalidate,
   Login,
   ChangePassword,
   Connections,
@@ -43,7 +44,9 @@ import {
   SettingsAuthentication,
   SettingsUserManagement,
   accessLoader,
+  adminFeaturesLoader,
   NotFound,
+  ShellNotFound,
   ParamRedirect,
 } from '@/routes';
 
@@ -99,6 +102,7 @@ export const routes: RouteObject[] = [
     path: `${PATH_PREFIX}`,
     element: <Layout />,
     loader: layoutLoader,
+    shouldRevalidate: layoutShouldRevalidate,
     errorElement: <ErrorPage />,
     children: [
       {
@@ -167,6 +171,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: ROUTE_SEGMENTS.KEYS,
+        loader: adminFeaturesLoader,
         element: <ApiKeys />,
       },
       {
@@ -197,11 +202,19 @@ export const routes: RouteObject[] = [
             path: ROUTE_SEGMENTS.SETTINGS_ACTIVITY,
             element: <SettingsActivity />,
           },
+          {
+            path: ROUTE_SEGMENTS.WILDCARD,
+            element: <ShellNotFound />,
+          },
         ],
       },
       {
         path: ROUTE_SEGMENTS.OTEL,
         element: <Otel />,
+      },
+      {
+        path: ROUTE_SEGMENTS.WILDCARD,
+        element: <ShellNotFound />,
       },
     ],
   },

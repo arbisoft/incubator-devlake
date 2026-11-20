@@ -82,12 +82,13 @@ describe('SettingsOptions in the snippet modal', () => {
     expect(group.getByText(OPTIONS.lastSignal)).toBe(hint);
   });
 
-  it('nests repository under events', () => {
+  it('nests repository under metrics, not events', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
     fireEvent.click(checkbox(OPTION_COPY.logs.label));
-    expect(screen.queryByRole('checkbox', { name: OPTION_COPY.repository.label })).toBeNull();
-    fireEvent.click(checkbox(OPTION_COPY.logs.label));
     expect(checkbox(OPTION_COPY.repository.label)).toBeTruthy();
+    fireEvent.click(checkbox(OPTION_COPY.logs.label));
+    fireEvent.click(checkbox(OPTION_COPY.metrics.label));
+    expect(screen.queryByRole('checkbox', { name: OPTION_COPY.repository.label })).toBeNull();
   });
 
   it('explains a content option with its own storage line', async () => {
@@ -130,7 +131,7 @@ describe('SettingsOptions in the snippet modal', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
     expect(screen.getByText(OPTIONS.estimate(73, 21))).toBeTruthy();
     fireEvent.click(checkbox(OPTION_COPY.logs.label));
-    expect(screen.getByText(OPTIONS.estimate(20, 1))).toBeTruthy();
+    expect(screen.getByText(OPTIONS.estimate(30, 4))).toBeTruthy();
   });
 
   it('announces the estimate as a status, not an alert', () => {

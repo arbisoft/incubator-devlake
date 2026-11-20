@@ -65,7 +65,7 @@ function assertLocalTarget(): void {
   if (dockerHost && !dockerHost.startsWith('unix://')) {
     throw new Error('Refusing to run SQL: DOCKER_HOST points at a remote Docker daemon');
   }
-  const host = dbCredentials().host;
+  const { host } = dbCredentials();
   if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
     throw new Error(`Refusing to run SQL: E2E_DB_HOST=${host} is not a local address`);
   }

@@ -27,7 +27,7 @@ import type { GrafanaUser } from '@/api/grafana-users/types';
 import type { IProject } from '@/types';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
-import { COPY, PASSWORD_MIN_LENGTH } from '../../constants';
+import { COPY } from '../../constants';
 import { AddUserModal } from '../add-user-modal';
 
 export const grafana = vi.mocked(API.grafanaUsers);
@@ -35,7 +35,7 @@ export const projectList = vi.mocked(API.project.list);
 export const listUsers = vi.mocked(API.access.listUsers);
 export const EMAIL = 'ann@example.com';
 export const USER_NAME = 'Ann Lee';
-export const PASSWORD = 'x'.repeat(PASSWORD_MIN_LENGTH);
+export const PASSWORD = 'Abcdefghijklm1!';
 const ARIA_DISABLED_ATTRIBUTE = 'aria-disabled';
 const ARIA_DISABLED_VALUE = { TRUE: 'true', FALSE: 'false' } as const;
 

@@ -39,8 +39,8 @@ import { useEffect } from 'react';
 import { Block } from '@/components';
 
 interface Props {
-  label?: string;
-  subLabel?: string;
+  label?: React.ReactNode;
+  subLabel?: React.ReactNode;
   placeholder?: string;
   name: string;
   initialValue: string;
@@ -64,7 +64,7 @@ export const ConnectionAppId = ({ label, subLabel, placeholder, initialValue, va
   };
 
   return (
-    <Block title={label ?? 'AppId'} description={subLabel ? subLabel : null} required>
+    <Block title={label ?? 'AppId'} description={subLabel} required>
       <Input placeholder={placeholder ?? 'Your AppId'} value={value} onChange={handleChange} />
     </Block>
   );

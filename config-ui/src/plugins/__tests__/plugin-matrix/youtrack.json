@@ -1,0 +1,130 @@
+{
+  "plugin": "youtrack",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "https://example.myjetbrains.com/youtrack/api"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*The full API base URL of your YouTrack instance — it must end in /api:InCloud: https://example.myjetbrains.com/youtrack/api — note the /youtrack context path, the most common setup errorYouTrack Cloud: https://example.youtrack.cloud/apiSelf-hosted: https://youtrack.example.com/api, or your custom context path such as https://www.example.com/youtrack/apiPermanent Token*Your YouTrack permanent token — it starts with `perm:` (YouTrack → Profile → Account Security → New Token). The Test button detects a token that silently authenticated as guest.ProxyAdd a proxy if you cannot access YouTrack directly.Custom Rate LimitMaximum number of API requests per hour. Leave blank for the default (10000).",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "token": "v2",
+      "proxy": "v3",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "typeField": "",
+      "stateField": "",
+      "priorityField": "",
+      "assigneeField": "",
+      "storyPointField": "",
+      "dueDateField": "",
+      "typeMappings": {},
+      "statusMappings": {}
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Type the value name as it appears in YouTrack"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Type the value name as it appears in YouTrack"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      }
+    ],
+    "text": "No projects attached to this scope config yet — manual entry modeType field names and mapped values by hand below. Once this scope config is attached to YouTrack projects, their real field names and bundle values load here automatically through the connection.Which custom fields hold Type / State / Priority / Assignee / Story Points / Due Date on this instance. The dropdowns list type-eligible, single-value fields loaded live from the attached projects; you can also type a name by hand.Type fieldDefault: TypeState fieldDefault: StatePriority fieldDefault: PriorityAssignee fieldDefault: AssigneeStory Points field (optional)(none) — offDue Date field (optional)(none) — offIssue type mappingUnmapped types are stored as UPPERCASE(original).Source valueStandard mappingNo values mapped yet — add one below.BUGAddStatus mappingStatuses map to TODO / IN_PROGRESS / DONE / OTHER.Source valueStandard mappingNo values mapped yet — add one below.TODOAdd",
+    "typed": {
+      "typeField": "v0",
+      "stateField": "v1",
+      "priorityField": "v2",
+      "assigneeField": "v3",
+      "storyPointField": "v4",
+      "dueDateField": "v5",
+      "typeMappings": {},
+      "statusMappings": {}
+    }
+  },
+  "consoleErrors": [
+    "<p> cannot contain a nested <ul>. See this log for the ancestor stack trace.",
+    "In HTML, <ul> cannot be a descendant of <p>. This will cause a hydration error.",
+    "Warning: [antd: Alert] `message` is deprecated. Please use `title` instead."
+  ],
+  "requests": [
+    "/plugins/youtrack/scope-config/1/projects"
+  ]
+}

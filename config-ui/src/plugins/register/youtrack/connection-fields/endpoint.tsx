@@ -20,10 +20,14 @@ import { Input } from 'antd';
 import { useEffect } from 'react';
 
 import { Block } from '@/components';
+import type { ConnectionFieldRenderProps } from '@/types';
+import { trimTrailingSlashes } from '@/utils';
 
-const ENDPOINT_EXAMPLE = 'https://example.myjetbrains.com/youtrack/api';
+import type { YouTrackConnectionValues } from '../types';
 
-const INVALID_MESSAGE = `endpoint must be the full API base URL ending in /api — e.g. ${ENDPOINT_EXAMPLE}`;
+const endpointExample = 'https://example.myjetbrains.com/youtrack/api';
+
+const invalidMessage = `endpoint must be the full API base URL ending in /api — e.g. ${endpointExample}`;
 
 // validateEndpoint mirrors the backend rule: after trimming trailing slashes,
 // the URL must be absolute http(s) with a path ending in `/api`. The endpoint
@@ -32,30 +36,49 @@ export const validateEndpoint = (endpoint: string): string => {
   if (!endpoint) {
     return 'endpoint is required';
   }
-  const normalized = endpoint.replace(/\/+$/, '');
+  const normalized = trimTrailingSlashes(endpoint);
   let url: URL;
   try {
     url = new URL(normalized);
   } catch {
-    return INVALID_MESSAGE;
+    return invalidMessage;
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    return INVALID_MESSAGE;
+    return invalidMessage;
   }
   if (!url.pathname.endsWith('/api')) {
-    return INVALID_MESSAGE;
+    return invalidMessage;
   }
   return '';
 };
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  errors: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+type Props = Pick<
+  ConnectionFieldRenderProps<YouTrackConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'errors' | 'setValues' | 'setErrors'
+>;
+
+const endpointExamples = [
+  {
+    label: 'InCloud',
+    url: 'https://example.myjetbrains.com/youtrack/api',
+    note: (
+      <>
+        {' '}
+        — note the <code>/youtrack</code> context path, the most common setup error
+      </>
+    ),
+  },
+  { label: 'YouTrack Cloud', url: 'https://example.youtrack.cloud/api' },
+  {
+    label: 'Self-hosted',
+    url: 'https://youtrack.example.com/api',
+    note: (
+      <>
+        , or your custom context path such as <code>https://www.example.com/youtrack/api</code>
+      </>
+    ),
+  },
+];
 
 export const Endpoint = ({ initialValues, values, errors, setValues, setErrors }: Props) => {
   useEffect(() => {
@@ -72,7 +95,8 @@ export const Endpoint = ({ initialValues, values, errors, setValues, setErrors }
 
   // like the built-in fields, an empty input only disables the buttons; a
   // malformed one also says why, with the canonical example
-  const showError = !!values.endpoint && !!errors?.endpoint;
+  const endpointError = typeof errors.endpoint === 'string' ? errors.endpoint : '';
+  const showError = !!values.endpoint && !!endpointError;
 
   return (
     <Block
@@ -81,17 +105,12 @@ export const Endpoint = ({ initialValues, values, errors, setValues, setErrors }
         <>
           The full API base URL of your YouTrack instance — it must end in <code>/api</code>:
           <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
-            <li>
-              InCloud: <code>https://example.myjetbrains.com/youtrack/api</code> — note the <code>/youtrack</code>{' '}
-              context path, the most common setup error
-            </li>
-            <li>
-              YouTrack Cloud: <code>https://example.youtrack.cloud/api</code>
-            </li>
-            <li>
-              Self-hosted: <code>https://youtrack.example.com/api</code>, or your custom context path such as{' '}
-              <code>https://www.example.com/youtrack/api</code>
-            </li>
+            {endpointExamples.map(({ label, url, note }) => (
+              <li key={label}>
+                {label}: <code>{url}</code>
+                {note}
+              </li>
+            ))}
           </ul>
         </>
       }
@@ -100,11 +119,11 @@ export const Endpoint = ({ initialValues, values, errors, setValues, setErrors }
       <Input
         style={{ width: 480 }}
         status={showError ? 'error' : ''}
-        placeholder={ENDPOINT_EXAMPLE}
+        placeholder={endpointExample}
         value={values.endpoint}
         onChange={handleChange}
       />
-      {showError && <p style={{ margin: '4px 0 0', color: '#ff4d4f' }}>{errors.endpoint}</p>}
+      {showError && <p style={{ margin: '4px 0 0', color: '#ff4d4f' }}>{endpointError}</p>}
     </Block>
   );
 };

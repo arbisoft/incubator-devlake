@@ -23,7 +23,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useModalForm } from './use-modal-form';
 
 vi.mock('antd', async (importOriginal) =>
-  (await import('../__tests__/antd-message-mock')).loadMockedMessage(importOriginal),
+  (await import('../__tests__/mock-message')).loadMockedMessage(importOriginal),
 );
 
 const INITIAL = { name: '', mode: 'normal' };

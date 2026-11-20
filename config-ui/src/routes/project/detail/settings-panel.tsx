@@ -171,7 +171,7 @@ export const SettingsPanel = ({ project, onRefresh }: ProjectPanelProps) => {
             />
           </div>
           <Footer>
-            <Button type="primary" loading={operating} disabled={!form.name} onClick={handleSave}>
+            <Button type="primary" loading={operating} disabled={!form.name || !dirty} onClick={handleSave}>
               {COPY.settings.save}
             </Button>
             <Button disabled={!dirty || operating} onClick={() => setForm(readSettingsForm(project))}>

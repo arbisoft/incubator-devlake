@@ -27,7 +27,7 @@ import { BLUEPRINT_ID, makeDetailBlueprint } from './__tests__/blueprint-fixture
 import { useBlueprintDetail } from './hooks';
 
 vi.mock('antd', async (importOriginal) =>
-  (await import('@/ui/__tests__/antd-message-mock')).loadMockedMessage(importOriginal),
+  (await import('@/ui/__tests__/mock-message')).loadMockedMessage(importOriginal),
 );
 
 vi.mock('@/api', () => ({ default: { blueprint: { get: vi.fn(), pipelines: vi.fn() } } }));

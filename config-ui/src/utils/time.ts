@@ -50,5 +50,8 @@ dayjs.extend(LocalizedFormat);
 dayjs.extend(utc);
 dayjs.updateLocale('en', localeConfiguration);
 
-export const formatTime = (val: Date | string | null, format = 'YYYY-MM-DD HH:mm', options?: { utc?: boolean }) =>
-  val ? (options?.utc ? dayjs(val).utc() : dayjs(val)).format(format) : '-';
+export const formatTime = (val: Date | string | null, format = 'YYYY-MM-DD HH:mm', options?: { utc?: boolean }) => {
+  if (!val) return '-';
+  const date = dayjs(val);
+  return (options?.utc ? date.utc() : date).format(format);
+};

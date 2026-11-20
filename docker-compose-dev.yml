@@ -62,8 +62,9 @@ services:
     image: devlake.docker.scarf.sh/apache/devlake-dashboard:latest
     build:
       context: grafana/
-    ports:
-      - 3002:3000
+    # Reached only through grafana-gate, which owns host port 3002.
+    expose:
+      - "3000"
     # host.docker.internal is a Docker Desktop-only DNS alias; this makes it
     # resolve on Linux hosts too, so the Prometheus datasource (url from
     # $PROMETHEUS_URL, see grafana/provisioning/datasources/prometheus.yml)
@@ -79,15 +80,6 @@ services:
     environment:
       GF_SERVER_ROOT_URL: "${GF_SERVER_ROOT_URL:-http://localhost:3002}"
       GF_USERS_DEFAULT_THEME: "light"
-      # Dev-only. Production bakes this plugin into the image (see grafana/Dockerfile);
-      # here it is installed at container start because the grafana-storage volume
-      # mounted above shadows /var/lib/grafana/plugins, hiding the plugins baked into
-      # the built image.
-      # Keep the version in sync with grafana/Dockerfile so dev matches production.
-      GF_PLUGINS_PREINSTALL_SYNC: "volkovlabs-form-panel@6.3.5"
-      GF_DATAPROXY_SEND_USER_HEADER: "true"
-      DEVLAKE_API_URL: "${DEVLAKE_API_URL:-http://devlake:8080}"
-      DEVLAKE_MAPPING_API_KEY: "${DEVLAKE_MAPPING_API_KEY:-}"
       GF_SMTP_ENABLED: "${GF_SMTP_ENABLED:-false}"
       GF_SMTP_HOST: "${GF_SMTP_HOST:-}"
       GF_SMTP_USER: "${GF_SMTP_USER:-}"
@@ -145,6 +137,34 @@ services:
     restart: always
     depends_on:
       - mysql
+
+  # Query gate in front of Grafana: non-admins may only run SQL that a dashboard contains.
+  grafana-gate:
+    image: devlake.docker.scarf.sh/apache/devlake-dashboard:latest
+    build:
+      context: grafana/
+    entrypoint: ["/usr/local/bin/grafana-query-gate"]
+    ports:
+      - 3002:3001
+    # Shipped dashboards load at start; restart the gate after editing a dashboard JSON.
+    volumes:
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    # GRAFANA_MANAGEMENT_USER/PASSWORD let the gate trust dashboards an admin saved in the UI.
+    env_file:
+      - path: ./auth-secrets.env
+        required: false
+    environment:
+      GATE_MODE: "${GATE_MODE:-report}"
+      GATE_UPSTREAM: http://grafana:3000
+      GATE_MYSQL_DS_UID: devlake-mysql
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/gate/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: always
+    depends_on:
+      - grafana
 
   otel-auth-init:
     image: busybox:1.36
@@ -207,7 +227,7 @@ services:
       # at its own local root URL for the Generic OAuth callback.
       USE_EXTERNAL_GRAFANA: "${USE_EXTERNAL_GRAFANA:-true}"
       # Internal-only upstream used by Config UI when external routing is disabled.
-      GRAFANA_ENDPOINT: "${GRAFANA_ENDPOINT:-grafana:3000}"
+      GRAFANA_ENDPOINT: "${GRAFANA_ENDPOINT:-grafana-gate:3001}"
       # Browser-facing URL used only when external Grafana routing is enabled.
       GRAFANA_EXTERNAL_URL: "${GRAFANA_EXTERNAL_URL:-http://localhost:3002}"
       GRAFANA_OIDC_ENABLED: "${GRAFANA_OIDC_ENABLED:-false}"

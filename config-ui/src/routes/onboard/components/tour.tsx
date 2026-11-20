@@ -32,23 +32,17 @@ interface Props {
   configRef: React.RefObject<HTMLAnchorElement | HTMLButtonElement | null>;
 }
 
+// antd types the lazy target as non-null but accepts null at runtime.
+const targetOf = (ref: React.RefObject<HTMLElement | null>) => (): HTMLElement => ref.current as HTMLElement;
+
 export const OnboardTour = ({ nameRef, connectionRef, configRef }: Props) => {
   const { ready, data } = useRefreshData<OnboardStore | null>(() => API.store.get(STORE_KEY), []);
 
   const steps = [
-    {
-      ...COPY.tour.project,
-      target: nameRef.current,
-    },
-    {
-      ...COPY.tour.connection,
-      target: connectionRef.current,
-    },
-    {
-      ...COPY.tour.configure,
-      target: configRef.current,
-    },
-  ];
+    { copy: COPY.tour.project, ref: nameRef },
+    { copy: COPY.tour.connection, ref: connectionRef },
+    { copy: COPY.tour.configure, ref: configRef },
+  ].map(({ copy, ref }) => ({ ...copy, target: targetOf(ref) }));
 
   if (!ready || !data || data.step !== ONBOARD_DONE_STEP || data.done) {
     return null;

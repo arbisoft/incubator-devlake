@@ -30,10 +30,10 @@ import { operator } from '@/utils';
 import { COPY, TASK_CELL } from '../constants';
 import { PIPELINE_PROGRESS_STATUS_MAP } from '../status-tone';
 import { getTaskName } from '../task-name';
-import { canRerunTask, getStageState, getTaskCell } from '../utils';
+import { canRerunTask, getStageState, getTaskCell, getTaskFailureHint } from '../utils';
 
 import { PipelineDuration } from './duration';
-import { Task, TaskAction, TaskCell, TaskFailed, TaskId, TaskName, TaskTime } from './styled';
+import { Task, TaskAction, TaskCell, TaskFailed, TaskFailureHint, TaskId, TaskName, TaskTime } from './styled';
 import type { PipelineTaskProps } from './types';
 
 const INACTIVE_CELLS: string[] = [TASK_CELL.PENDING, TASK_CELL.CANCELLED];
@@ -44,6 +44,7 @@ export const PipelineTask = ({ task, onChanged }: PipelineTaskProps) => {
   const config = getPluginConfig(plugin);
   const name = getTaskName(config.plugin, config.name, options);
   const cell = getTaskCell(task);
+  const failureHint = getTaskFailureHint(plugin, errorName);
 
   const handleRerun = async () => {
     const [success] = await operator(() => API.task.rertun(id), {
@@ -78,7 +79,14 @@ export const PipelineTask = ({ task, onChanged }: PipelineTaskProps) => {
         {cell.kind === TASK_CELL.PENDING && COPY.task.pending}
         {cell.kind === TASK_CELL.CANCELLED && COPY.task.cancelled}
         {cell.kind === TASK_CELL.FAILED && (
-          <Tooltip title={errorName}>
+          <Tooltip
+            title={
+              <>
+                {errorName}
+                {failureHint && <TaskFailureHint>{failureHint}</TaskFailureHint>}
+              </>
+            }
+          >
             <TaskFailed>{COPY.task.failed}</TaskFailed>
           </Tooltip>
         )}

@@ -1,105 +1,29 @@
 {
   "eslint": {
     "@typescript-eslint/no-explicit-any": {
-      "errors": 234,
-      "warnings": 0
-    },
-    "@typescript-eslint/no-unused-vars": {
-      "errors": 10,
-      "warnings": 0
-    },
-    "eqeqeq": {
-      "errors": 2,
-      "warnings": 0
-    },
-    "jsx-a11y/alt-text": {
-      "errors": 2,
+      "errors": 4,
       "warnings": 0
     },
     "max-lines": {
       "errors": 0,
-      "warnings": 14
-    },
-    "no-console": {
-      "errors": 1,
-      "warnings": 0
-    },
-    "no-duplicate-imports": {
-      "errors": 4,
-      "warnings": 0
-    },
-    "no-empty": {
-      "errors": 0,
-      "warnings": 1
-    },
-    "prefer-destructuring": {
-      "errors": 0,
-      "warnings": 9
+      "warnings": 13
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
-      "warnings": 61
-    },
-    "react-hooks/globals": {
-      "errors": 0,
-      "warnings": 1
+      "warnings": 58
     },
     "react-hooks/refs": {
       "errors": 0,
-      "warnings": 14
+      "warnings": 7
     },
     "react-hooks/set-state-in-effect": {
       "errors": 0,
-      "warnings": 23
-    },
-    "react/no-array-index-key": {
-      "errors": 2,
-      "warnings": 0
-    },
-    "react/no-unescaped-entities": {
-      "errors": 7,
-      "warnings": 0
-    },
-    "sonarjs/cognitive-complexity": {
-      "errors": 3,
-      "warnings": 0
-    },
-    "sonarjs/no-clear-text-protocols": {
-      "errors": 2,
-      "warnings": 0
-    },
-    "sonarjs/no-duplicate-string": {
-      "errors": 0,
-      "warnings": 18
-    },
-    "sonarjs/no-ignored-exceptions": {
-      "errors": 1,
-      "warnings": 0
-    },
-    "sonarjs/no-nested-conditional": {
-      "errors": 0,
-      "warnings": 6
-    },
-    "sonarjs/no-nested-template-literals": {
-      "errors": 1,
-      "warnings": 0
-    },
-    "sonarjs/prefer-specific-assertions": {
-      "errors": 5,
-      "warnings": 0
-    },
-    "sonarjs/super-linear-regex": {
-      "errors": 3,
-      "warnings": 0
-    },
-    "sonarjs/unused-import": {
-      "errors": 1,
-      "warnings": 0
+      "warnings": 21
     }
   },
   "knip": [],
   "jscpd": {
-    "clones": 99,
-    "duplicatedLines": 1828
+    "clones": 80,
+    "duplicatedLines": 1442
   }
 }

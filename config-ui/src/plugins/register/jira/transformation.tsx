@@ -24,9 +24,11 @@ import { useState, useEffect } from 'react';
 import API from '@/api';
 import { PageLoading, HelpTooltip, ExternalLink } from '@/components';
 import { useProxyPrefix, useRefreshData } from '@/hooks';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
 
 import { CrossDomain } from './transformation-fields';
+import type { JiraTransformationValues } from './types';
 
 enum StandardType {
   Requirement = 'REQUIREMENT',
@@ -34,12 +36,9 @@ enum StandardType {
   Incident = 'INCIDENT',
 }
 
-interface Props {
-  entities: string[];
-  connectionId: ID;
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+type TypeMappings = Record<string, { standardType: StandardType }>;
+
+type Props = TransformationProps<JiraTransformationValues>;
 
 export const JiraTransformation = ({ entities, connectionId, transformation, setTransformation }: Props) => {
   const [requirements, setRequirements] = useState<string[]>([]);
@@ -74,7 +73,7 @@ export const JiraTransformation = ({ entities, connectionId, transformation, set
   }, [prefix]);
 
   useEffect(() => {
-    const types = Object.entries(transformation.typeMappings ?? {}).map(([key, value]: any) => ({
+    const types = Object.entries(transformation.typeMappings ?? {}).map(([key, value]) => ({
       name: key,
       ...value,
     }));
@@ -98,7 +97,7 @@ export const JiraTransformation = ({ entities, connectionId, transformation, set
         standardType,
       };
       return acc;
-    }, {} as any);
+    }, {} as TypeMappings);
   };
 
   const panelStyle: React.CSSProperties = {
@@ -147,8 +146,8 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
+  transformation: JiraTransformationValues;
+  onChangeTransformation: (next: JiraTransformationValues) => void;
   connectionId: ID;
   issueTypes: Array<{
     id: string;
@@ -161,9 +160,11 @@ const renderCollapseItems = ({
   requirements: string[];
   bugs: string[];
   incidents: string[];
-  transformaType: any;
-}) =>
-  [
+  transformaType: (its: string[], standardType: StandardType) => TypeMappings;
+}) => {
+  const { storyPointField, extraJql } = transformation;
+
+  return [
     {
       key: 'TICKET',
       label: 'Issue Tracking',
@@ -256,7 +257,7 @@ const renderCollapseItems = ({
               filterOption={(input: string, option?: { label: string; value: string }) =>
                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
               }
-              value={transformation.storyPointField}
+              value={storyPointField}
               onChange={(value) =>
                 onChangeTransformation({
                   ...transformation,
@@ -276,7 +277,7 @@ const renderCollapseItems = ({
           >
             <Input
               placeholder='e.g. component = "my-project"'
-              value={transformation.extraJql}
+              value={extraJql}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -301,3 +302,4 @@ const renderCollapseItems = ({
       ),
     },
   ].filter((it) => entities.includes(it.key));
+};

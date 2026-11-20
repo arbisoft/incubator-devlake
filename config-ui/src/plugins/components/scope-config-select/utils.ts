@@ -23,3 +23,10 @@ export const toScopeConfigRows = (configs: ScopeConfigRow[] | undefined, hasCurr
   if (!configs) return [];
   return hasCurrent ? [{ ...NO_SCOPE_CONFIG }, ...configs] : configs;
 };
+
+export const nextScopeConfigName = (base: string, existingNames: readonly string[]) => {
+  if (!existingNames.includes(base)) return base;
+  let suffix = 2;
+  while (existingNames.includes(`${base} ${suffix}`)) suffix += 1;
+  return `${base} ${suffix}`;
+};

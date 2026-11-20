@@ -85,6 +85,8 @@ test.describe('Project rename with Claude Code OTel placements', () => {
       const projectPage = new ProjectPage(page, descOldName);
       await projectPage.openAtTab('settings');
       await expect(projectPage.nameInput).toBeEnabled();
+      // Save stays disabled until a setting changes.
+      await projectPage.toggleIssueTrace();
       await projectPage.saveSettings();
       await expect(projectPage.toast(PROJECT_DETAIL_COPY.settings.saved)).toBeVisible();
       await expect.poll(async () => (await getProject(api, descOldName))?.description).toBe(description);

@@ -16,10 +16,13 @@
  *
  */
 
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { Token, Organization, CustomHeaders } from './connection-fields';
+import type { ClaudeCodeConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<ClaudeCodeConnectionValues>;
 
 export const ClaudeCodeConfig: IPluginConfig = {
   plugin: 'claude_code',
@@ -39,7 +42,7 @@ export const ClaudeCodeConfig: IPluginConfig = {
     fields: [
       'name',
       'endpoint',
-      ({ type, initialValues, values, setValues, setErrors }: any) => (
+      ({ type, initialValues, values, setValues, setErrors }: RenderProps) => (
         <Organization
           type={type}
           initialValues={initialValues}
@@ -48,10 +51,10 @@ export const ClaudeCodeConfig: IPluginConfig = {
           setErrors={setErrors}
         />
       ),
-      ({ type, initialValues, values, setValues, setErrors }: any) => (
+      ({ type, initialValues, values, setValues, setErrors }: RenderProps) => (
         <Token type={type} initialValues={initialValues} values={values} setValues={setValues} setErrors={setErrors} />
       ),
-      ({ type, initialValues, values, setValues, setErrors }: any) => (
+      ({ type, initialValues, values, setValues, setErrors }: RenderProps) => (
         <CustomHeaders
           type={type}
           initialValues={initialValues}

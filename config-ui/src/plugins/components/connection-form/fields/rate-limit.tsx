@@ -24,15 +24,15 @@ import { Block, ExternalLink } from '@/components';
 import * as S from './styled';
 
 interface Props {
-  subLabel: string;
-  learnMore: string;
-  externalInfo: string;
-  defaultValue: number;
+  subLabel?: React.ReactNode;
+  learnMore?: string;
+  externalInfo?: string;
+  defaultValue?: number;
   name: string;
   initialValue: number;
   value: number;
   error: string;
-  setValue: (value: number) => void;
+  setValue: (value?: number) => void;
   setError: (value: string) => void;
 }
 

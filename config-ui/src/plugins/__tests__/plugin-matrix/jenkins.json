@@ -1,0 +1,79 @@
+{
+  "plugin": "jenkins",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "",
+      "username": "",
+      "password": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Username"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Password"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Provide the Jenkins instance API endpoint. E.g. https://api.jenkins.ioUsername*Password*ProxyAdd a proxy if you cannot access Jenkins directly.Custom Rate LimitBy default, DevLake uses 10,000 requests/hour for data collection for Jenkins. But you can adjust the collection speed by setting up your desirable rate limit. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "username": "v2",
+      "password": "v3",
+      "proxy": "v4",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "deploymentPattern": "(deploy|push-image)",
+      "productionPattern": "prod(.*)"
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(deploy|push-image)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "prod(.*)"
+      }
+    ],
+    "text": "CI/CDDeploymentDORAUse Regular Expression to define Deployments in DevLake in order to measure DORA metrics. Learn moreConvert a Jenkins Build as a DevLake Deployment when: The name of the Jenkins job or one of its stages matches*If the name also matches, this Deployment is a ‘Production Deployment’",
+    "typed": {
+      "deploymentPattern": "v0",
+      "productionPattern": "v1"
+    }
+  },
+  "consoleErrors": [],
+  "requests": []
+}

@@ -17,11 +17,13 @@
  */
 
 import { intersection } from 'lodash';
-import { redirect } from 'react-router-dom';
+import { redirect, type ShouldRevalidateFunction } from 'react-router-dom';
 
 import API from '@/api';
 import { PATHS } from '@/config';
 import { getRegisterPlugins } from '@/plugins';
+
+import { parseEnvPlugins } from './utils';
 
 type Props = {
   request: Request;
@@ -40,11 +42,8 @@ export const layoutLoader = async ({ request }: Props) => {
     return redirect(PATHS.ONBOARD());
   }
 
-  let fePlugins = getRegisterPlugins();
-  try {
-    const envPlugins = import.meta.env.DEVLAKE_PLUGINS.split(',').filter(Boolean);
-    fePlugins = fePlugins.filter((plugin) => !envPlugins.length || envPlugins.includes(plugin));
-  } catch (err) {}
+  const envPlugins = parseEnvPlugins(import.meta.env.DEVLAKE_PLUGINS);
+  const fePlugins = getRegisterPlugins().filter((plugin) => !envPlugins.length || envPlugins.includes(plugin));
 
   const [bePlugins, res, access] = await Promise.all([
     API.plugin.list(),
@@ -62,3 +61,14 @@ export const layoutLoader = async ({ request }: Props) => {
     access,
   };
 };
+
+// A search-only change on the same page leaves the shell data unchanged
+export const layoutShouldRevalidate: ShouldRevalidateFunction = ({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}) =>
+  !formMethod && currentUrl.pathname === nextUrl.pathname && currentUrl.search !== nextUrl.search
+    ? false
+    : defaultShouldRevalidate;

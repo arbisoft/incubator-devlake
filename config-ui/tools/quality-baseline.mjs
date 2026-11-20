@@ -90,7 +90,7 @@ for (const issue of knipReport.issues) {
 }
 knip.sort();
 
-const total = jscpdReport.statistics.total;
+const { total } = jscpdReport.statistics;
 const current = {
   eslint: Object.fromEntries(Object.entries(rules).sort(([a], [b]) => a.localeCompare(b))),
   knip,

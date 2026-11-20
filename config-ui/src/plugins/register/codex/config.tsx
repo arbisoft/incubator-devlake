@@ -19,9 +19,12 @@
 import { Input } from 'antd';
 
 import { Block } from '@/components/block';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
+import type { CodexConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<CodexConnectionValues>;
 
 export const CodexConfig: IPluginConfig = {
   plugin: 'codex',
@@ -40,7 +43,7 @@ export const CodexConfig: IPluginConfig = {
     fields: [
       'name',
       'endpoint',
-      ({ values, setValues }: any) => (
+      ({ values, setValues }: RenderProps) => (
         <Block key="projectId" title="Project ID">
           <Input
             placeholder="Your Codex project ID (optional)"

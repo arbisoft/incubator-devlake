@@ -33,7 +33,7 @@ import { COPY } from './constants';
 import { useBlueprintConfiguration } from './use-configuration';
 
 vi.mock('antd', async (importOriginal) => {
-  const { withMockedMessage } = await import('@/ui/__tests__/antd-message-mock');
+  const { withMockedMessage } = await import('@/ui/__tests__/mock-message');
   return withMockedMessage(await importOriginal<typeof import('antd')>());
 });
 

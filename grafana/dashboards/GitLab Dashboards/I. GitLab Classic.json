@@ -1,0 +1,3283 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 99,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "GitLab",
+          "url": "https://devlake.apache.org/docs/Plugins/gitlab"
+        }
+      ],
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "- Use Cases: This dashboard shows the basic Git and Code Review metrics from GitLab.\n- Data Source Required: GitLab",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.2",
+      "title": "Dashboard Introduction",
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 89,
+      "panels": [],
+      "title": "1. User Requirements (Issues)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Issues created in the selected period.\ndatasource: issues, board_issues, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 7,
+        "x": 0,
+        "y": 4
+      },
+      "id": 62,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Requirement Count",
+          "url": "https://devlake.apache.org/docs/Metrics/RequirementCount"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Issues created in the range.\nSELECT COUNT(*) AS issue_count\nFROM issues i\nWHERE i.id LIKE 'gitlab:%'\n  AND $__timeFilter(i.created_date)\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "1.1 Number of New Issues",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Issues created per month or week.\ndatasource: issues, board_issues, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Issue Count",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 17,
+        "x": 7,
+        "y": 4
+      },
+      "id": 74,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Requirement Count",
+          "url": "https://devlake.apache.org/docs/Metrics/RequirementCount"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.25,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Issues created per month or week.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(i.created_date), INTERVAL WEEKDAY(i.created_date) DAY) ELSE DATE_SUB(DATE(i.created_date), INTERVAL DAYOFMONTH(i.created_date) - 1 DAY) END AS time,\n         COUNT(*) AS issue_count\n  FROM issues i\n  WHERE i.id LIKE 'gitlab:%'\n    AND $__timeFilter(i.created_date)\n    AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       issue_count AS \"Issue Count\"\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "1.2 Number of New Issues",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 87,
+      "panels": [],
+      "title": "2. How issues are handled?",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Issues created in the period that are now closed.\ndatasource: issues, board_issues, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 7,
+        "x": 0,
+        "y": 11
+      },
+      "id": 43,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Requirement Count",
+          "url": "https://devlake.apache.org/docs/Metrics/RequirementCount"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Issues created in the range that are closed.\nSELECT COUNT(*) AS closed_issue_count\nFROM issues i\nWHERE i.id LIKE 'gitlab:%'\n  AND $__timeFilter(i.created_date)\n  AND i.status = 'DONE'\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "2.1 Number of Closed Issues",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Open vs closed issues, grouped by creation month or week.\ndatasource: issues, board_issues, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "closed_issue_count"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 17,
+        "x": 7,
+        "y": 11
+      },
+      "id": 111,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Requirement Count",
+          "url": "https://devlake.apache.org/docs/Metrics/RequirementCount"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.25,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "normal",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Issues created per month or week, split by whether they are still open or now closed.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(i.created_date), INTERVAL WEEKDAY(i.created_date) DAY) ELSE DATE_SUB(DATE(i.created_date), INTERVAL DAYOFMONTH(i.created_date) - 1 DAY) END AS time,\n         SUM(i.status <> 'DONE') AS open_issue_count,\n         SUM(i.status = 'DONE')  AS closed_issue_count\n  FROM issues i\n  WHERE i.id LIKE 'gitlab:%'\n    AND $__timeFilter(i.created_date)\n    AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       open_issue_count,\n       closed_issue_count\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "2.2 Number of open and closed issues by Issue creation time",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Average lead time in days of issues closed in the period.\ndatasource: issues, board_issues, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 14
+              }
+            ]
+          },
+          "unit": "d"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 7,
+        "x": 0,
+        "y": 17
+      },
+      "id": 64,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Requirement Count",
+          "url": "https://devlake.apache.org/docs/Metrics/RequirementCount"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Average lead time in days of issues closed in the range.\nSELECT ROUND(AVG(i.lead_time_minutes / 1440), 1) AS issue_lead_time_in_days\nFROM issues i\nWHERE i.id LIKE 'gitlab:%'\n  AND $__timeFilter(i.resolution_date)\n  AND i.status = 'DONE'\n  AND i.lead_time_minutes > 0\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "2.3 Mean Issue Lead Time by issue resolution time",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Average lead time in days of issues closed per month or week.\ndatasource: issues, board_issues, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "d"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 17,
+        "x": 7,
+        "y": 17
+      },
+      "id": 75,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Requirement Lead Time",
+          "url": "https://devlake.apache.org/docs/Metrics/RequirementLeadTime"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.25,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Average lead time in days of issues closed per month or week.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(i.resolution_date), INTERVAL WEEKDAY(i.resolution_date) DAY) ELSE DATE_SUB(DATE(i.resolution_date), INTERVAL DAYOFMONTH(i.resolution_date) - 1 DAY) END AS time,\n         AVG(i.lead_time_minutes / 1440) AS issue_lead_time\n  FROM issues i\n  WHERE i.id LIKE 'gitlab:%'\n    AND $__timeFilter(i.resolution_date)\n    AND i.status = 'DONE'\n    AND i.lead_time_minutes > 0\n    AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       ROUND(issue_lead_time, 1) AS \"Mean Issue Lead Time in Days\"\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "2.4 Mean issue lead time by issue resolution time",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "The 20 open issues waiting the longest, whatever the selected period.\ndatasource: issues, board_issues, boards, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Queue Time",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 100,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 30
+              }
+            ]
+          },
+          "unit": "d"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 93,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.25,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 45,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Every open issue, whatever the selected time range (as the title says), longest waiting first. Top 20.\nSELECT CONCAT('#', i.issue_key)                                  AS issue_key,\n       i.title,\n       i.url,\n       ROUND(TIMESTAMPDIFF(MINUTE, i.created_date, NOW()) / 1440, 1) AS queue_time_in_days\nFROM issues i\nJOIN board_issues bi ON bi.issue_id = i.id\nJOIN boards b        ON b.id = bi.board_id\nWHERE i.id LIKE 'gitlab:%'\n  AND i.status <> 'DONE'\n  AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = bi.board_id\n                 AND pm.`table` = 'boards'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nORDER BY queue_time_in_days DESC\nLIMIT 20;",
+          "refId": "A"
+        }
+      ],
+      "title": "2.5 Top 20 Queue Time [All Open Issues]",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "All open issues, whatever the selected period, longest waiting first.\ndatasource: issues, board_issues, boards, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": false,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "issue_key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 718
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "created_date"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 149
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "queue_time_in_days"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 155
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repo_name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 256
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "url"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "",
+                    "url": "${__data.fields.url}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 92,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Every open issue, whatever the selected time range (as the title says), longest waiting first.\nSELECT b.name                                                    AS repo_name,\n       i.issue_key,\n       i.title,\n       i.created_date,\n       ROUND(TIMESTAMPDIFF(MINUTE, i.created_date, NOW()) / 1440, 1) AS queue_time_in_days,\n       i.url\nFROM issues i\nJOIN board_issues bi ON bi.issue_id = i.id\nJOIN boards b        ON b.id = bi.board_id\nWHERE i.id LIKE 'gitlab:%'\n  AND i.status <> 'DONE'\n  AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = bi.board_id\n                 AND pm.`table` = 'boards'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nORDER BY queue_time_in_days DESC;",
+          "refId": "A"
+        }
+      ],
+      "title": "2.6 List of Outstanding Issues Order By Queue Time [All Open Issues]",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "id": 83,
+      "panels": [],
+      "title": "3. Contribution (MRs)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "MRs created in the selected period, drafts excluded. MRs imported from GitHub and bot-authored MRs are left out; a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 36
+      },
+      "id": 68,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Count",
+          "url": "https://devlake.apache.org/docs/Metrics/PRCount"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- MRs created in the range, drafts excluded.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\n-- GitLab's is_draft is always 0, so a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nSELECT COUNT(*) AS merge_request_count\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND NOT (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "3.1 Number of New Merge Requests",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "MRs created per month or week, drafts excluded. MRs imported from GitHub and bot-authored MRs are left out; a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Merge Request Count"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 18,
+        "x": 6,
+        "y": 36
+      },
+      "id": 77,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Count",
+          "url": "https://devlake.apache.org/docs/Metrics/PRCount"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.5,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- MRs created per month or week, drafts excluded.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\n-- GitLab's is_draft is always 0, so a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END AS time,\n         COUNT(*) AS mr_count\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.created_date)\n    AND NOT (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n    AND ${not_imported_mr:raw}\n    AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       mr_count AS \"Merge Request Count\"\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "3.2 Number of New Merge Requests",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Top 20 authors by merged MRs created in the period. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Merged MR Count",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 54,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 59,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Count",
+          "url": "https://devlake.apache.org/docs/Metrics/PRCount"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.5,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Top 20 authors by MRs created in the range that are merged.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nSELECT COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), NULLIF(TRIM(MAX(pr.author_name)), ''), '(unmapped)') AS author_name,\n       COUNT(*) AS merged_merge_request_count\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.status = 'MERGED'\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY pr.author_id, a.full_name, a.user_name\nORDER BY merged_merge_request_count DESC\nLIMIT 20;",
+          "refId": "A"
+        }
+      ],
+      "title": "3.3 Top 20 Contributors By Merged MRs",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      },
+      "id": 85,
+      "panels": [],
+      "title": "4. How MRs are handled?",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "% of closed MRs that were closed without merging. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 49
+      },
+      "id": 66,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Merge Rate",
+          "url": "https://devlake.apache.org/docs/Metrics/PRMergeRate"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Share of closed MRs (merged or not) created in the range that were closed without merging.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\n-- GitLab's is_draft is always 0, so a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nSELECT SUM(pr.status = 'CLOSED') / NULLIF(SUM(pr.status IN ('CLOSED', 'MERGED')), 0) AS ratio\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND NOT (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "4.1 Ratio of unmerged MRs of All Closed MRs",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Open, closed and merged MRs per creation month or week, drafts excluded. MRs imported from GitHub and bot-authored MRs are left out; a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MR: Open"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MR: Closed without merging"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MR: Closed and merged"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 18,
+        "x": 6,
+        "y": 49
+      },
+      "id": 79,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Merge Rate",
+          "url": "https://devlake.apache.org/docs/Metrics/PRMergeRate"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.25,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "normal",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- MRs created per month or week by current status, drafts excluded.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\n-- GitLab's is_draft is always 0, so a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END AS time,\n         SUM(pr.status = 'OPEN')   AS open,\n         SUM(pr.status = 'CLOSED') AS closed,\n         SUM(pr.status = 'MERGED') AS merged\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.created_date)\n    AND NOT (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n    AND ${not_imported_mr:raw}\n    AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       open   AS \"MR: Open\",\n       closed AS \"MR: Closed without merging\",\n       merged AS \"MR: Closed and merged\"\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "4.2 Merge Request Status Distribution",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "MRs created in the period that were closed without merging. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 55
+      },
+      "id": 80,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Count",
+          "url": "https://devlake.apache.org/docs/Metrics/PRCount"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- MRs created in the range that were closed without merging.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nSELECT COUNT(*) AS closed_merge_request_count\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.status = 'CLOSED'\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "4.3 Number of MRs Closed without Merging",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "% of closed MRs not merged, per creation month or week. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Ratio",
+            "axisPlacement": "auto",
+            "barAlignment": 1,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 1,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 15,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 18,
+        "x": 6,
+        "y": 55
+      },
+      "id": 81,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Merge Rate",
+          "url": "https://devlake.apache.org/docs/Metrics/PRMergeRate"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "-- Share of closed MRs created per month or week that were closed without merging.\n-- The first bucket is dated at the range start, so its point isn't drawn left of the visible axis.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\n-- GitLab's is_draft is always 0, so a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nSELECT GREATEST(CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END, DATE($__timeFrom())) AS time,\n       SUM(pr.status = 'CLOSED') / NULLIF(SUM(pr.status IN ('CLOSED', 'MERGED')), 0) AS ratio\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND NOT (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY time\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "4.4 Ratio of unmerged MRs of All Closed MRs",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Average days from creation to merge of MRs merged in the period. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "d"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 61
+      },
+      "id": 72,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Time To Merge",
+          "url": "https://devlake.apache.org/docs/Metrics/PRTimeToMerge"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Average days from creation to merge of MRs merged in the range, as on dashboards A and C.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nSELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) / 1440), 1) AS time_to_merge\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.merged_date)\n  AND pr.status = 'MERGED'\n  AND pr.merged_date IS NOT NULL\n  AND pr.merged_date > pr.created_date\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "4.5 Mean Time to Merge of Merge Requests",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Average days from creation to merge, per merge month or week. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "d"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 18,
+        "x": 6,
+        "y": 61
+      },
+      "id": 95,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Time To Merge",
+          "url": "https://devlake.apache.org/docs/Metrics/PRTimeToMerge"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.5,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Average days from creation to merge of MRs merged per month or week, as on dashboards A and C.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY) ELSE DATE_SUB(DATE(pr.merged_date), INTERVAL DAYOFMONTH(pr.merged_date) - 1 DAY) END AS time,\n         AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) / 1440) AS time_to_merge\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.merged_date)\n    AND pr.status = 'MERGED'\n    AND pr.merged_date IS NOT NULL\n    AND pr.merged_date > pr.created_date\n    AND ${not_imported_mr:raw}\n    AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       ROUND(time_to_merge, 1) AS \"Time to Merge\"\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "4.6 Mean Time to Merge of Merge Requests in Days",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Average days from creation to close (merged or not) of MRs created in the period; a merged MR closes at its merge date, and MRs with no close date are left out. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "d"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 67
+      },
+      "id": 96,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Time To Merge",
+          "url": "https://devlake.apache.org/docs/Metrics/PRTimeToMerge"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Average days from creation to close (merged or not) of MRs created in the range.\n-- GitLab leaves closed_date empty on merged MRs, so a merged MR closes at its merge date. MRs with no close date at\n-- all are left out.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nSELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, COALESCE(pr.closed_date, pr.merged_date)) / 1440), 1) AS time_to_close\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.status IN ('CLOSED', 'MERGED')\n  AND COALESCE(pr.closed_date, pr.merged_date) IS NOT NULL\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "4.7 Mean Time to Close of Merge Requests in Days",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Average days from creation to close (merged or not), per creation month or week; a merged MR closes at its merge date. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "d"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 18,
+        "x": 6,
+        "y": 67
+      },
+      "id": 97,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "MR Time To Merge",
+          "url": "https://devlake.apache.org/docs/Metrics/PRTimeToMerge"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.5,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Average days from creation to close (merged or not) of MRs created per month or week.\n-- GitLab leaves closed_date empty on merged MRs, so a merged MR closes at its merge date. MRs with no close date at\n-- all are left out.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END AS time,\n         AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, COALESCE(pr.closed_date, pr.merged_date)) / 1440) AS time_to_close\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.status IN ('CLOSED', 'MERGED')\n    AND COALESCE(pr.closed_date, pr.merged_date) IS NOT NULL\n    AND ${not_imported_mr:raw}\n    AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       ROUND(time_to_close, 1) AS \"Time to Close\"\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "4.8 Mean Time to Close of Merge Requests in Days",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 73
+      },
+      "id": 102,
+      "panels": [],
+      "title": "5. CI/CD Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Successful GitLab pipelines in the selected period. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue"
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 74
+      },
+      "id": 103,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Build Count",
+          "url": "https://devlake.apache.org/docs/Metrics/BuildCount"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Successful pipelines in the range.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nSELECT COUNT(*) AS successful_pipeline_run_count\nFROM cicd_pipelines cp\nWHERE cp.id LIKE 'gitlab:%'\n  AND COALESCE(cp.is_child, 0) = 0\n  AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n  AND cp.result = 'SUCCESS'\n  AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = cp.cicd_scope_id\n                 AND pm.`table` = 'cicd_scopes'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "5.1 Total Number of Successful pipeline runs",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "% of pipelines that succeeded, out of those that succeeded, failed or were canceled. Pipelines with no final result yet (blocked on a manual job, running, pending or skipped) are left out. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "green",
+                "value": 0.9
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 74
+      },
+      "id": 104,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Build Success Rate",
+          "url": "https://devlake.apache.org/docs/Metrics/BuildSuccessRate"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Share of pipelines in the range that succeeded.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- The rate covers pipelines with a final result only. A pipeline blocked on a manual job has no final result yet\n-- (nor do running, pending or skipped ones), so it is left out. FAILURE includes canceled pipelines.\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nSELECT SUM(cp.result = 'SUCCESS') / NULLIF(COUNT(*), 0) AS success_rate\nFROM cicd_pipelines cp\nWHERE cp.id LIKE 'gitlab:%'\n  AND COALESCE(cp.is_child, 0) = 0\n  AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n  AND cp.result IN ('SUCCESS', 'FAILURE')\n  AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = cp.cicd_scope_id\n                 AND pm.`table` = 'cicd_scopes'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "5.2 Mean Pipeline Runs Success Rate",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Succeeded vs failed (or canceled) pipelines per month or week. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "successful_pipeline_run_count"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failed_pipeline_run_count"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 74
+      },
+      "id": 109,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Build Count",
+          "url": "https://devlake.apache.org/docs/Metrics/BuildCount"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.25,
+        "fullHighlight": false,
+        "groupWidth": 0.25,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "normal",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Succeeded vs failed (or canceled) pipelines per month or week.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL WEEKDAY(COALESCE(cp.finished_date, cp.created_date)) DAY) ELSE DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL DAYOFMONTH(COALESCE(cp.finished_date, cp.created_date)) - 1 DAY) END AS time,\n         SUM(cp.result = 'SUCCESS') AS successful_pipeline_run_count,\n         SUM(cp.result = 'FAILURE') AS failed_pipeline_run_count\n  FROM cicd_pipelines cp\n  WHERE cp.id LIKE 'gitlab:%'\n    AND COALESCE(cp.is_child, 0) = 0\n    AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n    AND cp.result IN ('SUCCESS', 'FAILURE')\n    AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = cp.cicd_scope_id\n                   AND pm.`table` = 'cicd_scopes'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       successful_pipeline_run_count,\n       failed_pipeline_run_count\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "5.3 Number of successful and failed pipeline runs",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Share of pipelines by result. Unknown = no final result yet (manual, running, pending, skipped); FAILURE includes canceled pipelines. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SUCCESS"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FAILURE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Unknown"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "rgba(205, 204, 206, 1)",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 80
+      },
+      "id": 105,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Build Count",
+          "url": "https://devlake.apache.org/docs/Metrics/BuildCount"
+        }
+      ],
+      "options": {
+        "displayLabels": [
+          "value",
+          "percent"
+        ],
+        "legend": {
+          "calcs": [],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "percent",
+            "value"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Pipelines in the range by result. Unknown = no final result yet (manual, running, pending, skipped); FAILURE includes canceled\n-- pipelines.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nSELECT IF(cp.result = '', 'Unknown', cp.result) AS result,\n       COUNT(*)                                 AS build_count\nFROM cicd_pipelines cp\nWHERE cp.id LIKE 'gitlab:%'\n  AND COALESCE(cp.is_child, 0) = 0\n  AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n  AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = cp.cicd_scope_id\n                 AND pm.`table` = 'cicd_scopes'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY 1\nORDER BY 2 DESC;",
+          "refId": "A"
+        }
+      ],
+      "title": "5.4 Total Pipeline Runs Result Distribution",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Pipeline success rate per month or week, out of pipelines that succeeded, failed or were canceled; pipelines with no final result yet (blocked on a manual job, running, pending or skipped) are left out. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Rate(%)",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pipeline Runs Success Rate"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 18,
+        "x": 6,
+        "y": 80
+      },
+      "id": 108,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Build Success Rate",
+          "url": "https://devlake.apache.org/docs/Metrics/BuildSuccessRate"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.5,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 45,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Share of pipelines per month or week that succeeded.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- The rate covers pipelines with a final result only. A pipeline blocked on a manual job has no final result yet\n-- (nor do running, pending or skipped ones), so it is left out. FAILURE includes canceled pipelines.\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL WEEKDAY(COALESCE(cp.finished_date, cp.created_date)) DAY) ELSE DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL DAYOFMONTH(COALESCE(cp.finished_date, cp.created_date)) - 1 DAY) END AS time,\n         SUM(cp.result = 'SUCCESS') / COUNT(*) AS success_rate\n  FROM cicd_pipelines cp\n  WHERE cp.id LIKE 'gitlab:%'\n    AND COALESCE(cp.is_child, 0) = 0\n    AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n    AND cp.result IN ('SUCCESS', 'FAILURE')\n    AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = cp.cicd_scope_id\n                   AND pm.`table` = 'cicd_scopes'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       success_rate AS \"Pipeline Runs Success Rate\"\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "5.5 Pipeline Runs Success Rate",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Average pipeline duration in minutes, manual pipelines included; pipelines with no recorded duration (mostly ones canceled before they started) are left out. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "light-orange"
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 86
+      },
+      "id": 106,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Build Duration",
+          "url": "https://devlake.apache.org/docs/Metrics/BuildDuration"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Average duration in minutes of pipelines in the range.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- Every pipeline with a recorded duration counts, manual ones included: they ran, and only lack a finished date while\n-- they wait on a manual job. Pipelines with no recorded duration (mostly ones canceled before they started) are left out.\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nSELECT ROUND(AVG(cp.duration_sec / 60), 1) AS duration_in_minutes\nFROM cicd_pipelines cp\nWHERE cp.id LIKE 'gitlab:%'\n  AND COALESCE(cp.is_child, 0) = 0\n  AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n  AND cp.duration_sec > 0\n  AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = cp.cicd_scope_id\n                 AND pm.`table` = 'cicd_scopes'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "5.6 Mean Pipeline Runs Duration",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Average pipeline duration per month or week, manual pipelines included; pipelines with no recorded duration (mostly ones canceled before they started) are left out. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple"
+              },
+              {
+                "color": "red",
+                "value": 60
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mean_duration_sec"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 18,
+        "x": 6,
+        "y": 86
+      },
+      "id": 110,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Build Duration",
+          "url": "https://devlake.apache.org/docs/Metrics/BuildDuration"
+        }
+      ],
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.25,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {
+          "valueSize": 12
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Average duration of pipelines per month or week.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- Every pipeline with a recorded duration counts, manual ones included: they ran, and only lack a finished date while\n-- they wait on a manual job. Pipelines with no recorded duration (mostly ones canceled before they started) are left out.\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL WEEKDAY(COALESCE(cp.finished_date, cp.created_date)) DAY) ELSE DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL DAYOFMONTH(COALESCE(cp.finished_date, cp.created_date)) - 1 DAY) END AS time,\n         AVG(cp.duration_sec) AS mean_duration_sec\n  FROM cicd_pipelines cp\n  WHERE cp.id LIKE 'gitlab:%'\n    AND COALESCE(cp.is_child, 0) = 0\n    AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n    AND cp.duration_sec > 0\n    AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = cp.cicd_scope_id\n                   AND pm.`table` = 'cicd_scopes'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       ROUND(mean_duration_sec) AS mean_duration_sec\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "5.7 Mean Pipeline Runs Duration",
+      "type": "barchart"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 92
+      },
+      "id": 101,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "<br/>\n\nThis dashboard is created based on this [data schema](https://devlake.apache.org/docs/DataModels/DevLakeDomainLayerSchema). Want to add more metrics? Please follow the [guide](https://devlake.apache.org/docs/Configuration/Dashboards/GrafanaUserGuide).",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.2",
+      "title": "",
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 94
+      },
+      "id": 112,
+      "panels": [],
+      "title": "6. Draft MRs",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Open draft MRs created in the selected period. MRs imported from GitHub and bot-authored MRs are left out; a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 0,
+        "y": 95
+      },
+      "id": 113,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Open draft MRs created in the range.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\n-- GitLab's is_draft is always 0, so a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nSELECT COUNT(*) AS \"Draft MR Count\"\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "refId": "A"
+        }
+      ],
+      "title": "Draft MR Count",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Open draft MRs per creation month or week. MRs imported from GitHub and bot-authored MRs are left out; a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 60,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 4,
+        "y": 95
+      },
+      "id": 114,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Open draft MRs created per month or week.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\n-- GitLab's is_draft is always 0, so a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END AS time,\n         COUNT(*) AS draft_mr_count\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.created_date)\n    AND (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n    AND ${not_imported_mr:raw}\n    AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       draft_mr_count AS \"Open Draft MR Count\"\nFROM buckets\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "6.1 Open Draft MRs Over Time",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Top 20 authors with open draft MRs created in the period. MRs imported from GitHub and bot-authored MRs are left out; a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 95
+      },
+      "id": 115,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Top 20 authors by open draft MRs created in the range.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\n-- GitLab's is_draft is always 0, so a Draft is an open MR whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nSELECT COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), NULLIF(TRIM(MAX(pr.author_name)), ''), '(unmapped)') AS \"Author Name\",\n       COUNT(*) AS \"Open Draft MR Count\"\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY pr.author_id, a.full_name, a.user_name\nORDER BY 2 DESC\nLIMIT 20;",
+          "refId": "A"
+        }
+      ],
+      "title": "6.2 Top Contributors with Open Draft MRs",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 103
+      },
+      "id": 118,
+      "panels": [],
+      "title": "7. Test Cases Coverage Dashboard",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Overall unit test coverage of the selected repos from their latest SonarQube scan, whatever the selected period. Repos match SonarQube projects by full name, or by slug when no project has the full name.\ndatasource: cq_projects, repos, cq_file_metrics, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "noValue": "No coverage data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 104
+      },
+      "id": 116,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Code Quality Test",
+          "url": "https://devlake.apache.org/docs/Metrics/CQTest"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {},
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Unit test coverage from the latest SonarQube scan. File metrics are a snapshot of that scan and updated_at is only\n-- DevLake's sync time, so the time range does not apply.\n-- GitLab repos are matched to SonarQube projects by full name (group/repo); the repo slug is used only when no project\n-- has the full name, so an unrelated project that shares the slug is never mixed in.\n-- Each project's file metrics count once, even when the slug fallback matches it to several repos.\nWITH matched AS (\n  SELECT DISTINCT cqp.id AS project_key\n  FROM cq_projects cqp\n  JOIN repos r ON r.name = cqp.name\n               OR (SUBSTRING_INDEX(r.name, '/', -1) = cqp.name AND NOT EXISTS (SELECT 1 FROM cq_projects x WHERE x.name = r.name))\n  WHERE r.id LIKE 'gitlab:%'\n    AND r.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n)\nSELECT ROUND((SUM(fm.lines_to_cover) - SUM(fm.uncovered_lines)) * 100.0 / NULLIF(SUM(fm.lines_to_cover), 0), 1) AS \"Unit Test Coverage %\"\nFROM matched m\nJOIN cq_file_metrics fm ON fm.project_key = m.project_key;",
+          "refId": "A"
+        }
+      ],
+      "title": "7.1 Aggregate Unit Test Coverage",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "MRs created in the period (50 newest, drafts included) with the current unit test coverage of their repo's SonarQube project. GitLab MRs carry no head commit, so coverage can't be tied to the MR's own commit. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: repos, cq_projects, cq_file_metrics, pull_requests, accounts, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Current Repo Coverage"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MR URL"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open MR",
+                    "url": "${__data.fields[\"MR URL\"]}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 18,
+        "x": 6,
+        "y": 104
+      },
+      "id": 117,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Code Quality Test",
+          "url": "https://devlake.apache.org/docs/Metrics/CQTest"
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- MRs created in the range (drafts included) with their repo's SonarQube coverage, newest first, capped at 50 rows.\n-- GitLab repos are matched to SonarQube projects by full name (group/repo); the repo slug is used only when no project\n-- has the full name, so an unrelated project that shares the slug is never mixed in.\n-- An MR uses the project scanned at its head commit when there is one, else the repo's latest scanned project.\n-- GitLab leaves head_commit_sha empty, so every MR falls back to the repo project and shows the repo's current coverage.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nWITH selected_repos AS (\n  SELECT r.id, r.name AS repo_name, SUBSTRING_INDEX(r.name, '/', -1) AS repo_slug\n  FROM repos r\n  WHERE r.id LIKE 'gitlab:%'\n    AND r.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n),\nproject_coverage AS (\n  SELECT cqp.id                                                    AS project_key,\n         cqp.commit_sha,\n         cqp.last_analysis_date,\n         cqp.updated_at                                            AS project_updated_at,\n         sr.repo_name,\n         CASE WHEN cqp.name = sr.repo_name THEN 'full' ELSE 'slug' END AS match_type,\n         COUNT(fm.id)                                              AS files,\n         SUM(fm.lines_to_cover)                                    AS lines_to_cover,\n         SUM(fm.uncovered_lines)                                   AS uncovered_lines\n  FROM cq_projects cqp\n  JOIN selected_repos sr ON sr.repo_name = cqp.name\n                         OR (sr.repo_slug = cqp.name AND NOT EXISTS (SELECT 1 FROM cq_projects x WHERE x.name = sr.repo_name))\n  LEFT JOIN cq_file_metrics fm ON fm.project_key = cqp.id\n  GROUP BY cqp.id, cqp.commit_sha, cqp.last_analysis_date, cqp.updated_at, sr.repo_name,\n           CASE WHEN cqp.name = sr.repo_name THEN 'full' ELSE 'slug' END\n),\nrepo_project AS (\n  SELECT pc.*,\n         ROW_NUMBER() OVER (PARTITION BY pc.repo_name\n                            ORDER BY pc.match_type = 'full' DESC, COALESCE(pc.last_analysis_date, pc.project_updated_at) DESC, pc.files DESC, pc.project_key DESC) AS rn\n  FROM project_coverage pc\n),\nmrs AS (\n  SELECT pr.pull_request_key, pr.title, COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), NULLIF(TRIM(pr.author_name), ''), '(unmapped)') AS author, pr.status, pr.created_date, pr.url, pr.head_commit_sha,\n         r.name AS repo_name\n  FROM pull_requests pr\n  JOIN repos r         ON r.id = pr.base_repo_id\n  LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.created_date)\n    AND ${not_imported_mr:raw}\n    AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n)\nSELECT CAST(mr.pull_request_key AS UNSIGNED)                         AS \"MR Number\",\n       mr.title                                                      AS \"MR Title\",\n       mr.author                                                     AS \"Author\",\n       CASE UPPER(mr.status) WHEN 'OPEN' THEN 'Open' WHEN 'MERGED' THEN 'Merged' WHEN 'CLOSED' THEN 'Closed' ELSE mr.status END AS \"Status\",\n       mr.created_date                                               AS \"Created Date\",\n       mr.url                                                        AS \"MR URL\",\n       COALESCE(exact.project_key, rp.project_key)                   AS \"SonarQube Project\",\n       CASE\n         WHEN exact.project_key IS NOT NULL THEN CONCAT('MR commit match', CASE WHEN exact.match_type = 'slug' THEN ' (slug)' ELSE '' END)\n         WHEN rp.project_key IS NOT NULL THEN CONCAT('Repo project fallback', CASE WHEN rp.match_type = 'slug' THEN ' (slug)' ELSE '' END)\n         ELSE 'No SonarQube project'\n       END                                                           AS \"Coverage Source\",\n       COALESCE(exact.files, rp.files)                               AS \"Files Scanned\",\n       COALESCE(exact.lines_to_cover, rp.lines_to_cover)             AS \"Lines To Cover\",\n       ROUND((COALESCE(exact.lines_to_cover, rp.lines_to_cover) - COALESCE(exact.uncovered_lines, rp.uncovered_lines)) * 100.0\n             / NULLIF(COALESCE(exact.lines_to_cover, rp.lines_to_cover), 0), 1) AS \"Current Repo Coverage\",\n       CASE\n         WHEN exact.project_key IS NULL AND rp.project_key IS NULL THEN 'No SonarQube project matched this repo by full repo name or slug'\n         WHEN exact.project_key IS NULL THEN 'No MR commit match; showing repository SonarQube project status'\n         WHEN COALESCE(exact.lines_to_cover, rp.lines_to_cover) IS NULL THEN 'No SonarQube file metrics'\n         WHEN COALESCE(exact.lines_to_cover, rp.lines_to_cover) = 0 THEN 'SonarQube imported files, but no LCOV lines_to_cover'\n         ELSE 'Coverage available'\n       END                                                           AS \"Coverage Data Status\"\nFROM mrs mr\nLEFT JOIN project_coverage exact ON exact.commit_sha = mr.head_commit_sha AND mr.head_commit_sha <> '' AND exact.repo_name = mr.repo_name\nLEFT JOIN repo_project rp        ON rp.repo_name = mr.repo_name AND rp.rn = 1\nORDER BY mr.created_date DESC\nLIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "7.2 MR Unit Test Coverage Details",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 41,
+  "tags": [
+    "Data Source Dashboard",
+    "Stable Data Sources"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "description": "",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT p.project_name AS __text, p.project_name AS __value FROM (\nselect DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nand upm.user_login = ${__user.login:sqlstring}\n) p\nUNION ALL\nSELECT '(no projects with GitLab data)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nand upm.user_login = ${__user.login:sqlstring}\n)\nORDER BY __text",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
+        "includeAll": true,
+        "label": "Repo",
+        "multi": true,
+        "name": "repo_id",
+        "options": [],
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nUNION ALL\nSELECT '(no GitLab repositories)--__none__' FROM DUAL WHERE NOT EXISTS (\nSELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "DAYOFMONTH",
+          "value": "DAYOFMONTH"
+        },
+        "includeAll": false,
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "DAYOFMONTH"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "WEEKDAY"
+          }
+        ],
+        "query": "Month : DAYOFMONTH, Week : WEEKDAY",
+        "type": "custom"
+      },
+      {
+        "name": "not_imported_mr",
+        "label": "SQL: MR not imported from GitHub (alias pr)",
+        "type": "constant",
+        "hide": 2,
+        "skipUrlSync": true,
+        "query": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
+        "current": {
+          "text": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
+          "value": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
+            "value": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))"
+          }
+        ],
+        "description": "Org-specific. An MR counts as imported from GitHub when its description or a comment starts with \"*Created by\", or when the import account (tayyab-razzaq) created it before 2021-07-01. Admins should change the account and date to their own import, or drop that part, and keep this the same on every dashboard that has it."
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "I. GitLab Classic",
+  "uid": "gitlab-i-classic",
+  "version": 1
+}

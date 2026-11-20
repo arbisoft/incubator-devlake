@@ -17,10 +17,13 @@
  */
 
 import { DOC_URL } from '@/release';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { Auth } from './connection-fields';
+import type { JiraConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<JiraConnectionValues>;
 
 export const JiraConfig: IPluginConfig = {
   plugin: 'jira',
@@ -32,7 +35,7 @@ export const JiraConfig: IPluginConfig = {
     initialValues: {},
     fields: [
       'name',
-      ({ type, initialValues, values, errors, setValues, setErrors }: any) => (
+      ({ type, initialValues, values, errors, setValues, setErrors }: RenderProps) => (
         <Auth
           key="auth"
           type={type}

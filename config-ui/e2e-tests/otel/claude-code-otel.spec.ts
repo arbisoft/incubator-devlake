@@ -75,6 +75,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     // Removes the facts and source preferences produced by test 2's telemetry.
     runSql(`
       DELETE FROM _tool_claude_code_otel_hourly_activity WHERE organization_id = '${organizationId}';
+      DELETE FROM _tool_claude_code_otel_hourly_session_starts WHERE organization_id = '${organizationId}';
       DELETE FROM _tool_claude_code_otel_series_state WHERE connection_id IN (${[
         0,
         ...testConnections.map((it) => it.connection.id),

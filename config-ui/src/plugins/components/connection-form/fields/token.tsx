@@ -46,7 +46,7 @@ export const ConnectionToken = ({ type, label, subLabel, initialValue, value, se
   };
 
   return (
-    <Block title={label ?? 'Token'} description={subLabel ? subLabel : null} required>
+    <Block title={label ?? 'Token'} description={subLabel} required>
       <Input.Password
         placeholder={type === 'update' ? '********' : 'Your Token'}
         value={value}

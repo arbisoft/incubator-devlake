@@ -19,9 +19,12 @@
 import { Input } from 'antd';
 
 import { Block } from '@/components/block';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
+import type { CursorConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<CursorConnectionValues>;
 
 export const CursorConfig: IPluginConfig = {
   plugin: 'cursor',
@@ -52,7 +55,7 @@ export const CursorConfig: IPluginConfig = {
           </>
         ),
       },
-      ({ values, setValues }: any) => (
+      ({ values, setValues }: RenderProps) => (
         <Block key="teamId" title="Team ID">
           <Input
             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"

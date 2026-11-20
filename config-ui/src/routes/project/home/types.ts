@@ -19,6 +19,7 @@
 import type { OtelConnectionResponse } from '@/api/otel';
 import type { IntegrationCategory } from '@/plugins/catalog';
 import type { IBlueprint, IPipelineStatus, IPluginConfig } from '@/types';
+import type { ConnectorLogo } from '@/ui/plugin-icon';
 
 import type { CONNECTION_ENTRY_KIND, PROJECT_COLUMN } from './constants';
 
@@ -44,10 +45,14 @@ export type ConnectionEntry =
 
 export type ConnectionDetail = {
   key: string;
+  plugin: string;
   name: string;
   pluginLabel: string;
   category: IntegrationCategory;
   icon: IPluginConfig['icon'];
+  logo?: ConnectorLogo;
 };
 
 export type CategoryCount = { category: IntegrationCategory; count: number };
+
+export type ProjectFilters = { connection: string[]; lastRunStatus: string[] };

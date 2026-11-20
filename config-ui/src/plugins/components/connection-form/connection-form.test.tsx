@@ -40,15 +40,18 @@ const renderCreate = (onSuccess = vi.fn()) => {
   return onSuccess;
 };
 
+const clickTestWhenReady = async () => {
+  const testButton = screen.getByRole('button', { name: /Test Connection$/ }) as HTMLButtonElement;
+  await waitFor(() => expect(testButton.disabled).toBe(false));
+  fireEvent.click(testButton);
+};
+
 const expectFailureToRetry = async (failureMessage: string, successMessage: string) => {
   fireEvent.click(screen.getByRole('button', { name: COPY.test.label }));
   await waitFor(() => expect(messageMock.error).toHaveBeenCalledWith(failureMessage));
   expect(messageMock.success).not.toHaveBeenCalled();
   expect(messageMock.error).toHaveBeenCalledOnce();
-  const testButton = screen.getByRole('button', { name: /Test Connection$/ }) as HTMLButtonElement;
-  await waitFor(() => expect(testButton.disabled).toBe(false));
-
-  fireEvent.click(testButton);
+  await clickTestWhenReady();
   await waitFor(() => expect(messageMock.success).toHaveBeenCalledWith(successMessage));
   expect(messageMock.error).toHaveBeenCalledOnce();
 };
@@ -110,6 +113,46 @@ describe('ConnectionForm test actions', () => {
     renderCreate();
     await expectFailureToRetry('Custom mode rejected', 'Custom test passed');
     expect(testOld).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('ConnectionForm save after a failed test', () => {
+  beforeEach(() => {
+    resetConnectionFormMocks();
+  });
+
+  const saveButton = () => screen.getByRole('button', { name: COPY.save.label }) as HTMLButtonElement;
+  const failTest = async () => {
+    fireEvent.click(screen.getByRole('button', { name: COPY.test.label }));
+    await waitFor(() => expect(messageMock.error).toHaveBeenCalled());
+  };
+
+  it('keeps Save enabled before any test', () => {
+    renderCreate();
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it('disables Save after a failed test and re-enables it once a field changes', async () => {
+    testOld.mockRejectedValue({ response: { status: 400, data: { message: 'Test request rejected' } } });
+    renderCreate();
+    await failTest();
+    await waitFor(() => expect(saveButton().disabled).toBe(true));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change endpoint' }));
+    await waitFor(() => expect(saveButton().disabled).toBe(false));
+  });
+
+  it('re-enables Save when a retry passes with the same values', async () => {
+    testOld
+      .mockRejectedValueOnce({ response: { status: 400, data: { message: 'Test request rejected' } } })
+      .mockResolvedValueOnce({ success: true, message: mocks.successMessage });
+    renderCreate();
+    await failTest();
+    await waitFor(() => expect(saveButton().disabled).toBe(true));
+
+    await clickTestWhenReady();
+    await waitFor(() => expect(messageMock.success).toHaveBeenCalled());
+    await waitFor(() => expect(saveButton().disabled).toBe(false));
   });
 });
 

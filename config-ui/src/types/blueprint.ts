@@ -38,7 +38,18 @@ export interface IBlueprint {
   isManual: boolean;
   cronConfig: string;
   skipOnFail: boolean;
-  plan: any;
+  plan: Array<Array<Record<string, unknown>>> | null;
   timeAfter: null | string;
   connections: BlueprintConnectionPayload[];
 }
+
+export type BlueprintCreatePayload = {
+  name: string;
+  mode: IBPMode;
+  enable: boolean;
+  cronConfig: string;
+  isManual: boolean;
+  skipOnFail: boolean;
+  connections?: BlueprintConnectionPayload[];
+  plan?: Array<Array<Record<string, unknown>>>;
+};

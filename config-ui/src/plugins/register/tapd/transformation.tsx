@@ -19,11 +19,14 @@
 import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Tag, Form, Select } from 'antd';
 import { uniqWith } from 'lodash';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import API from '@/api';
 import { PageLoading } from '@/components';
 import { useProxyPrefix, useRefreshData } from '@/hooks';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
+
+import type { TapdTransformationValues } from './types';
 
 enum StandardType {
   Requirement = 'Requirement',
@@ -37,13 +40,9 @@ enum StandardStatus {
   Done = 'DONE',
 }
 
-interface Props {
-  entities: string[];
-  connectionId: ID;
-  scopeId: ID;
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+type MappingRow = { label: ReactNode; standard: string; list: string[] };
+
+type Props = TransformationProps<TapdTransformationValues> & { scopeId: ID };
 
 export const TapdTransformation = ({ entities, connectionId, scopeId, transformation, setTransformation }: Props) => {
   const [featureTypeList, setFeatureTypeList] = useState<string[]>([]);
@@ -95,7 +94,10 @@ export const TapdTransformation = ({ entities, connectionId, scopeId, transforma
     );
 
     const typeList: { id: string; name: string }[] = [
-      ...storyType.data.map((it: any) => ({ id: it.Category.id, name: it.Category.name })),
+      ...storyType.data.map((it: { Category: { id: string; name: string } }) => ({
+        id: it.Category.id,
+        name: it.Category.name,
+      })),
       { id: 'BUG', name: bugType['BUG'] },
       { id: 'TASK', name: taskType['TASK'] },
     ];
@@ -107,12 +109,12 @@ export const TapdTransformation = ({ entities, connectionId, scopeId, transforma
   }, [prefix]);
 
   useEffect(() => {
-    const typeList = Object.entries(transformation.typeMappings ?? {}).map(([key, value]: any) => ({ key, value }));
+    const typeList = Object.entries(transformation.typeMappings ?? {}).map(([key, value]) => ({ key, value }));
     setFeatureTypeList(typeList.filter((it) => it.value === StandardType.Requirement).map((it) => it.key));
     setBugTypeList(typeList.filter((it) => it.value === StandardType.Bug).map((it) => it.key));
     setIncidentTypeList(typeList.filter((it) => it.value === StandardType.Incident).map((it) => it.key));
 
-    const statusList = Object.entries(transformation.statusMappings ?? {}).map(([key, value]: any) => ({ key, value }));
+    const statusList = Object.entries(transformation.statusMappings ?? {}).map(([key, value]) => ({ key, value }));
     setTodoStatusList(statusList.filter((it) => it.value === StandardStatus.Todo).map((it) => it.key));
     setInProgressStatusList(statusList.filter((it) => it.value === StandardStatus.InProgress).map((it) => it.key));
     setDoneStatusList(statusList.filter((it) => it.value === StandardStatus.Done).map((it) => it.key));
@@ -184,25 +186,54 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
+  transformation: TapdTransformationValues;
+  onChangeTransformation: (next: TapdTransformationValues) => void;
   typeList: Array<{
     id: string;
     name: string;
   }>;
-  featureTypeList: any;
-  bugTypeList: any;
-  incidentTypeList: any;
+  featureTypeList: string[];
+  bugTypeList: string[];
+  incidentTypeList: string[];
   statusList: Array<{
     id: string;
     name: string;
   }>;
-  todoStatusList: any;
-  inProgressStatusList: any;
-  doneStatusList: any;
-  transformaType: any;
-}) =>
-  [
+  todoStatusList: string[];
+  inProgressStatusList: string[];
+  doneStatusList: string[];
+  transformaType: (its: string[], standardType: string) => Record<string, string>;
+}) => {
+  const typeOptions = typeList.map((it) => ({ label: it.name, value: it.id }));
+  const statusOptions = statusList.map((it) => ({ label: it.name, value: it.id }));
+
+  const typeRows: MappingRow[] = [
+    { label: 'Requirement', standard: StandardType.Requirement, list: featureTypeList },
+    { label: 'Bug', standard: StandardType.Bug, list: bugTypeList },
+    {
+      label: (
+        <>
+          <span>Incident</span>
+          <Tag style={{ marginLeft: 4 }} color="blue">
+            DORA
+          </Tag>
+        </>
+      ),
+      standard: StandardType.Incident,
+      list: incidentTypeList,
+    },
+  ];
+
+  const statusRows: MappingRow[] = [
+    { label: 'TODO', standard: StandardStatus.Todo, list: todoStatusList },
+    { label: 'IN-PROGRESS', standard: StandardStatus.InProgress, list: inProgressStatusList },
+    { label: 'DONE', standard: StandardStatus.Done, list: doneStatusList },
+  ];
+
+  const mappingWith = (rows: MappingRow[], changed: MappingRow, value: string[]) =>
+    Object.assign({}, ...rows.map((row) => transformaType(row === changed ? value : row.list, row.standard)));
+
+  return [
     {
       key: 'TICKET',
       label: 'Issue Tracking',
@@ -213,122 +244,42 @@ const renderCollapseItems = ({
             Standardize your issue types to the following issue types to view metrics such as `Requirement lead time`
             and `Bug age` in built-in dashboards.
           </p>
-          <Form.Item label="Requirement">
-            <Select
-              mode="multiple"
-              options={typeList.map((it) => ({ label: it.name, value: it.id }))}
-              value={featureTypeList}
-              onChange={(value) =>
-                onChangeTransformation({
-                  ...transformation,
-                  typeMappings: {
-                    ...transformaType(value, StandardType.Requirement),
-                    ...transformaType(bugTypeList, StandardType.Bug),
-                    ...transformaType(incidentTypeList, StandardType.Incident),
-                  },
-                })
-              }
-            />
-          </Form.Item>
-          <Form.Item label="Bug">
-            <Select
-              mode="multiple"
-              options={typeList.map((it) => ({ label: it.name, value: it.id }))}
-              value={bugTypeList}
-              onChange={(value) =>
-                onChangeTransformation({
-                  ...transformation,
-                  typeMappings: {
-                    ...transformaType(featureTypeList, StandardType.Requirement),
-                    ...transformaType(value, StandardType.Bug),
-                    ...transformaType(incidentTypeList, StandardType.Incident),
-                  },
-                })
-              }
-            />
-          </Form.Item>
-          <Form.Item
-            label={
-              <>
-                <span>Incident</span>
-                <Tag style={{ marginLeft: 4 }} color="blue">
-                  DORA
-                </Tag>
-              </>
-            }
-          >
-            <Select
-              mode="multiple"
-              options={typeList.map((it) => ({ label: it.name, value: it.id }))}
-              value={incidentTypeList}
-              onChange={(value) =>
-                onChangeTransformation({
-                  ...transformation,
-                  typeMappings: {
-                    ...transformaType(featureTypeList, StandardType.Requirement),
-                    ...transformaType(bugTypeList, StandardType.Bug),
-                    ...transformaType(value, StandardType.Incident),
-                  },
-                })
-              }
-            />
-          </Form.Item>
+          {typeRows.map((row) => (
+            <Form.Item key={row.standard} label={row.label}>
+              <Select
+                mode="multiple"
+                options={typeOptions}
+                value={row.list}
+                onChange={(value) =>
+                  onChangeTransformation({
+                    ...transformation,
+                    typeMappings: mappingWith(typeRows, row, value),
+                  })
+                }
+              />
+            </Form.Item>
+          ))}
           <p>
             Standardize your issue statuses to the following issue statuses to view metrics such as `Requirement
             Delivery Rate` in built-in dashboards.
           </p>
-          <Form.Item label="TODO">
-            <Select
-              mode="multiple"
-              options={statusList.map((it) => ({ label: it.name, value: it.id }))}
-              value={todoStatusList}
-              onChange={(value) =>
-                onChangeTransformation({
-                  ...transformation,
-                  statusMappings: {
-                    ...transformaType(value, StandardStatus.Todo),
-                    ...transformaType(inProgressStatusList, StandardStatus.InProgress),
-                    ...transformaType(doneStatusList, StandardStatus.Done),
-                  },
-                })
-              }
-            />
-          </Form.Item>
-          <Form.Item label="IN-PROGRESS">
-            <Select
-              mode="multiple"
-              options={statusList.map((it) => ({ label: it.name, value: it.id }))}
-              value={inProgressStatusList}
-              onChange={(value) =>
-                onChangeTransformation({
-                  ...transformation,
-                  statusMappings: {
-                    ...transformaType(todoStatusList, StandardStatus.Todo),
-                    ...transformaType(value, StandardStatus.InProgress),
-                    ...transformaType(doneStatusList, StandardStatus.Done),
-                  },
-                })
-              }
-            />
-          </Form.Item>
-          <Form.Item label="DONE">
-            <Select
-              mode="multiple"
-              options={statusList.map((it) => ({ label: it.name, value: it.id }))}
-              value={doneStatusList}
-              onChange={(value) =>
-                onChangeTransformation({
-                  ...transformation,
-                  statusMappings: {
-                    ...transformaType(todoStatusList, StandardStatus.Todo),
-                    ...transformaType(inProgressStatusList, StandardStatus.InProgress),
-                    ...transformaType(value, StandardStatus.Done),
-                  },
-                })
-              }
-            />
-          </Form.Item>
+          {statusRows.map((row) => (
+            <Form.Item key={row.standard} label={row.label}>
+              <Select
+                mode="multiple"
+                options={statusOptions}
+                value={row.list}
+                onChange={(value) =>
+                  onChangeTransformation({
+                    ...transformation,
+                    statusMappings: mappingWith(statusRows, row, value),
+                  })
+                }
+              />
+            </Form.Item>
+          ))}
         </Form>
       ),
     },
   ].filter((it) => entities.includes(it.key));
+};

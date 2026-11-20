@@ -23,3 +23,6 @@ export const messageMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn(),
 
 // Keeps toasts out of the jsdom window: pass the module `vi.mock('antd', ...)` gets from `importOriginal`.
 export const withMockedMessage = (antd: typeof Antd) => ({ ...antd, message: messageMock });
+
+export const loadMockedMessage = async (importOriginal: () => Promise<typeof Antd>) =>
+  withMockedMessage(await importOriginal());

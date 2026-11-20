@@ -182,7 +182,6 @@ describe('Step4 collection progress and actions', () => {
   it('shows the new pipeline and warns when saving progress fails after a successful trigger', async () => {
     const { value } = setup(TASK_STATUS.FAILED);
     const setRecords = vi.mocked(value.setRecords);
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
     storeSet.mockRejectedValueOnce(new Error('safe persistence failure'));
 
     const recollect = recollectButton();

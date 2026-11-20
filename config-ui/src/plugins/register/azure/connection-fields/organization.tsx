@@ -23,8 +23,8 @@ import { Block, ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
 
 interface Props {
-  initialValue?: OrganizationSettings | null;
-  value: string;
+  initialValue?: { organization?: string } | null;
+  value?: string;
   label?: string;
   setValue: (value: string) => void;
 }

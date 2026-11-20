@@ -20,13 +20,14 @@ import { Input } from 'antd';
 import { ChangeEvent, useEffect, useMemo, useRef } from 'react';
 
 import { Block } from '@/components';
+import type { ConnectionFieldRenderProps } from '@/types';
 
-interface Props {
-  initialValues: any;
-  values: any;
-  setValues: (values: any) => void;
-  setErrors: (errors: any) => void;
-}
+import type { QDevConnectionValues } from '../types';
+
+type Props = Pick<
+  ConnectionFieldRenderProps<QDevConnectionValues>,
+  'initialValues' | 'values' | 'setValues' | 'setErrors'
+>;
 
 const STORE_ID_PATTERN = /^d-[a-z0-9]{10}$/;
 const REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;

@@ -20,13 +20,12 @@ import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Tag, Input } from 'antd';
 
 import { ExternalLink, HelpTooltip } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+import type { JenkinsTransformationValues } from './types';
+
+type Props = TransformationProps<JenkinsTransformationValues>;
 
 export const JenkinsTransformation = ({ entities, transformation, setTransformation }: Props) => {
   const { token } = theme.useToken();
@@ -63,10 +62,12 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
-}) =>
-  [
+  transformation: JenkinsTransformationValues;
+  onChangeTransformation: (next: JenkinsTransformationValues) => void;
+}) => {
+  const { deploymentPattern, productionPattern } = transformation;
+
+  return [
     {
       key: 'CICD',
       label: 'CI/CD',
@@ -91,12 +92,12 @@ const renderCollapseItems = ({
             <Input
               style={{ width: 200, margin: '0 8px' }}
               placeholder="(deploy|push-image)"
-              value={transformation.deploymentPattern ?? ''}
+              value={deploymentPattern ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
                   deploymentPattern: e.target.value,
-                  productionPattern: !e.target.value ? '' : transformation.productionPattern,
+                  productionPattern: !e.target.value ? '' : productionPattern,
                 })
               }
             />
@@ -107,9 +108,9 @@ const renderCollapseItems = ({
             <span>If the name also matches</span>
             <Input
               style={{ width: 120, margin: '0 8px' }}
-              disabled={!transformation.deploymentPattern}
+              disabled={!deploymentPattern}
               placeholder="prod(.*)"
-              value={transformation.productionPattern ?? ''}
+              value={productionPattern ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -124,3 +125,4 @@ const renderCollapseItems = ({
       ),
     },
   ].filter((it) => entities.includes(it.key));
+};

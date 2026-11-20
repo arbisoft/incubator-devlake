@@ -158,6 +158,15 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/**/*.test.{ts,tsx}'],
+    rules: {
+      // Fixtures use http:// on purpose.
+      'sonarjs/no-clear-text-protocols': 'off',
+      // Fixture strings repeat by design.
+      'sonarjs/no-duplicate-string': 'off',
+    },
+  },
+  {
     files: ['**/*.d.ts'],
     rules: { 'no-var': 'off' },
   },

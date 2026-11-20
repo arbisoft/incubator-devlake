@@ -22,17 +22,20 @@ import { useEffect, useState } from 'react';
 import API from '@/api';
 import { Block } from '@/components';
 import JiraIssueTipsImg from '@/images/jira-issue-tips.png';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { operator } from '@/utils';
+
+import type { JiraTransformationValues } from '../types';
 
 import * as S from './styled';
 
-interface Props {
-  connectionId: ID;
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
+type Props = Pick<
+  TransformationProps<JiraTransformationValues>,
+  'connectionId' | 'transformation' | 'setTransformation'
+> & {
   open: boolean;
   onCancel: () => void;
-}
+};
 
 export const DevPanel = ({ connectionId, transformation, setTransformation, open, onCancel }: Props) => {
   const [step, setStep] = useState(1);

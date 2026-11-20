@@ -22,7 +22,6 @@ vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 
 export const resetLogActionMocks = () => {
   vi.clearAllMocks();
-  vi.spyOn(console, 'error').mockImplementation(() => undefined);
 };
 
 export const restoreLogActionMocks = () => {

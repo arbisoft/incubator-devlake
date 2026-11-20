@@ -18,5 +18,9 @@
 
 import { ACCESS_ROLE, type AccessCurrent } from '../../api/access';
 
+// The backend enforces the same rule on the admin-only endpoints.
+export const canManageAdminFeatures = (access: AccessCurrent | null) =>
+  access !== null && (access.enabled !== true || access.role === ACCESS_ROLE.CUSTOMER_ADMIN);
+
 export const canManageAccess = (access: AccessCurrent | null) =>
   access?.enabled === true && access.role === ACCESS_ROLE.CUSTOMER_ADMIN;

@@ -16,5 +16,18 @@
  *
  */
 
+export const trimTrailingSlashes = (value: string): string => {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end -= 1;
+  return value.slice(0, end);
+};
+
+export const trimSlashes = (value: string): string => {
+  const trimmed = trimTrailingSlashes(value);
+  let start = 0;
+  while (start < trimmed.length && trimmed[start] === '/') start += 1;
+  return trimmed.slice(start);
+};
+
 export const formatPlural = (count: number, singular: string, plural = `${singular}s`): string =>
   `${count} ${count === 1 ? singular : plural}`;

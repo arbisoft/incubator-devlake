@@ -38,7 +38,7 @@ const PROJECT_CONTENT_TEST_ID = 'project-content';
 const SETTINGS_DRAFT_LABEL = 'settings draft';
 
 vi.mock('antd', async (importOriginal) =>
-  (await import('@/ui/__tests__/antd-message-mock')).loadMockedMessage(importOriginal),
+  (await import('@/ui/__tests__/mock-message')).loadMockedMessage(importOriginal),
 );
 
 vi.mock('@/api', () => ({ default: { project: { get: vi.fn() } } }));

@@ -16,6 +16,8 @@
  *
  */
 
+import type { GithubAppValues } from '../types';
+
 export interface GithubInstallation {
   id: number;
   account: {
@@ -23,11 +25,7 @@ export interface GithubInstallation {
   };
 }
 
-export interface GithubAppSettings {
-  appId?: string;
-  secretKey?: string;
-  installationId?: number;
-
+export interface GithubAppSettings extends GithubAppValues {
   status: 'idle' | 'valid' | 'invalid';
   from?: string;
   installations?: GithubInstallation[];

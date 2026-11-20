@@ -39,9 +39,25 @@ Spend a minute discovering what already exists, so recommendations reuse it inst
   - If a building block exists → findings say "use `useFetch` from `shared/hooks`".
   - If it's missing → recommend creating it **once** (in "Suggested shared building blocks"), and reference that in the individual findings instead of repeating the full sketch each time.
 - Note the state tools (Redux, RTK Query, React Query, context), i18n library, router, and whether the React Compiler is enabled (if so, skip manual memoization findings).
-- Check the ESLint config. Don't report what a configured lint rule already enforces. If a mechanical rule is violated repeatedly and no lint rule covers it, recommend the lint rule once instead of listing every instance.
+- Check the ESLint config. Don't report what a configured lint rule already enforces. If a mechanical rule is violated repeatedly and no lint rule covers it, list every instance in the changed code as one grouped finding **and** recommend the lint rule.
+- Existing code is not the standard. If the repo already breaks a rule (e.g. local constants in `SCREAMING_SNAKE_CASE` everywhere), still flag it in changed code; precedent goes in "Pre-existing", it never exempts new code.
 
-## 3. Review, area by area
+## 3. Mechanical sweep, file by file
+
+Before the area review, walk **every changed file top to bottom**, including demos, stories, tests and page objects, and check each declaration and JSX block against this list. These are cheap to spot and easy to skip when attention goes to bigger issues, so do them deliberately:
+
+| Check | Rule | Reference |
+|---|---|---|
+| Every top-level `const` | `SCREAMING_SNAKE_CASE` only if **exported**; non-exported → `camelCase` | naming.md |
+| Every alias of a nested path (`const x = COPY.a.b`) and every function reading ≥2 fields of one object | Destructure: `const { options } = COPY.snippet`, `({ rawMb, monthlyMb }) =>` | maintainability.md → Idioms |
+| Every `cond ? <X/> : null` / `cond ? value : null` in JSX | `cond && …` when `cond` is boolean | maintainability.md → Idioms |
+| Sibling JSX blocks that differ only in props/data | Config array + `.map` | maintainability.md → Idioms |
+| What each file exports | Constants/data **or** functions **or** a component — not a mix | architecture.md §2a |
+| Every pair of objects/maps keyed by the same ids (ids, meta, labels, effects, handlers) | One object per id holding all of it | reusability.md §6 |
+
+Group the hits per rule into one finding with all locations. Don't drop them as nits because the review is long — they're **Minor** and they recur in every PR until someone names them.
+
+## 4. Review, area by area
 
 Read the reference file for each area the code touches. Most reviews touch most areas; skip only the ones that clearly don't apply (e.g. no popups in the diff → skip the popup section).
 
@@ -57,14 +73,14 @@ Read the reference file for each area the code touches. Most reviews touch most 
 | Naming conventions | [references/naming.md](references/naming.md) |
 | Readability, component size, dead code, styling, forms, tests, lint rules | [references/maintainability.md](references/maintainability.md) |
 
-## 4. Severity
+## 5. Severity
 
 - 🔴 **Critical** — security holes, bugs, crashes, wrong data from races, leaks.
 - 🟠 **Major** — layer/dependency violations, tight coupling, duplicated logic, scattered try/catch or loading state, wrong state tool, prop drilling, popups that stay mounted, type-switching that should be a strategy/registry.
-- 🟡 **Minor** — loose strings, naming, file placement, missing or unnecessary memoization, small a11y gaps.
+- 🟡 **Minor** — loose strings, naming, file placement, mixed-export files, missed destructuring / `&&` / `.map` idioms, missing or unnecessary memoization, small a11y gaps.
 - ⚪ **Nit** — preference-level. Drop nits entirely when there are more than ~10 higher findings; they bury the signal.
 
-## 5. Writing findings
+## 6. Writing findings
 
 - **Verify before reporting.** Only report what you saw in the code. When a verdict depends on context you couldn't see (e.g. "is this slice really used app-wide?"), say what you checked and tag the finding **(verify)**.
 - **Group repeats.** One finding with a list of locations beats eight identical findings.
@@ -72,7 +88,7 @@ Read the reference file for each area the code touches. Most reviews touch most 
 - **Show the fix** with a short after-snippet (and before-snippet when it clarifies). Prefer the smallest change that satisfies the rule; propose restructuring a module only when structure *is* the finding.
 - Name the rule area so the author can find it in the team standard.
 
-## 6. Output template
+## 7. Output template
 
 Use this structure:
 

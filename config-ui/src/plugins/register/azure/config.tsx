@@ -18,10 +18,13 @@
 
 import { ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { BaseURL, ConnectionOrganization } from './connection-fields';
+import type { AzureConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<AzureConnectionValues>;
 
 export const AzureConfig: IPluginConfig = {
   plugin: 'azuredevops',
@@ -36,7 +39,7 @@ export const AzureConfig: IPluginConfig = {
     initialValues: {},
     fields: [
       'name',
-      ({ values, setValues }: any) => (
+      ({ values, setValues }: RenderProps) => (
         <BaseURL key="base-url" value={values.endpoint} onChange={(val) => setValues({ endpoint: val })} />
       ),
       {
@@ -91,7 +94,7 @@ export const AzureGoConfig: IPluginConfig = {
     initialValues: {},
     fields: [
       'name',
-      ({ values, setValues }: any) => (
+      ({ values, setValues }: RenderProps) => (
         <BaseURL key="base-url" value={values.endpoint} onChange={(val) => setValues({ endpoint: val })} />
       ),
       {
@@ -110,7 +113,7 @@ export const AzureGoConfig: IPluginConfig = {
           </span>
         ),
       },
-      ({ initialValues, values, setValues }: any) => (
+      ({ initialValues, values, setValues }: RenderProps) => (
         <ConnectionOrganization
           initialValue={initialValues}
           label="Personal Access Token Scope"

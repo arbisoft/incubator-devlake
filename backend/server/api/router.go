@@ -26,6 +26,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/impls/logruslog"
 	"github.com/apache/incubator-devlake/server/api/access"
+	"github.com/apache/incubator-devlake/server/api/adminonly"
 	"github.com/apache/incubator-devlake/server/api/apikeys"
 	"github.com/apache/incubator-devlake/server/api/auth"
 	"github.com/apache/incubator-devlake/server/api/store"
@@ -34,8 +35,10 @@ import (
 	"github.com/apache/incubator-devlake/server/api/blueprints"
 	compliancescorecard "github.com/apache/incubator-devlake/server/api/compliance_scorecard"
 	"github.com/apache/incubator-devlake/server/api/domainlayer"
-	"github.com/apache/incubator-devlake/server/api/grafanarole"
 	"github.com/apache/incubator-devlake/server/api/grafanausers"
+	"github.com/apache/incubator-devlake/server/api/integration"
+	statsrepositories "github.com/apache/incubator-devlake/server/api/integration/repositories"
+	statsservices "github.com/apache/incubator-devlake/server/api/integration/services"
 	"github.com/apache/incubator-devlake/server/api/pipelines"
 	"github.com/apache/incubator-devlake/server/api/plugininfo"
 	"github.com/apache/incubator-devlake/server/api/project"
@@ -89,11 +92,12 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.GET("/store/:storeKey", store.GetStore)
 	r.PUT("/store/:storeKey", store.PutStore)
 
-	// api keys api
-	r.GET("/api-keys", apikeys.GetApiKeys)
-	r.POST("/api-keys", apikeys.PostApiKey)
-	r.PUT("/api-keys/:apiKeyId", apikeys.PutApiKey)
-	r.DELETE("/api-keys/:apiKeyId", apikeys.DeleteApiKey)
+	// api keys api (admin-only)
+	admin := adminonly.Require()
+	r.GET("/api-keys", admin, apikeys.GetApiKeys)
+	r.POST("/api-keys", admin, apikeys.PostApiKey)
+	r.PUT("/api-keys/:apiKeyId", admin, apikeys.PutApiKey)
+	r.DELETE("/api-keys/:apiKeyId", admin, apikeys.DeleteApiKey)
 
 	// auth (OIDC and local user login)
 	auth.RegisterRoutes(r)
@@ -102,18 +106,15 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	access.RegisterRoutes(r)
 	grafanausers.RegisterRoutes(r)
 
+	// Integration Service endpoints, reachable only through /rest/... with a DevLake API key.
+	registerIntegrationRoutes(r, basicRes)
+
 	// user project mapping api
-	//
-	// Reachable from config-ui with a session, and from the Grafana admin dashboard
-	// through Grafana's datasource proxy with a scoped API key. RequireGrafanaAdmin
-	// constrains only the latter: that proxy admits any signed-in Grafana user, so
-	// without it a Viewer could grant themselves any project. Session callers are
-	// unaffected; gating those is tracked separately.
-	grafanaAdmin := grafanarole.RequireGrafanaAdmin()
-	r.GET("/user-project-mappings", grafanaAdmin, userprojectmapping.GetAllMappings)
-	r.GET("/user-project-mappings/:userLogin", grafanaAdmin, userprojectmapping.GetMappingsByUser)
-	r.POST("/user-project-mappings/:userLogin", grafanaAdmin, userprojectmapping.PostMapping)
-	r.DELETE("/user-project-mappings/:userLogin/:projectName", grafanaAdmin, userprojectmapping.DeleteMapping)
+	// admin-only: customer-admin sessions; API keys can't manage keys or project access
+	r.GET("/user-project-mappings", admin, userprojectmapping.GetAllMappings)
+	r.GET("/user-project-mappings/:userLogin", admin, userprojectmapping.GetMappingsByUser)
+	r.POST("/user-project-mappings/:userLogin", admin, userprojectmapping.PostMapping)
+	r.DELETE("/user-project-mappings/:userLogin/:projectName", admin, userprojectmapping.DeleteMapping)
 
 	// mount all api resources for all plugins
 	resources, err := services.GetPluginsApiResources()
@@ -124,6 +125,41 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	for pluginName, apiResources := range resources {
 		registerPluginEndpoints(r, basicRes, pluginName, apiResources)
 	}
+}
+
+// registerIntegrationRoutes is the composition root for the Integration Service endpoints.
+func registerIntegrationRoutes(r *gin.Engine, basicRes context.BasicRes) {
+	db := basicRes.GetDal()
+	activity, err := statsrepositories.NewActivity(db)
+	if err != nil {
+		panic(err)
+	}
+	jira, err := statsrepositories.NewIssues(db, statsrepositories.SourceJira)
+	if err != nil {
+		panic(err)
+	}
+	github, err := statsrepositories.NewCode(db, statsrepositories.SourceGitHub)
+	if err != nil {
+		panic(err)
+	}
+	ai, err := statsrepositories.NewAI(db)
+	if err != nil {
+		panic(err)
+	}
+	stats, err := statsservices.NewStatsService(activity, jira, github, ai)
+	if err != nil {
+		panic(err)
+	}
+	handlers, err := integration.NewHandlers(stats)
+	if err != nil {
+		panic(err)
+	}
+	apiKeyOnly := integration.RequireAPIKey()
+	r.GET("/is_valid", apiKeyOnly, handlers.IsValid)
+	r.GET("/stats/:email/jira", apiKeyOnly, handlers.GetJiraStats)
+	r.GET("/stats/:email/github", apiKeyOnly, handlers.GetGitHubStats)
+	r.GET("/stats/:email/ai_usage", apiKeyOnly, handlers.GetAIUsageStats)
+	r.GET("/stats/:email/ai_cost", apiKeyOnly, handlers.GetAICostStats)
 }
 
 func registerPluginEndpoints(r *gin.Engine, basicRes context.BasicRes, pluginName string, apiResources map[string]map[string]plugin.ApiResourceHandler) {

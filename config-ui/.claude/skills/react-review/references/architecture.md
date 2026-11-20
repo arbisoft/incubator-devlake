@@ -70,6 +70,18 @@ A component lives in a lowercase kebab-case folder as `index.tsx`, and that file
 
 Why: a file that only holds the component is predictable to navigate, fast-refresh works reliably (mixed exports break React Fast Refresh), and shared things don't hide inside UI files.
 
+## 2a. One job per file
+
+The same rule applies to non-component files: a file exports **one kind** of thing.
+
+- `constants` — data only: id maps, meta/config objects, copy, defaults.
+- `utils` — functions only (pure), importing their data from `constants`.
+- `types` — types only.
+
+Flag any `.ts` file that exports both constant data and functions (e.g. `managed-settings.ts` exporting `DEFAULT_SETTINGS_SELECTION` / `TOP_LEVEL_OPTIONS` alongside `buildManagedSettings` / `estimateStorage`) → move the data to the module's constants and keep the functions in utils. A non-exported constant used only by one function may stay next to it; anything exported or shared moves.
+
+Why: readers know where to look, constants can be imported without pulling in logic, and tests of the logic don't depend on where data lives.
+
 ## 3. Folder-per-concern rule
 
 Every concern is a folder with `index.ts`: `constants/index.ts`, `service/index.ts`, `types/index.ts`, `utils/index.ts`, `hooks/index.ts`. Apply it uniformly — don't mix `service/index.ts` in one module with `constants.ts` in another.

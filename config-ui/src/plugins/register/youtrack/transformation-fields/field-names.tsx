@@ -18,6 +18,10 @@
 
 import { AutoComplete } from 'antd';
 
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
+
+import type { YoutrackTransformationValues } from '../types';
+
 // FieldDef is the union (across attached projects) of custom-field
 // definitions the slot selects filter against. Eligibility mirrors the
 // extractor: the slot's valueType category and non-multi-value only.
@@ -50,11 +54,9 @@ const SLOTS: Slot[] = [
   { key: 'dueDateField', label: 'Due Date field (optional)', valueTypes: ['date'], optional: true },
 ];
 
-interface Props {
+type Props = Pick<TransformationProps<YoutrackTransformationValues>, 'transformation' | 'setTransformation'> & {
   fieldDefs: FieldDef[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+};
 
 export const FieldNames = ({ fieldDefs, transformation, setTransformation }: Props) => {
   const optionsFor = (slot: Slot) =>

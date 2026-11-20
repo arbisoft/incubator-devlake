@@ -21,15 +21,15 @@ export const CONNECTION_FORM_TYPE = { CREATE: 'create', UPDATE: 'update' } as co
 export const COPY = {
   docHint: (name: string) => `If you run into any problems while creating a new connection for ${name},`,
   docLink: 'check out this doc',
-  test: { label: 'Test Connection', success: 'Test Connection Successfully.' },
+  test: { label: 'Test Connection', success: 'Connection test passed.' },
   details: {
     loading: 'Loading saved connection details…',
     failed: 'Saved connection details could not be loaded. Retry before saving or testing.',
   },
   save: {
     label: 'Save Connection',
-    created: 'Create a New Connection Successful.',
-    updated: 'Update Connection Successful.',
+    created: 'Connection created.',
+    updated: 'Connection updated.',
     failed: 'Could not save the connection. Check the fields and try again.',
     invalid: 'The connection was rejected. Check the fields and try again.',
     duplicate: 'A connection with this name already exists.',

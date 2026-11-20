@@ -16,4 +16,4 @@
  *
  */
 
-export { loadMockedMessage as mockOnboardAntd } from '@/ui/__tests__/antd-message-mock';
+export { loadMockedMessage as mockOnboardAntd } from '@/ui/__tests__/mock-message';

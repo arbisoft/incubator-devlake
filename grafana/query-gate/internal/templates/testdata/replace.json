@@ -1,0 +1,14 @@
+{
+  "title": "Synthetic Titles",
+  "panels": [
+    {
+      "title": "Normalised titles",
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT REGEXP_REPLACE(t.title, '^([A-Z]+)-([0-9]+)', '$1 $2') AS title FROM tickets t WHERE t.owner = ${__user.login:sqlstring} AND $__timeFrom() < t.created_at"
+        }
+      ]
+    }
+  ]
+}

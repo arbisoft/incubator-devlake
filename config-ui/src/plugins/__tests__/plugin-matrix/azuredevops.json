@@ -1,0 +1,81 @@
+{
+  "plugin": "azuredevops",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Azure DevOps Version*Azure DevOps CloudAzure DevOps Server (On-Premises)If you are using Azure DevOps Cloud, you do not need to enter the endpoint URL.Personal Access Token*Learn about how to create a PAT Please select ALL ACCESSIBLE ORGANIZATIONS for the Organization field when you create the PAT.ProxyAdd a proxy if you cannot access Azure DevOps directly.Custom Rate LimitBy default, DevLake uses 18,000 requests/hour for data collection for Azure DevOps. But you can adjust the collection speed by setting up your desirable rate limit. Learn more",
+    "typed": {
+      "name": "v0",
+      "token": "v1",
+      "proxy": "v2",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "deploymentPattern": "(deploy|push-image)",
+      "productionPattern": "prod(.*)",
+      "refdiff": {
+        "tagsLimit": 10,
+        "tagsPattern": "/v\\d+\\.\\d+(\\.\\d+(-rc)*\\d*)*$/"
+      }
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(deploy|push-image)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "prod(.*)"
+      }
+    ],
+    "text": "CI/CDDeploymentDORAUse Regular Expression to define Deployments in DevLake in order to measure DORA metrics. Learn moreConvert a Azure Pipeline Run as a DevLake Deployment when: The pipeline name, run name, or one of its jobs matches*If the pipeline name, run name, or job name also matches, this Deployment is a ‘Production Deployment’Additional Settings",
+    "typed": {
+      "deploymentPattern": "v0",
+      "productionPattern": "v1",
+      "refdiff": {
+        "tagsLimit": 10,
+        "tagsPattern": "/v\\d+\\.\\d+(\\.\\d+(-rc)*\\d*)*$/"
+      }
+    }
+  },
+  "consoleErrors": [],
+  "requests": []
+}

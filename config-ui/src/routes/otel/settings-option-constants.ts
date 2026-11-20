@@ -40,6 +40,7 @@ export const SETTINGS_OPTION_META: Record<SettingsOption, OptionMeta> = {
     isSignal: true,
     defaultOn: true,
     storage: { rawMb: 20, monthlyMb: 1 },
+    children: [SETTINGS_OPTION.REPOSITORY],
     offEnv: {
       set: { [MANAGED_ENV_KEY.METRICS_EXPORTER]: 'none' },
       remove: [MANAGED_ENV_KEY.METRIC_EXPORT_INTERVAL],
@@ -49,7 +50,7 @@ export const SETTINGS_OPTION_META: Record<SettingsOption, OptionMeta> = {
     isSignal: true,
     defaultOn: true,
     storage: { rawMb: 42, monthlyMb: 17 },
-    children: [SETTINGS_OPTION.PROMPT_TEXT, SETTINGS_OPTION.TOOL_DETAILS, SETTINGS_OPTION.REPOSITORY],
+    children: [SETTINGS_OPTION.PROMPT_TEXT, SETTINGS_OPTION.TOOL_DETAILS],
     offEnv: { set: { [MANAGED_ENV_KEY.LOGS_EXPORTER]: 'none' } },
   },
   [SETTINGS_OPTION.PROMPT_TEXT]: {

@@ -20,7 +20,20 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Trends",
+      "tooltip": "Weekly trends in cost per line, effort, agents, adoption and spend concentration",
+      "type": "link",
+      "url": "/d/claude_trends_mysql"
+    }
+  ],
   "panels": [
     {
       "datasource": "mysql",
@@ -69,7 +82,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT COUNT(DISTINCT user_key) AS \"Active Users\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))",
+          "rawSql": "SELECT COUNT(DISTINCT user_key) AS \"Active Users\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))",
           "refId": "A"
         }
       ],
@@ -124,7 +137,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))",
+          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))",
           "refId": "A"
         }
       ],
@@ -178,7 +191,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT SUM(prs_created) AS \"PRs by Claude\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))",
+          "rawSql": "SELECT SUM(prs_created) AS \"PRs by Claude\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))",
           "refId": "A"
         }
       ],
@@ -241,7 +254,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT SUM(estimated_cost_usd) AS \"Estimated Cost (USD)\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))",
+          "rawSql": "SELECT SUM(estimated_cost_usd) AS \"Estimated Cost (USD)\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))",
           "refId": "A"
         }
       ],
@@ -275,11 +288,11 @@
             "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
-            "pointSize": 5,
+            "pointSize": 6,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "never",
+            "showPoints": "always",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -327,7 +340,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(DATE(hour_start)) AS time,\n  COUNT(DISTINCT user_key) AS \"Daily Active Users\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND session_count > 0\nGROUP BY UNIX_TIMESTAMP(DATE(hour_start))\nORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(DATE(hour_start)) AS time,\n  COUNT(DISTINCT user_key) AS \"Daily Active Users\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\n  AND session_count > 0\nGROUP BY UNIX_TIMESTAMP(DATE(hour_start))\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -413,14 +426,14 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(prs_created) AS \"PRs by Claude\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(prs_created) AS \"PRs by Claude\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
           "refId": "A"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(commits_created) AS \"Commits by Claude\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(commits_created) AS \"Commits by Claude\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
           "refId": "B"
         }
       ],
@@ -507,7 +520,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  CONCAT(UPPER(LEFT(model_family, 1)), SUBSTRING(model_family, 2)) AS metric,\n  SUM(estimated_cost_usd) AS value\nFROM (\n  SELECT hour_start, estimated_cost_usd,\n    CASE\n      -- Legacy IDs put version before family (claude-3-7-sonnet); current IDs put family first (claude-fable-5-1).\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 4), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 3), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+([.][0-9]+)?$'\n        THEN CONCAT('claude ', SUBSTRING(LOWER(model), 8))\n      WHEN LOWER(model) LIKE 'claude-%'\n        THEN SUBSTRING_INDEX(SUBSTRING(LOWER(model), 8), '-', 1)\n      ELSE SUBSTRING_INDEX(LOWER(model), '-', 1)\n    END AS model_family\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n) AS usage_by_model_family\nGROUP BY hour_start, model_family\nORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  CONCAT(UPPER(LEFT(model_family, 1)), SUBSTRING(model_family, 2)) AS metric,\n  SUM(estimated_cost_usd) AS value\nFROM (\n  SELECT hour_start, estimated_cost_usd,\n    CASE\n      -- Legacy IDs put version before family (claude-3-7-sonnet); current IDs put family first (claude-fable-5-1).\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 4), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 3), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+([.][0-9]+)?$'\n        THEN CONCAT('claude ', SUBSTRING(LOWER(model), 8))\n      WHEN LOWER(model) LIKE 'claude-%'\n        THEN SUBSTRING_INDEX(SUBSTRING(LOWER(model), 8), '-', 1)\n      ELSE SUBSTRING_INDEX(LOWER(model), '-', 1)\n    END AS model_family\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\n) AS usage_by_model_family\nGROUP BY hour_start, model_family\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -593,21 +606,21 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(lines_added) AS \"Lines Added (Features)\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(lines_added) AS \"Lines Added (Features)\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
           "refId": "A"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(lines_removed) AS \"Lines Removed (Refactoring)\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(lines_removed) AS \"Lines Removed (Refactoring)\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
           "refId": "B"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(lines_removed) / NULLIF(SUM(lines_added), 0) AS \"Refactor Ratio\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(lines_removed) / NULLIF(SUM(lines_added), 0) AS \"Refactor Ratio\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
           "refId": "C"
         }
       ],
@@ -624,7 +637,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -636,7 +650,20 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -663,7 +690,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT COALESCE(names.full_name, user_usage.user) AS \"User\", SUM(sessions) AS \"Sessions\", SUM(cost_usd) AS \"Cost (USD)\"\nFROM (\n  SELECT COALESCE(user_email, user_key) AS user, SUM(session_count) AS sessions, 0 AS cost_usd\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  GROUP BY COALESCE(user_email, user_key)\n  UNION ALL\n  SELECT COALESCE(user_email, user_key) AS user, 0 AS sessions, SUM(estimated_cost_usd) AS cost_usd\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  GROUP BY COALESCE(user_email, user_key)\n) AS user_usage\nLEFT JOIN (\n  -- Resolve each email to a person's full name from accounts. gitextractor rows (id = email) are preferred;\n  -- only names that look like a full name (contain a space) are used, otherwise the email is shown.\n  SELECT LOWER(TRIM(a_n.email)) AS email_key,\n         COALESCE(MAX(CASE WHEN a_n.id = a_n.email THEN n_n.name END), MAX(n_n.name)) AS full_name\n  FROM accounts a_n\n  JOIN (SELECT id, TRIM(REPLACE(full_name, UNHEX('E2808B'), '')) AS name FROM accounts) n_n\n    ON n_n.id = a_n.id AND n_n.name LIKE '% %' AND n_n.name NOT LIKE '%@%'\n  WHERE NULLIF(TRIM(a_n.email), '') IS NOT NULL\n  GROUP BY LOWER(TRIM(a_n.email))\n) names ON names.email_key = LOWER(TRIM(user_usage.user))\nGROUP BY user_usage.user, names.full_name\nORDER BY SUM(sessions) DESC, SUM(cost_usd) DESC",
+          "rawSql": "SELECT COALESCE(names.full_name, user_usage.user) AS \"User\", SUM(sessions) AS \"Sessions\", SUM(cost_usd) AS \"Cost (USD)\"\nFROM (\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user, SUM(session_count) AS sessions, 0 AS cost_usd\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\n  GROUP BY COALESCE(NULLIF(user_email, ''), user_key)\n  UNION ALL\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user, 0 AS sessions, SUM(estimated_cost_usd) AS cost_usd\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\n  GROUP BY COALESCE(NULLIF(user_email, ''), user_key)\n) AS user_usage\nLEFT JOIN (\n  -- Resolve each email to a person's full name from accounts. gitextractor rows (id = email) are preferred;\n  -- only names that look like a full name (contain a space) are used, otherwise the email is shown.\n  SELECT LOWER(TRIM(a_n.email)) AS email_key,\n         COALESCE(MAX(CASE WHEN a_n.id = a_n.email THEN n_n.name END), MAX(n_n.name)) AS full_name\n  FROM accounts a_n\n  JOIN (SELECT id, TRIM(REPLACE(full_name, UNHEX('E2808B'), '')) AS name FROM accounts) n_n\n    ON n_n.id = a_n.id AND n_n.name LIKE '% %' AND n_n.name NOT LIKE '%@%'\n  WHERE NULLIF(TRIM(a_n.email), '') IS NOT NULL\n  GROUP BY LOWER(TRIM(a_n.email))\n) names ON names.email_key = LOWER(TRIM(user_usage.user))\nGROUP BY user_usage.user, names.full_name\nORDER BY SUM(sessions) DESC, SUM(cost_usd) DESC",
           "refId": "A"
         }
       ],
@@ -680,7 +707,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -692,7 +720,20 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -719,7 +760,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT COALESCE(names.full_name, mu.user) AS \"User\",\n  CONCAT(UPPER(LEFT(mu.model_family, 1)), SUBSTRING(mu.model_family, 2)) AS \"Model\",\n  mu.query_source AS \"Source\",\n  mu.input_tokens AS \"Input Tokens\",\n  mu.output_tokens AS \"Output Tokens\",\n  mu.cost_usd AS \"Total Cost (USD)\"\nFROM (\n  SELECT COALESCE(user_email, user_key) AS user,\n    CASE\n      -- Legacy IDs put version before family (claude-3-7-sonnet); current IDs put family first (claude-fable-5-1).\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 4), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 3), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+([.][0-9]+)?$'\n        THEN CONCAT('claude ', SUBSTRING(LOWER(model), 8))\n      WHEN LOWER(model) LIKE 'claude-%'\n        THEN SUBSTRING_INDEX(SUBSTRING(LOWER(model), 8), '-', 1)\n      ELSE SUBSTRING_INDEX(LOWER(model), '-', 1)\n    END AS model_family,\n    query_source,\n    SUM(input_tokens) AS input_tokens,\n    SUM(output_tokens) AS output_tokens,\n    SUM(estimated_cost_usd) AS cost_usd\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  GROUP BY COALESCE(user_email, user_key), model_family, query_source\n) AS mu\nLEFT JOIN (\n  -- Resolve each email to a person's full name from accounts. gitextractor rows (id = email) are preferred;\n  -- only names that look like a full name (contain a space) are used, otherwise the email is shown.\n  SELECT LOWER(TRIM(a_n.email)) AS email_key,\n         COALESCE(MAX(CASE WHEN a_n.id = a_n.email THEN n_n.name END), MAX(n_n.name)) AS full_name\n  FROM accounts a_n\n  JOIN (SELECT id, TRIM(REPLACE(full_name, UNHEX('E2808B'), '')) AS name FROM accounts) n_n\n    ON n_n.id = a_n.id AND n_n.name LIKE '% %' AND n_n.name NOT LIKE '%@%'\n  WHERE NULLIF(TRIM(a_n.email), '') IS NOT NULL\n  GROUP BY LOWER(TRIM(a_n.email))\n) names ON names.email_key = LOWER(TRIM(mu.user))\nORDER BY mu.cost_usd DESC",
+          "rawSql": "SELECT COALESCE(names.full_name, mu.user) AS \"User\",\n  CONCAT(UPPER(LEFT(mu.model_family, 1)), SUBSTRING(mu.model_family, 2)) AS \"Model\",\n  mu.query_source AS \"Source\",\n  mu.input_tokens AS \"Input Tokens\",\n  mu.output_tokens AS \"Output Tokens\",\n  mu.cost_usd AS \"Total Cost (USD)\"\nFROM (\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user,\n    CASE\n      -- Legacy IDs put version before family (claude-3-7-sonnet); current IDs put family first (claude-fable-5-1).\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 4), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 3), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+([.][0-9]+)?$'\n        THEN CONCAT('claude ', SUBSTRING(LOWER(model), 8))\n      WHEN LOWER(model) LIKE 'claude-%'\n        THEN SUBSTRING_INDEX(SUBSTRING(LOWER(model), 8), '-', 1)\n      ELSE SUBSTRING_INDEX(LOWER(model), '-', 1)\n    END AS model_family,\n    query_source,\n    SUM(input_tokens) AS input_tokens,\n    SUM(output_tokens) AS output_tokens,\n    SUM(estimated_cost_usd) AS cost_usd\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\n  GROUP BY COALESCE(NULLIF(user_email, ''), user_key), model_family, query_source\n) AS mu\nLEFT JOIN (\n  -- Resolve each email to a person's full name from accounts. gitextractor rows (id = email) are preferred;\n  -- only names that look like a full name (contain a space) are used, otherwise the email is shown.\n  SELECT LOWER(TRIM(a_n.email)) AS email_key,\n         COALESCE(MAX(CASE WHEN a_n.id = a_n.email THEN n_n.name END), MAX(n_n.name)) AS full_name\n  FROM accounts a_n\n  JOIN (SELECT id, TRIM(REPLACE(full_name, UNHEX('E2808B'), '')) AS name FROM accounts) n_n\n    ON n_n.id = a_n.id AND n_n.name LIKE '% %' AND n_n.name NOT LIKE '%@%'\n  WHERE NULLIF(TRIM(a_n.email), '') IS NOT NULL\n  GROUP BY LOWER(TRIM(a_n.email))\n) names ON names.email_key = LOWER(TRIM(mu.user))\nORDER BY mu.cost_usd DESC",
           "refId": "A"
         }
       ],
@@ -805,56 +846,56 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"Edit accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring})) AND tool_name = 'Edit'\nGROUP BY hour_start ORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"Edit accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})) AND tool_name = 'Edit'\nGROUP BY hour_start ORDER BY time",
           "refId": "A"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"Edit rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring})) AND tool_name = 'Edit'\nGROUP BY hour_start ORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"Edit rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})) AND tool_name = 'Edit'\nGROUP BY hour_start ORDER BY time",
           "refId": "B"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"MultiEdit accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring})) AND tool_name = 'MultiEdit'\nGROUP BY hour_start ORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"MultiEdit accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})) AND tool_name = 'MultiEdit'\nGROUP BY hour_start ORDER BY time",
           "refId": "C"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"MultiEdit rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring})) AND tool_name = 'MultiEdit'\nGROUP BY hour_start ORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"MultiEdit rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})) AND tool_name = 'MultiEdit'\nGROUP BY hour_start ORDER BY time",
           "refId": "D"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"Write accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring})) AND tool_name = 'Write'\nGROUP BY hour_start ORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"Write accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})) AND tool_name = 'Write'\nGROUP BY hour_start ORDER BY time",
           "refId": "E"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"Write rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring})) AND tool_name = 'Write'\nGROUP BY hour_start ORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"Write rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})) AND tool_name = 'Write'\nGROUP BY hour_start ORDER BY time",
           "refId": "F"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"NotebookEdit accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring})) AND tool_name = 'NotebookEdit'\nGROUP BY hour_start ORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"NotebookEdit accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})) AND tool_name = 'NotebookEdit'\nGROUP BY hour_start ORDER BY time",
           "refId": "G"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"NotebookEdit rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring})) AND tool_name = 'NotebookEdit'\nGROUP BY hour_start ORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"NotebookEdit rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})) AND tool_name = 'NotebookEdit'\nGROUP BY hour_start ORDER BY time",
           "refId": "H"
         }
       ],
@@ -940,14 +981,14 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(cache_read_tokens) AS \"Cache Read\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\nGROUP BY hour_start ORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(cache_read_tokens) AS \"Cache Read\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\nGROUP BY hour_start ORDER BY time",
           "refId": "A"
         },
         {
           "datasource": "mysql",
           "editorMode": "code",
           "format": "time_series",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(cache_creation_tokens) AS \"Cache Creation\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\nGROUP BY hour_start ORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(cache_creation_tokens) AS \"Cache Creation\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start) AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\nGROUP BY hour_start ORDER BY time",
           "refId": "B"
         }
       ],
@@ -964,7 +1005,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -1070,7 +1112,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT tool_name AS \"Tool\",\n  SUM(accepted_count) AS \"Accepted\",\n  SUM(rejected_count) AS \"Rejected\",\n  100 * SUM(accepted_count) / NULLIF(SUM(accepted_count) + SUM(rejected_count), 0) AS \"Acceptance Rate %\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\nGROUP BY tool_name\nORDER BY SUM(accepted_count) / NULLIF(SUM(accepted_count) + SUM(rejected_count), 0) DESC",
+          "rawSql": "SELECT tool_name AS \"Tool\",\n  SUM(accepted_count) AS \"Accepted\",\n  SUM(rejected_count) AS \"Rejected\",\n  100 * SUM(accepted_count) / NULLIF(SUM(accepted_count) + SUM(rejected_count), 0) AS \"Acceptance Rate %\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\nGROUP BY tool_name\nORDER BY SUM(accepted_count) / NULLIF(SUM(accepted_count) + SUM(rejected_count), 0) DESC",
           "refId": "A"
         }
       ],
@@ -1087,7 +1129,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -1132,7 +1175,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT CONCAT(UPPER(LEFT(model_family, 1)), SUBSTRING(model_family, 2)) AS \"Model\",\n  100 * SUM(cache_read_tokens) / NULLIF(SUM(cache_read_tokens) + SUM(cache_creation_tokens), 0) AS \"Cache Hit %\"\nFROM (\n  SELECT cache_read_tokens, cache_creation_tokens,\n    CASE\n      -- Legacy IDs put version before family (claude-3-7-sonnet); current IDs put family first (claude-fable-5-1).\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 4), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 3), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+([.][0-9]+)?$'\n        THEN CONCAT('claude ', SUBSTRING(LOWER(model), 8))\n      WHEN LOWER(model) LIKE 'claude-%'\n        THEN SUBSTRING_INDEX(SUBSTRING(LOWER(model), 8), '-', 1)\n      ELSE SUBSTRING_INDEX(LOWER(model), '-', 1)\n    END AS model_family\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n) AS usage_by_model_family\nGROUP BY model_family\nORDER BY SUM(cache_read_tokens) / NULLIF(SUM(cache_read_tokens) + SUM(cache_creation_tokens), 0) DESC",
+          "rawSql": "SELECT CONCAT(UPPER(LEFT(model_family, 1)), SUBSTRING(model_family, 2)) AS \"Model\",\n  100 * SUM(cache_read_tokens) / NULLIF(SUM(cache_read_tokens) + SUM(cache_creation_tokens), 0) AS \"Cache Hit %\"\nFROM (\n  SELECT cache_read_tokens, cache_creation_tokens,\n    CASE\n      -- Legacy IDs put version before family (claude-3-7-sonnet); current IDs put family first (claude-fable-5-1).\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 4), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+-[a-z]'\n        THEN SUBSTRING_INDEX(SUBSTRING_INDEX(LOWER(model), '-', 3), '-', -1)\n      WHEN LOWER(model) REGEXP '^claude-[0-9]+([.][0-9]+)?$'\n        THEN CONCAT('claude ', SUBSTRING(LOWER(model), 8))\n      WHEN LOWER(model) LIKE 'claude-%'\n        THEN SUBSTRING_INDEX(SUBSTRING(LOWER(model), 8), '-', 1)\n      ELSE SUBSTRING_INDEX(LOWER(model), '-', 1)\n    END AS model_family\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\n) AS usage_by_model_family\nGROUP BY model_family\nORDER BY SUM(cache_read_tokens) / NULLIF(SUM(cache_read_tokens) + SUM(cache_creation_tokens), 0) DESC",
           "refId": "C"
         }
       ],
@@ -1152,7 +1195,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -1196,7 +1240,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS \"Total Tokens\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS \"Total Tokens\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\nGROUP BY hour_start\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -1216,7 +1260,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -1285,7 +1330,7 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT language AS \"Language\",\n  SUM(accepted_count + rejected_count) AS \"Edits\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND language <> 'unknown'\nGROUP BY language\nORDER BY edits DESC\nLIMIT 10",
+          "rawSql": "SELECT language AS \"Language\",\n  SUM(accepted_count + rejected_count) AS \"Edits\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\n  AND language <> 'unknown'\nGROUP BY language\nORDER BY edits DESC\nLIMIT 10",
           "refId": "A"
         }
       ],
@@ -1347,12 +1392,326 @@
           "datasource": "mysql",
           "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT SUM(active_time_seconds) / NULLIF(COUNT(DISTINCT user_key), 0) / 3600 AS \"Average Active Coding Hours\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))",
+          "rawSql": "SELECT SUM(active_time_seconds) / NULLIF(COUNT(DISTINCT user_key), 0) / 3600 AS \"Average Active Coding Hours\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))",
           "refId": "A"
         }
       ],
       "title": "Avg Active Coding Hours per User (Period)",
       "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 70
+      },
+      "id": 18,
+      "panels": [],
+      "title": "Telemetry Setup",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Per Claude Code OTel team, over the selected range. Metrics users: users sending any telemetry. Log users: users with at least one prompt, meaning their logs reach DevLake. Logs coverage: log users as a share of metrics users. Repo users: users with at least one prompt that carries a repository. Repo share: share of the team's prompts that carry a repository. Low repo users: users with 10+ prompts whose own repo share is under half the team's; working outside a git repository also lowers it.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false,
+            "minWidth": 110
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Logs coverage"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Logs coverage"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red"
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.5
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.9
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Team"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 71
+      },
+      "id": 19,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "-- Users are those sending metrics; logs mean at least one prompt in the range.\nWITH m AS (\n  SELECT team_slug, COALESCE(NULLIF(user_email, ''), user_key) AS u, MAX(hour_start) AS last_metrics\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start)\n    AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\n  GROUP BY 1, 2\n),\nl AS (\n  SELECT c.team_slug, COALESCE(NULLIF(p.user_email, ''), p.user_key) AS u, COUNT(*) AS prompts, SUM(NULLIF(p.repository_url, '') IS NOT NULL) AS repo_prompts\n  FROM ai_prompts p\n  JOIN _tool_claude_code_otel_connections c ON c.id = p.source_connection_id\n  WHERE $__timeFilter(p.started_at)\n    AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring}))\n  GROUP BY 1, 2\n),\nu AS (\n  -- A user is low on repo attribution with 10+ prompts and under half the team's repository share.\n  SELECT m.team_slug, m.u, m.last_metrics, l.prompts, l.repo_prompts,\n    l.repo_prompts / NULLIF(l.prompts, 0) AS repo_share,\n    SUM(l.repo_prompts) OVER (PARTITION BY m.team_slug) / NULLIF(SUM(l.prompts) OVER (PARTITION BY m.team_slug), 0) AS team_repo_share\n  FROM m\n  LEFT JOIN l ON l.team_slug = m.team_slug AND l.u = m.u\n)\nSELECT team_slug AS \"Team\",\n  COUNT(*) AS \"Metrics users\",\n  COUNT(prompts) AS \"Log users\",\n  COUNT(prompts) / COUNT(*) AS \"Logs coverage\",\n  COALESCE(SUM(repo_prompts > 0), 0) AS \"Repo users\",\n  MAX(team_repo_share) AS \"Repo share\",\n  COALESCE(SUM(prompts >= 10 AND repo_share < 0.5 * team_repo_share), 0) AS \"Low repo users\"\nFROM u\nGROUP BY team_slug\nORDER BY 2 DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Telemetry Coverage by Team",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Users to follow up with their team lead, over the selected range. Gap: No logs means metrics arrived but no prompts did; Low repo attribution means 10+ prompts and under half the team's repo share, which can also come from working outside a git repository. Last metrics: latest hour with metrics from the user. Prompts: the user's prompts. Repo share: share of the user's prompts that carry a repository. Team repo share: share of all the team's prompts that carry a repository, the baseline the user is compared against.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false,
+            "minWidth": 110
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repo share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Team repo share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last metrics"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:YYYY-MM-DD HH:mm"
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gap"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "No logs": {
+                        "color": "red",
+                        "index": 0
+                      },
+                      "Low repo attribution": {
+                        "color": "orange",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Engineer"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 240
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Team"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 79
+      },
+      "id": 20,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "-- Users sending metrics with no prompts in the range, or well below their team's repository share.\nWITH m AS (\n  SELECT team_slug, COALESCE(NULLIF(user_email, ''), user_key) AS u, MAX(hour_start) AS last_metrics\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start)\n    AND (team_slug REGEXP '^(${otel_teams:regex})$' AND team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring}))\n  GROUP BY 1, 2\n),\nl AS (\n  SELECT c.team_slug, COALESCE(NULLIF(p.user_email, ''), p.user_key) AS u, COUNT(*) AS prompts, SUM(NULLIF(p.repository_url, '') IS NOT NULL) AS repo_prompts\n  FROM ai_prompts p\n  JOIN _tool_claude_code_otel_connections c ON c.id = p.source_connection_id\n  WHERE $__timeFilter(p.started_at)\n    AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring}))\n  GROUP BY 1, 2\n),\nu AS (\n  -- A user is low on repo attribution with 10+ prompts and under half the team's repository share.\n  SELECT m.team_slug, m.u, m.last_metrics, l.prompts, l.repo_prompts,\n    l.repo_prompts / NULLIF(l.prompts, 0) AS repo_share,\n    SUM(l.repo_prompts) OVER (PARTITION BY m.team_slug) / NULLIF(SUM(l.prompts) OVER (PARTITION BY m.team_slug), 0) AS team_repo_share\n  FROM m\n  LEFT JOIN l ON l.team_slug = m.team_slug AND l.u = m.u\n)\nSELECT COALESCE(names.full_name, u.u) AS \"Engineer\",\n  u.team_slug AS \"Team\",\n  CASE WHEN u.prompts IS NULL THEN 'No logs' ELSE 'Low repo attribution' END AS \"Gap\",\n  u.last_metrics AS \"Last metrics\",\n  COALESCE(u.prompts, 0) AS \"Prompts\",\n  u.repo_share AS \"Repo share\",\n  u.team_repo_share AS \"Team repo share\"\nFROM u\nLEFT JOIN (\n  SELECT LOWER(TRIM(a_n.email)) AS email_key,\n         COALESCE(MAX(CASE WHEN a_n.id = a_n.email THEN n_n.name END), MAX(n_n.name)) AS full_name\n  FROM accounts a_n\n  JOIN (SELECT id, TRIM(REPLACE(full_name, UNHEX('E2808B'), '')) AS name FROM accounts) n_n\n    ON n_n.id = a_n.id AND n_n.name LIKE '% %' AND n_n.name NOT LIKE '%@%'\n  WHERE NULLIF(TRIM(a_n.email), '') IS NOT NULL\n  GROUP BY LOWER(TRIM(a_n.email))\n) names ON names.email_key = LOWER(TRIM(u.u))\nWHERE u.prompts IS NULL OR (u.prompts >= 10 AND u.repo_share < 0.5 * u.team_repo_share)\nORDER BY u.prompts IS NOT NULL, u.team_slug, u.last_metrics DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Users Missing Logs or Repository Attribution",
+      "type": "table"
     }
   ],
   "preload": false,
@@ -1404,6 +1763,31 @@
         "refresh": 1,
         "sort": 1,
         "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- '__none__' keeps the result from being empty, which Grafana treats as an error; the regex hides it.\n-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(names.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_activity WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  UNION\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_model_usage WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  UNION\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_tool_usage WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  UNION\n  SELECT '__none__'\n) u\nLEFT JOIN (\n  -- Resolve each email to a person's full name from accounts. gitextractor rows (id = email) are preferred;\n  -- only names that look like a full name (contain a space) are used, otherwise the email is shown.\n  SELECT LOWER(TRIM(a_n.email)) AS email_key,\n         COALESCE(MAX(CASE WHEN a_n.id = a_n.email THEN n_n.name END), MAX(n_n.name)) AS full_name\n  FROM accounts a_n\n  JOIN (SELECT id, TRIM(REPLACE(full_name, UNHEX('E2808B'), '')) AS name FROM accounts) n_n\n    ON n_n.id = a_n.id AND n_n.name LIKE '% %' AND n_n.name NOT LIKE '%@%'\n  WHERE NULLIF(TRIM(a_n.email), '') IS NOT NULL\n  GROUP BY LOWER(TRIM(a_n.email))\n) names ON names.email_key = LOWER(TRIM(u.user))\nORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "User",
+        "multi": true,
+        "name": "user",
+        "options": [],
+        "query": "-- '__none__' keeps the result from being empty, which Grafana treats as an error; the regex hides it.\n-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(names.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_activity WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  UNION\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_model_usage WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  UNION\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_tool_usage WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  UNION\n  SELECT '__none__'\n) u\nLEFT JOIN (\n  -- Resolve each email to a person's full name from accounts. gitextractor rows (id = email) are preferred;\n  -- only names that look like a full name (contain a space) are used, otherwise the email is shown.\n  SELECT LOWER(TRIM(a_n.email)) AS email_key,\n         COALESCE(MAX(CASE WHEN a_n.id = a_n.email THEN n_n.name END), MAX(n_n.name)) AS full_name\n  FROM accounts a_n\n  JOIN (SELECT id, TRIM(REPLACE(full_name, UNHEX('E2808B'), '')) AS name FROM accounts) n_n\n    ON n_n.id = a_n.id AND n_n.name LIKE '% %' AND n_n.name NOT LIKE '%@%'\n  WHERE NULLIF(TRIM(a_n.email), '') IS NOT NULL\n  GROUP BY LOWER(TRIM(a_n.email))\n) names ON names.email_key = LOWER(TRIM(u.user))\nORDER BY 1;",
+        "refresh": 2,
+        "regex": "/^(?!__none__$)/",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query",
+        "allValue": "'__all__'"
       }
     ]
   },

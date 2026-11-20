@@ -16,10 +16,13 @@
  *
  */
 
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { Organization, Enterprise } from './connection-fields';
+import type { GhCopilotConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<GhCopilotConnectionValues>;
 
 export const GhCopilotConfig: IPluginConfig = {
   plugin: 'gh-copilot',
@@ -39,7 +42,7 @@ export const GhCopilotConfig: IPluginConfig = {
     fields: [
       'name',
       'endpoint',
-      ({ type, initialValues, values, setValues, setErrors }: any) => (
+      ({ type, initialValues, values, setValues, setErrors }: RenderProps) => (
         <Organization
           type={type}
           initialValues={initialValues}
@@ -48,7 +51,7 @@ export const GhCopilotConfig: IPluginConfig = {
           setErrors={setErrors}
         />
       ),
-      ({ type, initialValues, values, setValues, setErrors }: any) => (
+      ({ type, initialValues, values, setValues, setErrors }: RenderProps) => (
         <Enterprise
           type={type}
           initialValues={initialValues}

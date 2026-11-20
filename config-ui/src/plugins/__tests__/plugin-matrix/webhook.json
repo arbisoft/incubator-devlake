@@ -1,0 +1,12 @@
+{
+  "plugin": "webhook",
+  "connection": {
+    "mounted": {},
+    "controls": [],
+    "text": "",
+    "typed": {}
+  },
+  "scopeConfig": null,
+  "consoleErrors": [],
+  "requests": []
+}

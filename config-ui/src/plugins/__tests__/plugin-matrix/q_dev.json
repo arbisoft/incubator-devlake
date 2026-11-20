@@ -1,0 +1,97 @@
+{
+  "plugin": "q_dev",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "authType": "access_key",
+      "accessKeyId": "",
+      "secretAccessKey": "",
+      "region": "us-east-1",
+      "bucket": "",
+      "identityStoreId": "",
+      "identityStoreRegion": "",
+      "proxy": "",
+      "rateLimitPerHour": 20000
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "AKIAIOSFODNN7EXAMPLE"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "us-east-1"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "my-q-dev-data"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "d-1234567890"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "us-east-1"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      },
+      {
+        "tag": "input",
+        "role": "spinbutton"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Authentication Type*Choose how to authenticate with AWSAccess Key & SecretIAM Role (for EC2/ECS/Lambda)AWS Access Key ID*Use the Access Key ID of the IAM user that can access your S3 bucketAWS Access Key ID is requiredAWS Secret Access Key*Use the Secret Access Key paired with the Access Key IDAWS Secret Access Key is requiredAWS Region*Region of the S3 bucket, e.g. us-east-1S3 Bucket*Name of the bucket that stores the Q Developer CSV files.S3 bucket name is required.IAM Identity Store IDOptional. Provide if you want DevLake to resolve user display names (format d-xxxxxxxxxx).IAM Identity Center RegionOptional. Required only when Identity Store ID is provided (e.g. us-east-1).ProxyAdd a proxy if you cannot access Q Developer directly.Custom Rate LimitSet a fixed hourly rate limit if you need to throttle collection speed (default 20,000). requests/hour",
+    "typed": {
+      "name": "v0",
+      "authType": "access_key",
+      "accessKeyId": "v1",
+      "secretAccessKey": "v2",
+      "region": "v3",
+      "bucket": "v4",
+      "identityStoreId": "v5",
+      "identityStoreRegion": "v6",
+      "proxy": "v7",
+      "rateLimitPerHour": 20000
+    }
+  },
+  "scopeConfig": {
+    "mounted": {},
+    "controls": [],
+    "text": "",
+    "typed": {}
+  },
+  "consoleErrors": [],
+  "requests": []
+}

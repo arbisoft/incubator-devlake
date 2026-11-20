@@ -31,7 +31,7 @@ import { StatusActions } from './status-actions';
 import type { BlueprintContext } from './types';
 
 vi.mock('antd', async (importOriginal) =>
-  (await import('@/ui/__tests__/antd-message-mock')).loadMockedMessage(importOriginal),
+  (await import('@/ui/__tests__/mock-message')).loadMockedMessage(importOriginal),
 );
 
 vi.mock('@/api', () => ({
@@ -78,6 +78,16 @@ describe('StatusActions', () => {
       expect(screen.getByRole('button', { name: COPY.actions.collect })).toBeTruthy();
       expect(screen.getByRole('button', { name: COPY.actions.more })).toBeTruthy();
       expect(screen.queryByRole('button', { name: COPY.actions.runNow })).toBeNull();
+    });
+
+    it('makes Collect the primary action and Re-transform a default button', () => {
+      setup(BLUEPRINT_CONTEXT.PROJECT);
+      expect(screen.getByRole('button', { name: COPY.actions.collect }).classList.contains('ant-btn-primary')).toBe(
+        true,
+      );
+      expect(screen.getByRole('button', { name: COPY.actions.reTransform }).classList.contains('ant-btn-primary')).toBe(
+        false,
+      );
     });
 
     it('collects data, then refreshes', async () => {

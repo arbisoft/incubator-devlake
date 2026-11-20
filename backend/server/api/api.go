@@ -38,7 +38,6 @@ import (
 	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/apache/incubator-devlake/server/api/auth"
 	_ "github.com/apache/incubator-devlake/server/api/docs"
-	"github.com/apache/incubator-devlake/server/api/grafanarole"
 	"github.com/apache/incubator-devlake/server/api/grafanausers"
 	"github.com/apache/incubator-devlake/server/api/ping"
 	"github.com/apache/incubator-devlake/server/api/shared"
@@ -65,7 +64,6 @@ func Init() {
 	basicRes = services.GetBasicRes()
 	access.Init(basicRes)
 	auth.Init(basicRes)
-	grafanarole.Init(basicRes)
 	grafanausers.Init(basicRes)
 }
 
@@ -79,6 +77,10 @@ func InjectCustomService(pipelineNotifier services.PipelineNotificationService, 
 // @license.name Apache-2.0
 // @host localhost:8080
 // @BasePath /
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
+// @description A DevLake API key as "Bearer <API key>". Routes that need it are called under /rest/...
 func CreateAndRunApiServer() {
 	// Setup and run the server
 	Init()

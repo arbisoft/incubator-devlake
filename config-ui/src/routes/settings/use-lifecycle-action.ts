@@ -19,7 +19,7 @@
 import { useCallback } from 'react';
 
 import API from '@/api';
-import { ACCESS_STATUS, type AccessRole } from '@/api/access';
+import { ACCESS_STATUS, type AccessRole, type LocalCredentialResponse } from '@/api/access';
 import { useConfirmFlow, usePendingKeys } from '@/ui/hooks';
 import { operator } from '@/utils';
 
@@ -34,6 +34,13 @@ import type {
 import { getDomainLabel, getLocalCredentialError, getUpdateAccessError, getUserLabel } from './utils';
 
 export type { LifecycleTarget } from './types';
+
+const isLocalCredential = (value: unknown): value is LocalCredentialResponse =>
+  typeof value === 'object' &&
+  value !== null &&
+  'user' in value &&
+  'loginName' in value &&
+  'temporaryPassword' in value;
 
 const toRoleKey = (subject: LifecycleSubject, id: ID) => `${subject}:${id}`;
 
@@ -84,7 +91,8 @@ export const useLifecycleAction = ({ onDone, onCredential }: LifecycleActionOpti
         setOperating: setLoading,
         formatReason: CREDENTIAL_ACTIONS.includes(next.action) ? getLocalCredentialError : getUpdateAccessError,
       });
-      if (success && next.action === LIFECYCLE_ACTION.RESET_PASSWORD && response) onCredential?.(response);
+      if (success && next.action === LIFECYCLE_ACTION.RESET_PASSWORD && isLocalCredential(response))
+        onCredential?.(response);
       onDone();
       return success;
     },

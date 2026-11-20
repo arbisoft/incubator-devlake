@@ -41,6 +41,8 @@ export const NAV_KEY = {
 
 export const ACCESS_NAV_KEYS: string[] = [NAV_KEY.SETTINGS, NAV_KEY.USERS, NAV_KEY.AUTHENTICATION, NAV_KEY.ACTIVITY];
 
+export const ADMIN_NAV_KEYS: string[] = [NAV_KEY.API_KEYS];
+
 export const COPYRIGHT_HIDDEN_NAV_KEYS: string[] = [NAV_KEY.DASHBOARDS, NAV_KEY.GITHUB, NAV_KEY.SLACK];
 
 export const ACCOUNT_MENU_KEY = {

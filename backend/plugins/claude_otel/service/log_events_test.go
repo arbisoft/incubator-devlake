@@ -19,6 +19,7 @@ package service
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -408,6 +409,27 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 	stripContentAttributes(request)
 	for _, record := range resourceLogRecords(request.GetResourceLogs()[0]) {
 		setStringAttribute(record, "assistant_draft", "content from a future release")
+		setStringAttribute(record, "process.owner", "content from a future release")
+		setStringAttribute(record, "anthropic.seat_type", "content from a future release")
+		setStringAttribute(record, "files_reviewed", "content from a future release")
+		setStringAttribute(record, "managed_settings.settings", "content from a future release")
+		setStringAttribute(record, "claude.deployment_mode", "content from a future release")
+		setStringAttribute(record, "ttft_ms", "content from a future release")
+		setStringAttribute(record, "cost_usd_micros", "content from a future release")
+		setStringAttribute(record, "client_request_id", "content from a future release")
+		setStringAttribute(record, "message.uuid", "content from a future release")
+		setStringAttribute(record, "plugin_id", "content from a future release")
+		setStringAttribute(record, "review_ms", "content from a future release")
+		setStringAttribute(record, "vulns_found", "content from a future release")
+		setStringAttribute(record, "hook_definitions", "content from a future release")
+		setStringAttribute(record, "workspace.host_paths", "content from a future release")
+		setStringAttribute(record, "managed_settings.resolved_sha", "content from a future release")
+		setStringAttribute(record, "managed_settings.helper.path", "content from a future release")
+		setStringAttribute(record, "hook_matcher", "content from a future release")
+		setStringAttribute(record, "permission_mode", "auto")
+		setStringAttribute(record, "hook_name", "PreToolUse:Bash")
+		setStringAttribute(record, "vcs.ref.head.revision", "0123456789abcdef0123456789abcdef01234567")
+		setStringAttribute(record, "vcs.ref.head.name", "feat/x")
 	}
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
@@ -428,6 +450,17 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 		if _, kept := attributes["event.sequence"]; !kept {
 			t.Fatalf("%s attributes = %v, want allowlisted attributes kept", item.event.EventName, attributes)
 		}
+		for _, key := range []string{"permission_mode", "hook_name", "vcs.ref.head.revision", "vcs.ref.head.name"} {
+			if _, kept := attributes[key]; !kept {
+				t.Fatalf("%s attributes = %v, want %s kept", item.event.EventName, attributes, key)
+			}
+		}
+		for _, key := range []string{"process.owner", "anthropic.seat_type", "files_reviewed", "managed_settings.settings",
+			"claude.deployment_mode", "ttft_ms", "cost_usd_micros", "client_request_id", "message.uuid", "plugin_id", "review_ms", "vulns_found", "hook_definitions", "workspace.host_paths", "managed_settings.resolved_sha", "managed_settings.helper.path", "hook_matcher"} {
+			if _, kept := attributes[key]; kept {
+				t.Fatalf("%s attributes kept %q, want it dropped", item.event.EventName, key)
+			}
+		}
 	}
 }
 
@@ -446,7 +479,7 @@ func TestStoredAttributesNormalizesTheRepositoryURL(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			stored := storedAttributes(map[string]interface{}{
+			stored := storedAttributes("", map[string]interface{}{
 				repositoryURLAttribute: test.value,
 				"vcs.repository.name":  "Repo",
 				"vcs.owner.name":       "Org",
@@ -464,7 +497,7 @@ func TestStoredAttributesNormalizesTheRepositoryURL(t *testing.T) {
 		})
 	}
 
-	stored := storedAttributes(map[string]interface{}{"vcs.repository.name": "Repo"})
+	stored := storedAttributes("", map[string]interface{}{"vcs.repository.name": "Repo"})
 	if _, added := stored[repositoryURLAttribute]; added || len(stored) != 1 {
 		t.Fatalf("stored = %v, want no repository url added", stored)
 	}
@@ -494,6 +527,74 @@ func TestPrepareEventsNormalizesTheStoredRepositoryURL(t *testing.T) {
 		if got := attributes[repositoryURLAttribute]; got != "https://github.com/example-org/example-repo" {
 			t.Fatalf("%s repository url = %v, want it normalized", item.event.EventName, got)
 		}
+	}
+}
+
+func TestStoredAttributesDropsEventContentAndCapsStrings(t *testing.T) {
+	longText := strings.Repeat("x", 3000)
+	tests := []struct {
+		name       string
+		event      string
+		attributes map[string]interface{}
+		check      func(t *testing.T, stored map[string]interface{})
+	}{
+		{"compaction error dropped", eventCompaction, map[string]interface{}{"error": longText, "pre_tokens": float64(1200)}, func(t *testing.T, stored map[string]interface{}) {
+			if _, kept := stored["error"]; kept || stored["pre_tokens"] != float64(1200) {
+				t.Fatalf("stored = %v, want error dropped and pre_tokens kept", stored)
+			}
+		}},
+		{"tool_result error dropped", eventToolResult, map[string]interface{}{"error": "file contents"}, func(t *testing.T, stored map[string]interface{}) {
+			if _, kept := stored["error"]; kept {
+				t.Fatalf("stored = %v, want error dropped", stored)
+			}
+		}},
+		{"api_error error kept", eventAPIError, map[string]interface{}{"error": "overloaded"}, func(t *testing.T, stored map[string]interface{}) {
+			if stored["error"] != "overloaded" {
+				t.Fatalf("stored = %v, want error kept", stored)
+			}
+		}},
+		{"long string capped by runes", "hook_execution_complete", map[string]interface{}{"hook_name": strings.Repeat("é", 5000)}, func(t *testing.T, stored map[string]interface{}) {
+			name, _ := stored["hook_name"].(string)
+			if utf8.RuneCountInString(name) != maxStoredAttributeLength || !utf8.ValidString(name) {
+				t.Fatalf("hook_name has %d runes, want %d", utf8.RuneCountInString(name), maxStoredAttributeLength)
+			}
+		}},
+		{"tool_parameters not capped", eventToolDecision, map[string]interface{}{toolParametersAttribute: longText}, func(t *testing.T, stored map[string]interface{}) {
+			if stored[toolParametersAttribute] != longText {
+				t.Fatalf("tool_parameters was changed, want it kept as is")
+			}
+		}},
+		{"number unchanged", eventAPIRequest, map[string]interface{}{"cost_usd": float64(0.25)}, func(t *testing.T, stored map[string]interface{}) {
+			if stored["cost_usd"] != float64(0.25) {
+				t.Fatalf("stored = %v, want cost_usd unchanged", stored)
+			}
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.check(t, storedAttributes(test.event, test.attributes))
+		})
+	}
+}
+
+func TestStripContentAttributesDropsCompactionError(t *testing.T) {
+	compaction := &logsv1.LogRecord{Attributes: []*commonv1.KeyValue{
+		stringAttribute("event.name", "compaction"), stringAttribute("error", "model output"), stringAttribute("pre_tokens", "1200"),
+	}}
+	apiError := &logsv1.LogRecord{Attributes: []*commonv1.KeyValue{
+		stringAttribute("event.name", "api_error"), stringAttribute("error", "overloaded"),
+	}}
+	request := &collectorlogs.ExportLogsServiceRequest{ResourceLogs: []*logsv1.ResourceLogs{{
+		ScopeLogs: []*logsv1.ScopeLogs{{LogRecords: []*logsv1.LogRecord{compaction, apiError}}},
+	}}}
+
+	stripContentAttributes(request)
+
+	if hasAttribute(compaction.GetAttributes(), "error") || !hasAttribute(compaction.GetAttributes(), "pre_tokens") {
+		t.Fatalf("compaction attributes = %v, want error dropped and pre_tokens kept", compaction.GetAttributes())
+	}
+	if !hasAttribute(apiError.GetAttributes(), "error") {
+		t.Fatalf("api_error attributes = %v, want error kept", apiError.GetAttributes())
 	}
 }
 
@@ -567,6 +668,167 @@ func TestSessionModesInferEachPromptMode(t *testing.T) {
 	}
 }
 
+func TestPromptModePrefersObservedDecisions(t *testing.T) {
+	at := func(minute int) time.Time { return time.Date(2026, 10, 14, 10, minute, 0, 0, time.UTC) }
+	change := func(minute int, from, to string) *models.OtelEvent {
+		attributes, _ := json.Marshal(map[string]string{"from_mode": from, "to_mode": to})
+		return &models.OtelEvent{EventName: eventPermissionModeChanged, EventTimestamp: at(minute), Attributes: attributes}
+	}
+	decision := func(minute int, attributes map[string]string) *models.OtelEvent {
+		encoded, _ := json.Marshal(attributes)
+		return &models.OtelEvent{EventName: eventToolDecision, PromptId: "p1", EventTimestamp: at(minute), Attributes: encoded}
+	}
+	reporting := func(minute int, mode string) *models.OtelEvent {
+		return decision(minute, map[string]string{"permission_mode": mode})
+	}
+	testCases := []struct {
+		name     string
+		own      []*models.OtelEvent
+		earlier  *models.OtelEvent
+		changes  []*models.OtelEvent
+		mode     string
+		inferred bool
+	}{
+		{name: "own decision", own: []*models.OtelEvent{reporting(5, "auto")}, mode: "auto"},
+		{name: "own decision beats an earlier change", own: []*models.OtelEvent{reporting(5, "auto")}, changes: []*models.OtelEvent{change(1, "default", "plan")}, mode: "auto"},
+		{name: "earlier decision", earlier: reporting(1, "auto"), mode: "auto"},
+		{name: "mode change after the earlier decision wins", earlier: reporting(1, "auto"), changes: []*models.OtelEvent{change(3, "auto", "plan")}, mode: "plan"},
+		{name: "earlier decision after the mode change wins", earlier: reporting(3, "bypassPermissions"), changes: []*models.OtelEvent{change(1, "default", "plan")}, mode: "bypassPermissions"},
+		{name: "decision without a mode", own: []*models.OtelEvent{decision(5, map[string]string{"decision": "accept"})}, mode: ai.PermissionModeDefault, inferred: true},
+		{name: "nothing observed", mode: ai.PermissionModeDefault, inferred: true},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var earlier *observedMode
+			if testCase.earlier != nil {
+				observed, _ := observedModeOf(testCase.earlier)
+				earlier = &observed
+			}
+			mode, inferred := newSessionModes(testCase.changes).promptMode(firstObservedMode(testCase.own), earlier, at(5), 0)
+			if mode != testCase.mode || inferred != testCase.inferred {
+				t.Fatalf("promptMode() = %q inferred=%t, want %q inferred=%t", mode, inferred, testCase.mode, testCase.inferred)
+			}
+		})
+	}
+}
+
+func TestEarlierObservedMode(t *testing.T) {
+	at := func(minute int) time.Time { return time.Date(2026, 10, 14, 10, minute, 0, 0, time.UTC) }
+	entry := func(prompt string, minute int, sequence int64, mode string) observedMode {
+		return observedMode{at: at(minute), sequence: sequence, promptID: prompt, mode: mode}
+	}
+	testCases := []struct {
+		name     string
+		observed []observedMode
+		prompt   string
+		minute   int
+		sequence int64
+		want     string
+	}{
+		{name: "first decision of the latest earlier prompt", observed: []observedMode{entry("p1", 1, 1, "acceptEdits"), entry("p1", 2, 2, "bypassPermissions")}, prompt: "p2", minute: 5, want: "acceptEdits"},
+		{name: "two earlier prompts", observed: []observedMode{entry("p1", 1, 1, "default"), entry("p2", 3, 2, "plan")}, prompt: "p3", minute: 5, want: "plan"},
+		{name: "same timestamp with a lower sequence is earlier", observed: []observedMode{entry("p1", 5, 3, "plan")}, prompt: "p2", minute: 5, sequence: 4, want: "plan"},
+		{name: "same timestamp with a higher sequence is later", observed: []observedMode{entry("p1", 5, 3, "plan")}, prompt: "p2", minute: 5, sequence: 2},
+		{name: "own decisions are ignored", observed: []observedMode{entry("p2", 1, 1, "plan")}, prompt: "p2", minute: 5},
+		{name: "later decisions are ignored", observed: []observedMode{entry("p1", 6, 1, "plan")}, prompt: "p2", minute: 5},
+		{name: "decisions without a prompt are returned themselves", observed: []observedMode{entry("", 1, 1, "plan"), entry("", 2, 2, "auto")}, prompt: "p2", minute: 5, want: "auto"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := earlierObservedMode(testCase.observed, testCase.prompt, at(testCase.minute), testCase.sequence)
+			if testCase.want == "" {
+				if got != nil {
+					t.Fatalf("earlierObservedMode() = %#v, want nil", got)
+				}
+				return
+			}
+			if got == nil || got.mode != testCase.want {
+				t.Fatalf("earlierObservedMode() = %#v, want mode %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func collectSkills(adds func(c *skillCollector)) []*ai.AiPromptSkill {
+	collector := newSkillCollector(testOrganizationID, "p1")
+	adds(collector)
+	return collector.result(&ai.AiPrompt{UserKey: "u1", SessionId: "s1"})
+}
+
+func TestSkillCollectorMergesPlainIntoNamespaced(t *testing.T) {
+	t1 := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Minute)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("pdf", ai.SkillDetectedViaApiRequest, "", "", "", t2)
+		c.add("anthropic-skills:pdf", ai.SkillDetectedViaActivation, "user", "plugin", "", t1)
+	})
+	if len(skills) != 1 {
+		t.Fatalf("got %d skills, want 1", len(skills))
+	}
+	got := skills[0]
+	if got.SkillName != "anthropic-skills:pdf" || got.DetectedVia != ai.SkillDetectedViaActivation || !got.FirstUsedAt.Equal(t1) ||
+		got.PluginName != "anthropic-skills" || got.InvocationTrigger != "user" || got.UserKey != "u1" || got.SessionId != "s1" {
+		t.Fatalf("merged skill = %+v", got)
+	}
+}
+
+func TestSkillCollectorMergeKeepsEarliestTimeInEitherOrder(t *testing.T) {
+	t1 := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Minute)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("anthropic-skills:pdf", ai.SkillDetectedViaActivation, "user", "plugin", "", t2)
+		c.add("pdf", ai.SkillDetectedViaApiRequest, "", "", "", t1)
+	})
+	if len(skills) != 1 || skills[0].SkillName != "anthropic-skills:pdf" || !skills[0].FirstUsedAt.Equal(t1) {
+		t.Fatalf("skills = %+v, want one namespaced row first used at %v", skills, t1)
+	}
+}
+
+func TestSkillCollectorKeepsAmbiguousNames(t *testing.T) {
+	at := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("docs", ai.SkillDetectedViaApiRequest, "", "", "", at)
+		c.add("a:docs", ai.SkillDetectedViaActivation, "", "", "", at)
+		c.add("b:docs", ai.SkillDetectedViaActivation, "", "", "", at)
+	})
+	if len(skills) != 3 {
+		t.Fatalf("got %d skills, want 3", len(skills))
+	}
+}
+
+func TestSkillCollectorLeavesUnmatchedPlainSkill(t *testing.T) {
+	at := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("code-review", ai.SkillDetectedViaApiRequest, "", "", "", at)
+	})
+	if len(skills) != 1 || skills[0].SkillName != "code-review" || skills[0].PluginName != "" {
+		t.Fatalf("skills = %+v", skills)
+	}
+}
+
+func TestSkillCollectorKeepsOwnPluginName(t *testing.T) {
+	at := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("skill-creator:skill-creator", ai.SkillDetectedViaActivation, "", "", "skill-creator", at)
+	})
+	if len(skills) != 1 || skills[0].SkillName != "skill-creator:skill-creator" || skills[0].PluginName != "skill-creator" {
+		t.Fatalf("skills = %+v", skills)
+	}
+}
+
+func TestSkillCollectorMergesEachPlainSkillIntoItsOwnMatch(t *testing.T) {
+	at := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("pdf", ai.SkillDetectedViaApiRequest, "", "", "", at)
+		c.add("docs", ai.SkillDetectedViaApiRequest, "", "", "", at)
+		c.add("anthropic-skills:pdf", ai.SkillDetectedViaActivation, "", "", "", at)
+		c.add("anthropic-skills:docs", ai.SkillDetectedViaActivation, "", "", "", at)
+	})
+	if len(skills) != 2 || skills[0].SkillName != "anthropic-skills:pdf" || skills[1].SkillName != "anthropic-skills:docs" {
+		t.Fatalf("skills = %+v, want the two namespaced rows in first-seen order", skills)
+	}
+}
+
 func TestBuildPromptRollupMergesSkillSourcesAndCounts(t *testing.T) {
 	events := fixturePromptEvents(t, "p2")
 	rollup := buildPromptRollup(testOrganizationID, "p2", events)
@@ -599,6 +861,84 @@ func TestBuildPromptRollupMergesSkillSourcesAndCounts(t *testing.T) {
 	}
 }
 
+// Each api_error and failed tool_result becomes one failure row with its reason. A tool
+// error's message is stripped at ingest, so only its error type reaches the row; successful
+// tool calls add none.
+func TestBuildPromptRollupRecordsFailureReasons(t *testing.T) {
+	events := fixturePromptEvents(t, "p2")
+	rollup := buildPromptRollup(testOrganizationID, "p2", events)
+	prompt := rollup.prompt
+	if int64(len(rollup.failures)) != prompt.ApiErrorCount+prompt.ToolFailureCount || len(rollup.failures) != 2 {
+		t.Fatalf("failures = %d, want one per api error (%d) and tool failure (%d)", len(rollup.failures), prompt.ApiErrorCount, prompt.ToolFailureCount)
+	}
+	byKind := make(map[string]*ai.AiPromptFailure)
+	for _, failure := range rollup.failures {
+		byKind[failure.FailureKind] = failure
+		if failure.AiPromptId != prompt.Id || failure.PromptId != "p2" || failure.SessionId != "sess-1" || failure.UserKey != prompt.UserKey || failure.WorkspaceKey != testOrganizationID {
+			t.Fatalf("failure identity = %#v, want prompt %q", failure, prompt.Id)
+		}
+	}
+
+	api := byKind[ai.FailureKindApiError]
+	if api == nil || api.Model != "claude-opus-5-5" || api.QuerySource != mainThreadQuerySource || api.ErrorMessage != "overloaded" ||
+		int64Value(api.StatusCode) != 529 || int64Value(api.Attempt) != 1 || int64Value(api.DurationMs) != 2100 || api.ToolName != "" {
+		t.Fatalf("api failure = %#v", api)
+	}
+	tool := byKind[ai.FailureKindToolError]
+	if tool == nil || tool.ToolName != "Bash" || tool.ErrorType != "ShellError" || tool.ErrorMessage != "" || int64Value(tool.DurationMs) != 340 ||
+		tool.StatusCode != nil || tool.QuerySource != "" {
+		t.Fatalf("tool failure = %#v", tool)
+	}
+	for _, check := range []struct {
+		failure *ai.AiPromptFailure
+		event   *models.OtelEvent
+	}{
+		{failure: api, event: firstEventNamed(t, events, eventAPIError)},
+		{failure: tool, event: failedToolResult(t, events)},
+	} {
+		wantID := ai.CanonicalKey{Kind: ai.IDKindPromptFailure, Provider: aiProviderClaude, WorkspaceKey: testOrganizationID, Grain: []string{"p2", hex.EncodeToString(check.event.EventKey)}}.ID()
+		if check.failure.Id != wantID || !check.failure.OccurredAt.Equal(check.event.EventTimestamp) {
+			t.Fatalf("%s failure id/time = %q %s, want %q %s", check.failure.FailureKind, check.failure.Id, check.failure.OccurredAt, wantID, check.event.EventTimestamp)
+		}
+	}
+	if api.Id == tool.Id {
+		t.Fatalf("api and tool failures share id %q", api.Id)
+	}
+
+	if failures := buildPromptRollup(testOrganizationID, "p1", fixturePromptEvents(t, "p1")).failures; len(failures) != 0 {
+		t.Fatalf("p1 failures = %d, want none", len(failures))
+	}
+}
+
+// A tool error's message never reaches its row, even from events that kept the error
+// attribute, so the rollup does not depend on ingest having stripped it.
+func TestBuildPromptRollupNeverCopiesToolErrorMessage(t *testing.T) {
+	events := promptEvents(t, loadLogEventsFixture(t), "p2")
+	toolEvent := failedToolResult(t, events)
+	// Conversion drops the tool_result error, so the event is given one to prove the rollup ignores it too.
+	attributes := eventAttributes(toolEvent)
+	attributes["error"] = "cat: secrets.env: contents echoed"
+	encoded, err := json.Marshal(attributes)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	toolEvent.Attributes = encoded
+	toolFailures := 0
+	for _, failure := range buildPromptRollup(testOrganizationID, "p2", events).failures {
+		if failure.FailureKind != ai.FailureKindToolError {
+			continue
+		}
+		toolFailures++
+		if failure.ErrorMessage != "" {
+			t.Fatalf("tool failure error_message = %q, want empty", failure.ErrorMessage)
+		}
+	}
+	// Without a tool failure row the check above would pass without checking anything.
+	if toolFailures != 1 {
+		t.Fatalf("tool failures = %d, want 1", toolFailures)
+	}
+}
+
 // The repository URL comes from the prompt's events. A prompt without one, or with one that
 // does not fit its column, stores NULL instead of failing or truncating.
 func TestPromptRollupRecordsRepositoryURL(t *testing.T) {
@@ -628,6 +968,157 @@ func TestPromptRollupRecordsRepositoryURL(t *testing.T) {
 			t.Fatalf("%s repository = %q, want nil", promptID, *got)
 		}
 	}
+}
+
+// The api_request effort attribute is kept on the stored event and becomes the prompt's
+// effort. A prompt whose requests report no effort, or that made none, has none.
+func TestPromptRollupRecordsEffort(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	setStringAttribute(records[1], "effort", "high") // p1's api_request
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
+	if err != nil {
+		t.Fatalf("prepareEvents() error = %v", err)
+	}
+	byPrompt := make(map[string][]*models.OtelEvent)
+	for _, item := range prepared.events {
+		byPrompt[item.event.PromptId] = append(byPrompt[item.event.PromptId], item.event)
+	}
+
+	if got := eventString(eventAttributes(firstEventNamed(t, byPrompt["p1"], eventAPIRequest)), "effort"); got != "high" {
+		t.Fatalf("stored p1 api_request effort = %q, want %q", got, "high")
+	}
+	for _, test := range []struct {
+		promptID string
+		want     string
+	}{
+		{"p1", "high"},
+		{"p2", ""}, // its api_request reports no effort
+		{"p3", ""}, // no api_request
+	} {
+		t.Run(test.promptID, func(t *testing.T) {
+			got := buildPromptRollup(testOrganizationID, test.promptID, byPrompt[test.promptID]).prompt.Effort
+			if gotValue := stringValue(got); gotValue != test.want || (test.want == "") != (got == nil) {
+				t.Fatalf("%s effort = %v, want %q", test.promptID, got, test.want)
+			}
+		})
+	}
+}
+
+// The main conversation's effort wins over background requests such as session titles,
+// which may run at another level. Background effort is used only while the prompt has no
+// main-thread effort.
+func TestPromptBuilderApplyEffort(t *testing.T) {
+	type request struct{ querySource, effort string }
+	for _, test := range []struct {
+		name     string
+		requests []request
+		want     string
+	}{
+		{"main thread after background", []request{{"generate_session_title", "low"}, {mainThreadQuerySource, "high"}, {mainThreadQuerySource, "max"}}, "high"},
+		{"main thread before background", []request{{mainThreadQuerySource, "xhigh"}, {"generate_session_title", "low"}}, "xhigh"},
+		{"headless main thread after subagent", []request{{"agent:custom", "low"}, {sdkQuerySource, "high"}}, "high"},
+		{"background only", []request{{"generate_session_title", "low"}, {"away_summary", "medium"}}, "low"},
+		{"main thread without effort", []request{{mainThreadQuerySource, ""}, {"away_summary", "medium"}}, "medium"},
+		{"no query source", []request{{"", "medium"}}, "medium"},
+		{"no effort", []request{{mainThreadQuerySource, ""}}, ""},
+		{"no requests", nil, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			builder := &promptBuilder{prompt: &ai.AiPrompt{}}
+			for _, r := range test.requests {
+				builder.applyEffort(r.querySource, r.effort)
+			}
+			got := builder.prompt.Effort
+			if gotValue := stringValue(got); gotValue != test.want || (test.want == "") != (got == nil) {
+				t.Fatalf("effort = %v, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+// models_used is what dashboards group prompts by, so a prompt's models are recorded as
+// sorted base model IDs: the same models in another order, a dated snapshot or a [1m] variant
+// must not make a separate group.
+func TestBuildPromptRollupRecordsModelsUsedAsBaseModelIDs(t *testing.T) {
+	start := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		name   string
+		models []string
+		want   string
+	}{
+		{"one model", []string{"claude-opus-5-5"}, "claude-opus-5-5"},
+		{"sorted whatever the order", []string{"claude-opus-5-5", "claude-haiku-4-5"}, "claude-haiku-4-5,claude-opus-5-5"},
+		{"snapshot date dropped", []string{"claude-sonnet-4-20250514", "claude-sonnet-4"}, "claude-sonnet-4"},
+		{"variant dropped", []string{"claude-sonnet-4-5[1m]", "claude-sonnet-4-5-20250929"}, "claude-sonnet-4-5"},
+		{"empty model skipped", []string{"", " ", "claude-haiku-4-5"}, "claude-haiku-4-5"},
+		{"no requests", nil, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			events := make([]*models.OtelEvent, 0, len(test.models))
+			for index, model := range test.models {
+				events = append(events, &models.OtelEvent{EventName: eventAPIRequest, Model: model, EventTimestamp: start.Add(time.Duration(index) * time.Second)})
+			}
+			if got := buildPromptRollup(testOrganizationID, "p1", events).prompt.ModelsUsed; got != test.want {
+				t.Fatalf("models used = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+// The rollup reloads a prompt's stored events with rollupEventColumns, so every column it
+// reads must be in it. Without query_source, every reloaded request looks like background
+// work and a session-title request could decide the prompt's effort. Without event_key,
+// every failure of a prompt gets the same id and only one row survives.
+func TestRollupEventColumnsLoadRollupInputs(t *testing.T) {
+	columns := make(map[string]struct{})
+	for _, column := range strings.Split(strings.ReplaceAll(rollupEventColumnsSQL(), " ", ""), ",") {
+		columns[column] = struct{}{}
+	}
+	for _, test := range []struct {
+		reader string
+		column string
+	}{
+		{"effort", "query_source"},
+		{"effort", "attributes"},
+		{"failure id", "event_key"},
+		{"tool failure", "success"},
+		{"tool failure", "tool_name"},
+		{"api failure", "model"},
+		{"failure duration", "duration_ms"},
+	} {
+		t.Run(test.reader+"/"+test.column, func(t *testing.T) {
+			if _, found := columns[test.column]; !found {
+				t.Errorf("rollup event columns = %q, missing %s", rollupEventColumnsSQL(), test.column)
+			}
+		})
+	}
+}
+
+// firstEventNamed returns the first of a prompt's events with the given name.
+func firstEventNamed(t *testing.T, events []*models.OtelEvent, eventName string) *models.OtelEvent {
+	t.Helper()
+	for _, event := range events {
+		if event.EventName == eventName {
+			return event
+		}
+	}
+	t.Fatalf("no %s event among %d events", eventName, len(events))
+	return nil
+}
+
+// failedToolResult returns the first tool_result among events that reports success=false.
+func failedToolResult(t *testing.T, events []*models.OtelEvent) *models.OtelEvent {
+	t.Helper()
+	for _, event := range events {
+		if event.EventName == eventToolResult && event.Success != nil && !*event.Success {
+			return event
+		}
+	}
+	t.Fatalf("no failed %s event among %d events", eventToolResult, len(events))
+	return nil
 }
 
 func TestPromptRollupNeverCarriesPromptText(t *testing.T) {
@@ -717,6 +1208,27 @@ func TestSessionTargetsGroupPromptsAndFlagModeChanges(t *testing.T) {
 	}
 }
 
+func TestSessionTargetsFlagObservedModes(t *testing.T) {
+	at := func(minute int) time.Time { return time.Date(2026, 10, 14, 10, minute, 0, 0, time.UTC) }
+	decision := func(session string, minute int, mode string) preparedEvent {
+		event := otelEventWith(eventToolDecision, "p1", at(minute), int64(minute), map[string]string{"permission_mode": mode})
+		event.SessionId = session
+		return preparedEvent{event: event}
+	}
+	target := sessionTargets([]preparedEvent{decision("sess-1", 7, "plan"), decision("sess-1", 3, "auto"), decision("sess-1", 1, "")})[0]
+	if !target.modeObserved || !target.earliestObserved.Equal(at(3)) {
+		t.Fatalf("modeObserved = %t, earliestObserved = %v, want true and %v", target.modeObserved, target.earliestObserved, at(3))
+	}
+	for name, events := range map[string][]preparedEvent{
+		"blank mode": {decision("sess-1", 1, "")},
+		"no session": {decision("", 1, "plan")},
+	} {
+		if got := sessionTargets(events)[0]; got.modeObserved || !got.earliestObserved.IsZero() {
+			t.Fatalf("%s: modeObserved = %t, earliestObserved = %v, want unset", name, got.modeObserved, got.earliestObserved)
+		}
+	}
+}
+
 func loadLogEventsFixture(t *testing.T) *collectorlogs.ExportLogsServiceRequest {
 	t.Helper()
 	payload, err := os.ReadFile("testdata/claude_code_log_events.json")
@@ -742,12 +1254,18 @@ func newOtelLogsHTTPRequest(t *testing.T, logs *collectorlogs.ExportLogsServiceR
 	return request
 }
 
-// fixturePromptEvents converts the fixture and returns one prompt's events, as the rollup
-// loads them from storage.
+// fixturePromptEvents returns the fixture's events of one prompt as ingest stores them, with
+// content attributes stripped.
 func fixturePromptEvents(t *testing.T, promptID string) []*models.OtelEvent {
 	t.Helper()
 	request := loadLogEventsFixture(t)
 	stripContentAttributes(request)
+	return promptEvents(t, request, promptID)
+}
+
+// promptEvents prepares request and returns the events of one prompt.
+func promptEvents(t *testing.T, request *collectorlogs.ExportLogsServiceRequest, promptID string) []*models.OtelEvent {
+	t.Helper()
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
 	if err != nil {
