@@ -30,6 +30,13 @@ describe('IdentityCell', () => {
     expect(screen.getByText('ann@example.com')).toBeTruthy();
   });
 
+  it('wraps the lines with wrap, and keeps them on one line without it', () => {
+    const { rerender } = renderWithTheme(<IdentityCell primary="Ann" secondary="ann@example.com" wrap />);
+    expect(getComputedStyle(screen.getByText('ann@example.com')).whiteSpace).toBe('normal');
+    rerender(<IdentityCell primary="Ann" secondary="ann@example.com" />);
+    expect(getComputedStyle(screen.getByText('ann@example.com')).whiteSpace).toBe('nowrap');
+  });
+
   it('shows an adornment beside the primary line, and none when it is false', () => {
     const { rerender } = renderWithTheme(<IdentityCell primary="Ann" adornment={<span>tag</span>} />);
     expect(screen.getByText('tag')).toBeTruthy();

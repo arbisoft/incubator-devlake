@@ -39,6 +39,37 @@ var CollectEpicsMeta = plugin.SubTaskMeta{
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }
 
+func planeEpicCollectorArgs(apiClient api.RateLimitedApiClient, since func() *time.Time) api.ApiCollectorArgs {
+	return api.ApiCollectorArgs{
+		ApiClient:     apiClient,
+		PageSize:      planeEpicPageSize,
+		AfterResponse: ignoreHTTPStatus404,
+		UrlTemplate:   "api/v1/workspaces/{{ .Params.WorkspaceSlug }}/projects/{{ .Params.ProjectId }}/epics/",
+		Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
+			query := url.Values{}
+			query.Set("limit", strconv.Itoa(planeEpicPageSize))
+			query.Set("expand", "assignees")
+			if offset, ok := reqData.CustomData.(int); ok && offset > 0 {
+				query.Set("offset", strconv.Itoa(offset))
+			}
+			if sinceTime := since(); sinceTime != nil {
+				query.Set("updated_at__gte", sinceTime.UTC().Format(time.RFC3339))
+			}
+			return query, nil
+		},
+		GetNextPageCustomData: func(reqData *api.RequestData, prevPageResponse *http.Response) (interface{}, errors.Error) {
+			currentOffset := 0
+			if offset, ok := reqData.CustomData.(int); ok {
+				currentOffset = offset
+			}
+			return parsePlaneEpicNextOffset(prevPageResponse, currentOffset, reqData.Pager.Size)
+		},
+		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
+			return parsePlaneEpicResultsForCollector(res, since())
+		},
+	}
+}
+
 func CollectEpics(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*PlaneTaskData)
 
@@ -55,33 +86,7 @@ func CollectEpics(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	err = collector.InitCollector(api.ApiCollectorArgs{
-		ApiClient:   data.ApiClient,
-		PageSize:    planeEpicPageSize,
-		UrlTemplate: "api/v1/workspaces/{{ .Params.WorkspaceSlug }}/projects/{{ .Params.ProjectId }}/epics/",
-		Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
-			query := url.Values{}
-			query.Set("limit", strconv.Itoa(planeEpicPageSize))
-			query.Set("expand", "assignees")
-			if offset, ok := reqData.CustomData.(int); ok && offset > 0 {
-				query.Set("offset", strconv.Itoa(offset))
-			}
-			if since := collector.GetSince(); since != nil {
-				query.Set("updated_at__gte", since.UTC().Format(time.RFC3339))
-			}
-			return query, nil
-		},
-		GetNextPageCustomData: func(reqData *api.RequestData, prevPageResponse *http.Response) (interface{}, errors.Error) {
-			currentOffset := 0
-			if offset, ok := reqData.CustomData.(int); ok {
-				currentOffset = offset
-			}
-			return parsePlaneEpicNextOffset(prevPageResponse, currentOffset, reqData.Pager.Size)
-		},
-		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
-			return parsePlaneEpicResultsForCollector(res, collector.GetSince())
-		},
-	})
+	err = collector.InitCollector(planeEpicCollectorArgs(data.ApiClient, collector.GetSince))
 	if err != nil {
 		return err
 	}

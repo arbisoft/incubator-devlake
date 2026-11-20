@@ -103,6 +103,8 @@ func TestRollupSessionRederivesEarlierPromptModesOnLaterModeChange(t *testing.T)
 	tx.EXPECT().All(mock.Anything, mock.Anything, mock.Anything).Run(func(result interface{}, clauses ...dal.Clause) {
 		where := whereExpr(clauses, 1)
 		switch {
+		case strings.Contains(where, "permission_mode"):
+			*result.(*[]*models.OtelEvent) = []*models.OtelEvent{}
 		case strings.Contains(where, "command_name = ?"):
 			*result.(*[]*models.OtelEvent) = []*models.OtelEvent{modeChange}
 		case strings.Contains(where, "event_name = ?"):
@@ -112,7 +114,7 @@ func TestRollupSessionRederivesEarlierPromptModesOnLaterModeChange(t *testing.T)
 		default:
 			t.Fatalf("unexpected load %q", where)
 		}
-	}).Return(nil).Times(3)
+	}).Return(nil).Times(4)
 	tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPermissionModeChange")).Return(nil).Once()
 	updated := make(map[string]map[string]interface{})
 	tx.EXPECT().UpdateColumns(mock.AnythingOfType("*ai.AiPrompt"), mock.Anything, mock.Anything).Run(func(_ interface{}, sets []dal.DalSet, clauses ...dal.Clause) {
@@ -145,6 +147,8 @@ func TestRollupSessionWithoutSessionIDSkipsModeQueries(t *testing.T) {
 	}).Return(nil).Once()
 	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
 	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Return(nil).Once()
+	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptTool"), mock.Anything).Return(nil).Once()
+	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiCommit"), mock.Anything).Return(nil).Once()
 	expectStoredAccount(tx, &crossdomain.Account{})
 
 	target := &sessionTarget{connectionID: 1, userKey: "uuid:u1", promptIDs: map[string]struct{}{"p1": {}}}
@@ -179,6 +183,8 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 			tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPrompt")).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Return(nil).Once()
+			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptTool"), mock.Anything).Return(nil).Once()
+			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiCommit"), mock.Anything).Return(nil).Once()
 			expectStoredAccount(tx, &crossdomain.Account{})
 			if modeChanged {
 				tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPermissionModeChange")).Return(nil).Once()
@@ -191,19 +197,23 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 			if !strings.Contains(loads[0], "command_name = ?") {
 				t.Fatalf("first load = %q, want only the session's mode changes", loads[0])
 			}
-			sessionPromptLoads := 0
+			sessionPromptLoads, observedLoads := 0, 0
 			for _, where := range loads {
-				if strings.Contains(where, "event_name = ?") && !strings.Contains(where, "command_name") {
+				if strings.Contains(where, "permission_mode") {
+					observedLoads++
+				}
+				if strings.Contains(where, "event_name = ?") && !strings.Contains(where, "command_name") && !strings.Contains(where, "permission_mode") {
 					sessionPromptLoads++
 				}
 			}
-			wantLoads, wantPromptLoads := 2, 0
+			// The mode events, the prompt events and the session's observed modes, which a refresh reuses.
+			wantLoads, wantPromptLoads := 3, 0
 			if modeChanged {
-				// The prompt sequences and the session's prompts for refreshSessionModes.
-				wantLoads, wantPromptLoads = 4, 1
+				// The prompt sequences and the session's prompts load for refreshSessionModes.
+				wantLoads, wantPromptLoads = 5, 1
 			}
-			if len(loads) != wantLoads || sessionPromptLoads != wantPromptLoads {
-				t.Fatalf("loads = %q, want %d loads with %d session prompt sequence load(s)", loads, wantLoads, wantPromptLoads)
+			if len(loads) != wantLoads || sessionPromptLoads != wantPromptLoads || observedLoads != 1 {
+				t.Fatalf("loads = %q, want %d loads with %d session prompt sequence load(s) and 1 observed-mode load", loads, wantLoads, wantPromptLoads)
 			}
 		})
 	}
@@ -639,7 +649,7 @@ func TestWritePromptRollupReplacesFailures(t *testing.T) {
 		}
 		return rows
 	}
-	full, overflow := promptFailureInsertBatchSize, promptFailureInsertBatchSize+1
+	full, overflow := rollupInsertBatchSize, rollupInsertBatchSize+1
 	for _, test := range []struct {
 		name      string
 		failures  []*ai.AiPromptFailure
@@ -666,6 +676,10 @@ func TestWritePromptRollupReplacesFailures(t *testing.T) {
 				}
 				calls = append(calls, "clear")
 			}).Return(test.clearErr).Once()
+			if test.clearErr == nil && test.writeErr == nil {
+				tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptTool"), mock.Anything).Return(nil).Once()
+				tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiCommit"), mock.Anything).Return(nil).Once()
+			}
 			for range test.wantCalls[1:] {
 				tx.EXPECT().Create(mock.AnythingOfType("[]*ai.AiPromptFailure")).Run(func(entity interface{}, _ ...dal.Clause) {
 					batch := entity.([]*ai.AiPromptFailure)

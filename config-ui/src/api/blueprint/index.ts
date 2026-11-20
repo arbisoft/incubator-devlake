@@ -20,12 +20,18 @@ import type { BlueprintCreatePayload, IBlueprint } from '@/types';
 import { request } from '@/utils';
 
 import type { KeywordParams, SortParams } from '../types';
+import { toSearchParams } from '../utils';
 
-export type ListParams = Pagination & { type: string; enable?: boolean } & KeywordParams &
+export type ListParams = Pagination & {
+  type?: string | string[];
+  enable?: boolean;
+  connection?: string[];
+  projectName?: string[];
+} & KeywordParams &
   SortParams<'name' | 'createdAt'>;
 
 export const list = (data: ListParams, signal?: AbortSignal): Promise<{ count: number; blueprints: IBlueprint[] }> =>
-  request('/blueprints', { data, signal });
+  request('/blueprints', { data: toSearchParams(data), signal });
 
 export const get = (id: ID, signal?: AbortSignal): Promise<IBlueprint> => request(`/blueprints/${id}`, { signal });
 

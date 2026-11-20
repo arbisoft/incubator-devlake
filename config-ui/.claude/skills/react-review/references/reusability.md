@@ -136,6 +136,18 @@ export const ALIGNER = { title: 'title', subtitle: 'subtitle' } as const;
 
 Common violations:
 - Parallel arrays/maps keyed by the same values (`STATUS_LABELS`, `STATUS_COLORS`, `STATUS_ICONS`) → one map of objects: `STATUS_META[status].label/.color/.icon`.
+- **This includes behaviour and the id list itself.** An id constant (`SETTINGS_OPTION = { METRICS: 'metrics', … }`) plus a meta map (`SETTINGS_OPTION_META`) plus an effects/handler map (`OFF_EFFECTS`) plus a copy map, all keyed by the same ids and often in different files, is four sources of truth. Partially merging them (e.g. meta absorbed defaults and storage, but effects stay separate) still counts — report what is left. Target: one object per id with data and behaviour together, and derive the id union and lists from its keys:
+  ```ts
+  // constants
+  export const SETTINGS_OPTIONS = {
+    metrics: { isSignal: true, defaultOn: true, storage: { rawMb: 20, monthlyMb: 1 },
+      off: (env) => { env.OTEL_METRICS_EXPORTER = 'none'; delete env.OTEL_METRIC_EXPORT_INTERVAL; } },
+    ...
+  } satisfies Record<string, OptionMeta>;
+  // types
+  export type SettingsOption = keyof typeof SETTINGS_OPTIONS;
+  ```
+  Copy can stay in the copy/i18n file if the project keeps UI strings separate, but it must be typed `satisfies Record<SettingsOption, …>` where it is defined.
 - Select `options` arrays duplicated from a constant map → derive: `Object.entries(STATUS_META).map(([value, { label }]) => ({ value, label }))`.
 - TypeScript unions retyped by hand next to the constant they mirror → derive with `typeof`.
 - Server data copied into local state and edited there while the original stays in a cache → one owner.

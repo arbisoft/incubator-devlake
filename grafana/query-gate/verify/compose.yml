@@ -1,0 +1,141 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Paths are relative to the repo root because Compose resolves them from the first file's directory.
+services:
+  gv-staging-grafana:
+    extends:
+      file: docker-compose-dev.yml
+      service: grafana
+    ports: !override ["127.0.0.1:3013:3000"]
+    volumes: !override
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - gv-staging-grafana-data:/var/lib/grafana
+    restart: "no"
+    environment:
+      GF_SERVER_ROOT_URL: https://aperture.arbisoft.com/grafana
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ADMIN_USER: gv-admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GV_ADMIN_PASSWORD:?run verify/run.sh}
+      GF_AUTH_TOKEN_ROTATION_INTERVAL_MINUTES: "2"
+      GF_DATAPROXY_TIMEOUT: "30"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_PROXY_ENABLED: "false"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+
+  gv-staging-gate:
+    image: devlake.docker.scarf.sh/apache/devlake-dashboard:latest
+    pull_policy: never
+    entrypoint: ["/usr/local/bin/grafana-query-gate"]
+    restart: "no"
+    depends_on: [gv-staging-grafana]
+    ports: ["127.0.0.1:3011:3001"]
+    volumes:
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    environment:
+      GATE_MODE: ${GV_GATE_MODE:-enforce}
+      GATE_UPSTREAM: http://gv-staging-grafana:3000
+      GATE_ROOT_PATH: /grafana
+      GATE_MYSQL_DS_UID: devlake-mysql
+      GATE_GRAFANA_USER: gv-system
+      GATE_GRAFANA_PASSWORD: ${GV_SYSTEM_PASSWORD:?run verify/run.sh}
+      GATE_SYNC_INTERVAL: 10s
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/gate/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
+  gv-staging-nginx:
+    image: nginx:1.27.5-alpine
+    volumes:
+      - ./grafana/query-gate/verify/nginx/staging.conf:/etc/nginx/nginx.conf:ro
+    depends_on: [gv-staging-gate]
+
+  gv-prod-grafana:
+    extends:
+      file: docker-compose-dev.yml
+      service: grafana
+    ports: !override ["127.0.0.1:3012:3001"]
+    volumes: !override
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/provisioning/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+      - ./grafana/query-gate/verify/datasources/prod.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - gv-prod-grafana-data:/var/lib/grafana
+    restart: "no"
+    environment:
+      GF_SERVER_ROOT_URL: https://devlake-grafana.arbisoft.com
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_SECURITY_ADMIN_USER: gv-admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GV_ADMIN_PASSWORD:?run verify/run.sh}
+      GF_AUTH_TOKEN_ROTATION_INTERVAL_MINUTES: "2"
+      GF_DATAPROXY_TIMEOUT: "30"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_PROXY_ENABLED: "false"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+
+  gv-prod-gate:
+    image: devlake.docker.scarf.sh/apache/devlake-dashboard:latest
+    pull_policy: never
+    entrypoint: ["/usr/local/bin/grafana-query-gate"]
+    restart: "no"
+    network_mode: "service:gv-prod-grafana"
+    depends_on: [gv-prod-grafana]
+    volumes:
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    environment:
+      GATE_MODE: ${GV_GATE_MODE:-enforce}
+      GATE_UPSTREAM: http://127.0.0.1:3000
+      GATE_ROOT_PATH: ""
+      GATE_MYSQL_DS_UID: devlake-mysql,P430005175C4C7810
+      GATE_GRAFANA_USER: gv-system
+      GATE_GRAFANA_PASSWORD: ${GV_SYSTEM_PASSWORD:?run verify/run.sh}
+      GATE_SYNC_INTERVAL: 10s
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/gate/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
+  gv-prod-envoy:
+    image: envoyproxy/envoy:v1.34.1
+    command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"]
+    volumes:
+      - ./grafana/query-gate/verify/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+      - ${GV_WORK:?run verify/run.sh}/certs:/certs:ro
+    depends_on: [gv-prod-gate]
+
+  gv-edge:
+    image: nginx:1.27.5-alpine
+    volumes:
+      - ./grafana/query-gate/verify/nginx/edge.conf:/etc/nginx/nginx.conf:ro
+      - ${GV_WORK:?run verify/run.sh}/certs:/certs:ro
+    ports: ["127.0.0.1:443:443"]
+    depends_on: [gv-staging-nginx, gv-prod-envoy]
+
+# Grafana's database survives a stop and start, as on staging and prod; run.sh up and down remove these.
+volumes:
+  gv-staging-grafana-data:
+    name: gv-staging-grafana-data
+  gv-prod-grafana-data:
+    name: gv-prod-grafana-data

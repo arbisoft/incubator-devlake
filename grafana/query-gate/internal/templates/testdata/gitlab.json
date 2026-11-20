@@ -1,0 +1,25 @@
+{
+  "title": "Synthetic GitLab",
+  "templating": {
+    "list": [
+      {"name": "repo_filter", "type": "constant", "hide": 2, "query": "AND r.repo_id LIKE 'gitlab:%'"},
+      {"name": "interval", "type": "custom", "query": "Daily : 1d, Weekly : 7d", "options": [{"text": "Daily", "value": "1d"}, {"text": "Weekly", "value": "7d"}]},
+      {"name": "group", "type": "query", "query": "SELECT group_name FROM groups WHERE owner = ${__user.login:sqlstring}"}
+    ]
+  },
+  "rows": [
+    {
+      "panels": [
+        {
+          "title": "Merge requests",
+          "targets": [
+            {
+              "refId": "A",
+              "rawSql": "SELECT $__timeGroupAlias(mr.created_date, '${interval}') , COUNT(*) FROM merge_requests mr JOIN repos r ON r.id = mr.repo_id WHERE r.group_name = ${group:sqlstring} ${repo_filter:raw} AND r.id IN (SELECT repo_id FROM repo_access WHERE login = ${__user.login:sqlstring}) GROUP BY 1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

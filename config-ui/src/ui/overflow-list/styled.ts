@@ -68,12 +68,3 @@ export const MoreButton = styled.button<LayoutProps>`
     ${focusRingStyle}
   }
 `;
-
-export const HiddenList = styled.ul`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.xxs}px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-`;
