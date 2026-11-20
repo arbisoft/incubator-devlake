@@ -19,6 +19,7 @@ package repositories
 
 import (
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
@@ -41,13 +42,14 @@ const (
 // sourcePattern is what a source must look like: a lowercase tool name such as jira, github, gitlab or plane.
 var sourcePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-// idLike validates source and returns the LIKE pattern for its domain ids, for example "github:%". The pattern is
-// always bound as a query parameter, never written into the SQL.
+// idLike validates source and returns the LIKE pattern for its domain ids, for example "github:%". A _ in source is
+// escaped, because LIKE reads a bare _ as any one character. The pattern is always bound as a query parameter, never
+// written into the SQL.
 func idLike(source string) (string, errors.Error) {
 	if !sourcePattern.MatchString(source) {
 		return "", errors.Default.New("repository source must be a lowercase tool name such as jira or github")
 	}
-	return source + ":%", nil
+	return strings.ReplaceAll(source, "_", `\_`) + ":%", nil
 }
 
 // The repositories match emails case-insensitively and expect them lowercased, because the stored emails are not.

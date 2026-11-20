@@ -329,3 +329,21 @@ func TestResolvedIssuesMustBeDoneOnMySQL(t *testing.T) {
 		t.Errorf("ResolvedByType() = %+v, want %+v", byType, want)
 	}
 }
+
+func TestIDLikeMatchesAnUnderscoreLiterallyOnMySQL(t *testing.T) {
+	tx := testTx(t)
+	in := day("2026-11-05")
+	insert(t, tx,
+		&code.Commit{Sha: "liketest-1", AuthorEmail: dbTestUser, AuthoredDate: in, CommittedDate: in},
+		&code.RepoCommit{RepoId: "git_hub:IntegrationRepoTest:repo", CommitSha: "liketest-1"},
+		&code.Commit{Sha: "liketest-2", AuthorEmail: dbTestUser, AuthoredDate: in, CommittedDate: in},
+		&code.RepoCommit{RepoId: "gitxhub:IntegrationRepoTest:repo", CommitSha: "liketest-2"},
+	)
+	got, err := codeRepo(t, rowsReader(tx), "git_hub").Commits(dbTestUser, day("2026-11-01"), day("2026-11-10"))
+	if err != nil {
+		t.Fatalf("Commits() error = %v", err)
+	}
+	if got.Commits != 1 {
+		t.Errorf("Commits() = %d, want 1: git_hub must not match gitxhub", got.Commits)
+	}
+}

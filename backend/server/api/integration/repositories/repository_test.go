@@ -193,6 +193,14 @@ func TestGitHubRepositoryRejectsAnUnknownGroup(t *testing.T) {
 	}
 }
 
+func TestIDLikeEscapesUnderscores(t *testing.T) {
+	for source, want := range map[string]string{"github": "github:%", "github_graphql": `github\_graphql:%`, "a_b_c": `a\_b\_c:%`} {
+		if got, err := idLike(source); err != nil || got != want {
+			t.Errorf("idLike(%q) = (%q, %v), want %q", source, got, err, want)
+		}
+	}
+}
+
 func TestIssuesAndCodeRejectABadSource(t *testing.T) {
 	db := dalmocks.NewDal(t)
 	tests := []struct {
