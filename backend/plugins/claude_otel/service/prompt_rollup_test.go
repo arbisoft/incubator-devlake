@@ -143,6 +143,39 @@ func TestBuildPromptRollupFirstMainThreadRequest(t *testing.T) {
 	require.EqualValues(t, 42, headless.prompt.FirstRequestContextTokens)
 	require.NotNil(t, headless.firstMainRequestAt)
 	require.True(t, headless.firstMainRequestAt.Equal(time.Date(2026, 11, 11, 10, 2, 0, 0, time.UTC)))
+
+	styled := buildPromptRollup(testOrganizationID, "p1", []*models.OtelEvent{
+		rollupEvent(eventUserPrompt, 0, nil, nil),
+		request(1, "prompt_suggestion", 5, 5, 5, "1"),
+		request(2, "repl_main_thread:outputStyle:Learning", 30, 0, 3, "0.75"),
+	})
+	require.EqualValues(t, 33, styled.prompt.FirstRequestContextTokens)
+	require.NotNil(t, styled.prompt.FirstRequestCostUsd)
+	require.Equal(t, "0.75000000", *styled.prompt.FirstRequestCostUsd)
+	require.NotNil(t, styled.firstMainRequestAt)
+	require.True(t, styled.firstMainRequestAt.Equal(time.Date(2026, 11, 11, 10, 2, 0, 0, time.UTC)))
+}
+
+// A conversation's own requests use repl_main_thread, repl_main_thread:<variant> when an
+// output style is set, or sdk in headless and Agent SDK sessions. Everything else is
+// background work or a subagent.
+func TestIsMainThreadQuery(t *testing.T) {
+	for querySource, want := range map[string]bool{
+		"repl_main_thread":                         true,
+		"repl_main_thread:outputStyle:Explanatory": true,
+		"repl_main_thread:outputStyle:my-style":    true,
+		"sdk":                                      true,
+		"":                                         false,
+		"repl_main_thread_x":                       false,
+		"agent:builtin:web-fetch":                  false,
+		"agent:custom":                             false,
+		"generate_session_title":                   false,
+		"prompt_suggestion":                        false,
+		"away_summary":                             false,
+		"sdk:other":                                false,
+	} {
+		require.Equal(t, want, isMainThreadQuery(querySource), querySource)
+	}
 }
 
 func TestBuildSessionHooksGroupsRegistrations(t *testing.T) {

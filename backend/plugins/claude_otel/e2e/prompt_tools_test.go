@@ -66,7 +66,9 @@ func toolsSessionRecords(who actor, t0 time.Time) []*logsv1.LogRecord {
 		sessionRecord(who, toolsSession, "p-tools-1", "user_prompt", t0, 1, intAttr("prompt_length", 10)),
 		request("p-tools-1", t0.Add(5*s), 2, "subagent", 900, 900, 900, "9.0"),
 		request("p-tools-1", t0.Add(6*s), 3, "repl_main_thread", 10, 200, 3000, "0.25"),
-		request("p-tools-1", t0.Add(7*s), 4, "repl_main_thread", 1, 1, 1, "5.0"),
+		// An output style is set for this request, so it is still main-thread. It is the session's
+		// latest main-thread request before p-tools-2, which makes the idle gap exactly two hours.
+		request("p-tools-1", t0.Add(7*s), 4, "repl_main_thread:outputStyle:Explanatory", 1, 1, 1, "5.0"),
 		result(t0.Add(8*s), 5, "Bash", "", "true", 100, strAttr("vcs.ref.head.revision", toolsCommit), strAttr("vcs.ref.head.name", "feat/x")),
 		result(t0.Add(9*s), 6, "Bash", "", "false", 50),
 		result(t0.Add(10*s), 7, "search", "github", "true", 700),
