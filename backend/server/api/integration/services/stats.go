@@ -263,8 +263,9 @@ func (s *StatsService) githubBreakdown(w StatsWindow, group repositories.Group) 
 	return mergeBreakdown(commits, prs), nil
 }
 
-// mergeBreakdown joins commit and pull request rows on the group name. A group with only one kind of work gets
-// zeros for the other.
+// mergeBreakdown joins commit and pull request rows on the group name and keeps the groups where the engineer
+// committed, opened or merged something. A group's totals come from every author's work in it, whichever kind of work
+// the engineer did there.
 func mergeBreakdown(commits []repositories.CommitGroupRow, prs []repositories.PullRequestGroupRow) []GitHubBreakdown {
 	byName := make(map[string]*GitHubBreakdown, len(commits)+len(prs))
 	row := func(name string) *GitHubBreakdown {
@@ -287,6 +288,9 @@ func mergeBreakdown(commits []repositories.CommitGroupRow, prs []repositories.Pu
 	}
 	out := make([]GitHubBreakdown, 0, len(byName))
 	for _, r := range byName {
+		if r.Commits == 0 && r.PullRequestsOpened == 0 && r.PullRequestsMerged == 0 {
+			continue
+		}
 		r.CommitSharePct = sharePct(r.Commits, r.RepoCommits)
 		r.LinesSharePct = sharePct(r.LinesChanged, r.RepoLinesChanged)
 		r.PullRequestsMergedSharePct = sharePct(r.PullRequestsMerged, r.RepoPullRequestsMerged)

@@ -329,8 +329,8 @@ func TestMergeBreakdown(t *testing.T) {
 				{Name: "org/a", RepoCommits: 20, RepoLines: 1000, Contributors: 4, EngineerCommits: 5, EngineerLines: 250},
 			},
 			prs: []repositories.PullRequestGroupRow{
-				{Name: "org/a", RepoOpened: 8, RepoMerged: 4, EngineerOpened: 2, EngineerMerged: 1},
-				{Name: "org/c", RepoOpened: 1, EngineerOpened: 1},
+				{Name: "org/a", RepoMerged: 4, EngineerOpened: 2, EngineerMerged: 1},
+				{Name: "org/c", EngineerOpened: 1},
 			},
 			want: []GitHubBreakdown{
 				{Name: "org/a", Commits: 5, LinesChanged: 250, PullRequestsOpened: 2, PullRequestsMerged: 1, RepoCommits: 20, RepoLinesChanged: 1000,
@@ -338,6 +338,28 @@ func TestMergeBreakdown(t *testing.T) {
 				{Name: "org/b", Commits: 3, RepoCommits: 3, Contributors: 1, CommitSharePct: 100},
 				{Name: "org/c", PullRequestsOpened: 1},
 			},
+		},
+		{
+			name: "a group with only the engineer's pull requests keeps everyone's commit totals, and the reverse",
+			commits: []repositories.CommitGroupRow{
+				{Name: "org/a", RepoCommits: 10, RepoLines: 400, Contributors: 3},
+				{Name: "org/b", RepoCommits: 2, Contributors: 1, EngineerCommits: 2},
+			},
+			prs: []repositories.PullRequestGroupRow{
+				{Name: "org/a", RepoMerged: 2, EngineerMerged: 1},
+				{Name: "org/b", RepoMerged: 5},
+			},
+			want: []GitHubBreakdown{
+				{Name: "org/a", PullRequestsMerged: 1, RepoCommits: 10, RepoLinesChanged: 400, RepoPullRequestsMerged: 2,
+					Contributors: 3, PullRequestsMergedSharePct: 50},
+				{Name: "org/b", Commits: 2, RepoCommits: 2, RepoPullRequestsMerged: 5, Contributors: 1, CommitSharePct: 100},
+			},
+		},
+		{
+			name:    "a group where only others worked is left out",
+			commits: []repositories.CommitGroupRow{{Name: "org/x", RepoCommits: 7, Contributors: 2}},
+			prs:     []repositories.PullRequestGroupRow{{Name: "org/x", RepoMerged: 3}},
+			want:    []GitHubBreakdown{},
 		},
 	}
 	for _, tc := range tests {

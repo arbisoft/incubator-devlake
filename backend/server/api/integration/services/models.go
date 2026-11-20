@@ -103,9 +103,9 @@ type GitHubStats struct {
 	ByTeam []GitHubBreakdown `json:"byTeam"`
 }
 
-// GitHubBreakdown is the engineer's GitHub work in one repository or project, next to what every contributor did
-// there. A contributor is anyone who authored a commit or a pull request in the group. The shares are percentages
-// with one decimal, 0 when the group has no such work.
+// GitHubBreakdown is the engineer's GitHub work in one repository or project, next to what everyone did there. It
+// lists only the groups where the engineer committed, opened or merged something in the window. The shares are
+// percentages with one decimal, 0 when the group has no such work.
 type GitHubBreakdown struct {
 	Name               string `json:"name" example:"arbisoft/devlake"`
 	Commits            int64  `json:"commits"`
@@ -113,7 +113,8 @@ type GitHubBreakdown struct {
 	PullRequestsMerged int64  `json:"pullRequestsMerged"`
 	// LinesChanged sums the engineer's additions and deletions.
 	LinesChanged int64 `json:"linesChanged"`
-	// RepoCommits, RepoLinesChanged and RepoPullRequestsMerged are the totals of every contributor in the window.
+	// RepoCommits, RepoLinesChanged and RepoPullRequestsMerged are everyone's totals in the window, including in a
+	// group where the engineer did only one kind of work.
 	RepoCommits            int64 `json:"repoCommits"`
 	RepoLinesChanged       int64 `json:"repoLinesChanged"`
 	RepoPullRequestsMerged int64 `json:"repoPullRequestsMerged"`

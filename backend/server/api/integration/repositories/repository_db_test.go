@@ -19,6 +19,7 @@ package repositories
 
 import (
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -166,7 +167,7 @@ func TestGitHubReviewsOnMySQL(t *testing.T) {
 func TestGitHubBreakdownOnMySQL(t *testing.T) {
 	tx := testTx(t)
 	const p = "github:IntegrationRepoTest:"
-	in := day("2026-11-05")
+	in, out := day("2026-11-05"), day("2026-10-01")
 	insert(t, tx,
 		&code.Repo{DomainEntity: entity(p + "repo"), Name: "org/repo-test"},
 		&crossdomain.Account{DomainEntity: entity(p + "user"), Email: dbTestUser},
@@ -178,6 +179,12 @@ func TestGitHubBreakdownOnMySQL(t *testing.T) {
 		&code.RepoCommit{RepoId: p + "repo", CommitSha: "repotest-3"},
 		&code.PullRequest{DomainEntity: entity(p + "pr1"), BaseRepoId: p + "repo", AuthorId: p + "user", CreatedDate: in, MergedDate: &in},
 		&code.PullRequest{DomainEntity: entity(p + "pr2"), BaseRepoId: p + "repo", AuthorId: p + "nobody", CreatedDate: in, MergedDate: &in},
+		&code.PullRequest{DomainEntity: entity(p + "pr-old"), BaseRepoId: p + "repo", AuthorId: p + "user", CreatedDate: out, MergedDate: &out},
+		// In repo-other the engineer only merged a pull request; someone else committed.
+		&code.Repo{DomainEntity: entity(p + "repo-other"), Name: "org/repo-other"},
+		&code.Commit{Sha: "repotest-4", AuthorEmail: dbTestOther, AuthoredDate: in, CommittedDate: in, Additions: 7},
+		&code.RepoCommit{RepoId: p + "repo-other", CommitSha: "repotest-4"},
+		&code.PullRequest{DomainEntity: entity(p + "pr3"), BaseRepoId: p + "repo-other", AuthorId: p + "user", CreatedDate: out, MergedDate: &in},
 	)
 	r := codeRepo(t, rowsReader(tx), SourceGitHub)
 	from, to := day("2026-11-01"), day("2026-11-10")
@@ -191,13 +198,20 @@ func TestGitHubBreakdownOnMySQL(t *testing.T) {
 		t.Fatalf("PullRequestsByGroup() error = %v", err)
 	}
 
-	wantCommits := CommitGroupRow{Name: "org/repo-test", RepoCommits: 3, RepoLines: 20, Contributors: 2, EngineerCommits: 2, EngineerLines: 15}
-	if len(commits) != 1 || commits[0] != wantCommits {
-		t.Errorf("CommitsByGroup() = %+v, want [%+v]", commits, wantCommits)
+	wantCommits := []CommitGroupRow{
+		{Name: "org/repo-other", RepoCommits: 1, RepoLines: 7, Contributors: 1},
+		{Name: "org/repo-test", RepoCommits: 3, RepoLines: 20, Contributors: 2, EngineerCommits: 2, EngineerLines: 15},
 	}
-	wantPRs := PullRequestGroupRow{Name: "org/repo-test", RepoOpened: 2, RepoMerged: 2, EngineerOpened: 1, EngineerMerged: 1}
-	if len(prs) != 1 || prs[0] != wantPRs {
-		t.Errorf("PullRequestsByGroup() = %+v, want [%+v]", prs, wantPRs)
+	if !reflect.DeepEqual(commits, wantCommits) {
+		t.Errorf("CommitsByGroup() = %+v, want %+v", commits, wantCommits)
+	}
+	// pr-old was opened and merged before the window, so it is in neither count.
+	wantPRs := []PullRequestGroupRow{
+		{Name: "org/repo-other", RepoMerged: 1, EngineerMerged: 1},
+		{Name: "org/repo-test", RepoMerged: 2, EngineerOpened: 1, EngineerMerged: 1},
+	}
+	if !reflect.DeepEqual(prs, wantPRs) {
+		t.Errorf("PullRequestsByGroup() = %+v, want %+v", prs, wantPRs)
 	}
 }
 

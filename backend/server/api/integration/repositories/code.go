@@ -72,12 +72,12 @@ type CommitGroupRow struct {
 }
 
 // PullRequestGroupRow is one group's pull requests opened or merged in the window: the engineer's, and the
-// totals of every author.
+// merged total of every author.
 type PullRequestGroupRow struct {
-	Name                   string
-	RepoOpened, RepoMerged int64
-	EngineerOpened         int64
-	EngineerMerged         int64
+	Name           string
+	RepoMerged     int64
+	EngineerOpened int64
+	EngineerMerged int64
 }
 
 // Code reads one git tool's work from the domain tables: the commits, pull requests and reviews whose ids start with
@@ -185,8 +185,9 @@ func (r *Code) Reviews(email string, from, to time.Time) (ReviewCounts, errors.E
 	return singleRow(rows), nil
 }
 
-// CommitsByGroup lists, per group with a commit email authored in the window, the engineer's commits and lines
-// changed next to every author's. A commit sits once in a group even when several of the group's repos hold it.
+// CommitsByGroup lists, per group with a commit in the window, email's commits and lines changed next to every
+// author's. It lists groups where email has no commits too, so the caller can show the totals of a group where the
+// engineer only has pull requests. A commit sits once in a group even when several of the group's repos hold it.
 func (r *Code) CommitsByGroup(email string, from, to time.Time, group Group) ([]CommitGroupRow, errors.Error) {
 	g, ok := groupSQL[group]
 	if !ok {
@@ -206,16 +207,16 @@ func (r *Code) CommitsByGroup(email string, from, to time.Time, group Group) ([]
 			" JOIN repo_commits rc ON rc.commit_sha = c.sha "+fmt.Sprintf(g.joinFormat, "rc.repo_id")+
 			" WHERE rc.repo_id LIKE ? AND c.authored_date >= ? AND c.authored_date < ?) t", r.idLike, from, to),
 		dal.Groupby("t.name"),
-		dal.Having("SUM(t.email = ?) > 0", email),
+		dal.Orderby("t.name"),
 	); err != nil {
 		return nil, errors.Default.Wrap(err, "read "+r.source+" commits by group")
 	}
 	return rows, nil
 }
 
-// PullRequestsByGroup lists, per group where email's account opened or merged a pull request in the window, the
-// engineer's pull requests next to every author's. A pull request counts for its author whatever the email, so
-// the totals include accounts that hide theirs.
+// PullRequestsByGroup lists, per group with a pull request opened or merged in the window, the pull requests email's
+// account opened and merged next to every author's merges. Like CommitsByGroup, it lists groups where email has none.
+// A pull request counts for its author whatever the email, so the totals include accounts that hide theirs.
 func (r *Code) PullRequestsByGroup(email string, from, to time.Time, group Group) ([]PullRequestGroupRow, errors.Error) {
 	g, ok := groupSQL[group]
 	if !ok {
@@ -223,8 +224,7 @@ func (r *Code) PullRequestsByGroup(email string, from, to time.Time, group Group
 	}
 	var rows []PullRequestGroupRow
 	if err := r.db.All(&rows,
-		dal.Select(`t.name, COALESCE(SUM(t.opened), 0) AS repo_opened,
-			COALESCE(SUM(t.merged), 0) AS repo_merged,
+		dal.Select(`t.name, COALESCE(SUM(t.merged), 0) AS repo_merged,
 			COALESCE(SUM(t.opened AND t.email = ?), 0) AS engineer_opened,
 			COALESCE(SUM(t.merged AND t.email = ?), 0) AS engineer_merged`, email, email),
 		dal.From("(SELECT DISTINCT "+g.name+" AS name, p.id, LOWER(a.email) AS email,"+
@@ -232,9 +232,11 @@ func (r *Code) PullRequestsByGroup(email string, from, to time.Time, group Group
 			"(p.merged_date >= ? AND p.merged_date < ?) AS merged"+
 			" FROM pull_requests p "+
 			" LEFT JOIN accounts a ON a.id = p.author_id "+fmt.Sprintf(g.joinFormat, "p.base_repo_id")+
-			" WHERE p.id LIKE ?) t", from, to, from, to, r.idLike),
+			" WHERE p.id LIKE ?"+
+			" AND ((p.created_date >= ? AND p.created_date < ?) OR (p.merged_date >= ? AND p.merged_date < ?))) t",
+			from, to, from, to, r.idLike, from, to, from, to),
 		dal.Groupby("t.name"),
-		dal.Having("SUM((t.opened OR t.merged) AND t.email = ?) > 0", email),
+		dal.Orderby("t.name"),
 	); err != nil {
 		return nil, errors.Default.Wrap(err, "read "+r.source+" pull requests by group")
 	}
