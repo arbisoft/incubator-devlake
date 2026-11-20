@@ -5,8 +5,8 @@
     "name": "engineering_delivery_ai_usage",
     "namespace": "default",
     "uid": "8e5146c2-0399-47f0-8da3-d38d75bfcbeb",
-    "resourceVersion": "1795173489717015",
-    "generation": 10,
+    "resourceVersion": "1795185276675009",
+    "generation": 20,
     "creationTimestamp": "2026-11-19T12:07:22Z",
     "labels": {
       "grafana.app/deprecatedInternalID": "2192231557316608"
@@ -17,11 +17,11 @@
       "grafana.app/managerAllowsEdits": "true",
       "grafana.app/managerId": "My Dashboard",
       "grafana.app/saved-from-ui": "Grafana v13.2.2 (1bea008f7e)",
-      "grafana.app/sourceChecksum": "eed943eb2552139b62f8eaade16c7270",
+      "grafana.app/sourceChecksum": "80fa10842563a4266c69ba0dbd78f075",
       "grafana.app/sourcePath": "/etc/grafana/dashboards/Engineering/Engineering Delivery & AI Usage.json",
-      "grafana.app/sourceTimestamp": "1795081495000",
+      "grafana.app/sourceTimestamp": "1795182113000",
       "grafana.app/updatedBy": "user:cfuvpasun6l8ga",
-      "grafana.app/updatedTimestamp": "2026-11-20T11:18:09Z"
+      "grafana.app/updatedTimestamp": "2026-11-20T14:34:36Z"
     }
   },
   "spec": {
@@ -49,44 +49,6 @@
     "cursorSync": "Off",
     "editable": true,
     "elements": {
-      "panel-1": {
-        "kind": "Panel",
-        "spec": {
-          "id": 1,
-          "title": "",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "text",
-            "version": "13.2.2",
-            "spec": {
-              "options": {
-                "code": {
-                  "language": "plaintext",
-                  "showLineNumbers": false,
-                  "showMiniMap": false
-                },
-                "content": "From ${__from:date:D MMM} to ${__to:date:D MMM} the teams merged **${n_prs}** pull requests and closed **${n_tickets}** tickets, shipping **${n_deploys}** deployments to production. **${n_ai_share}** of merged PRs had AI-assisted commits, and **${n_adopt}** of engineers used Claude Code. ${n_attention_clause}",
-                "mode": "markdown"
-              },
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              }
-            }
-          },
-          "transparent": true
-        }
-      },
       "panel-10": {
         "kind": "Panel",
         "spec": {
@@ -1312,44 +1274,6 @@
           }
         }
       },
-      "panel-22": {
-        "kind": "Panel",
-        "spec": {
-          "id": 22,
-          "title": "",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "text",
-            "version": "13.2.2",
-            "spec": {
-              "options": {
-                "code": {
-                  "language": "plaintext",
-                  "showLineNumbers": false,
-                  "showMiniMap": false
-                },
-                "content": "AI-assisted means a merged PR with a Claude co-author trailer or a commit Claude Code reported; the trailer is matched in any case. Code generated compares lines Claude Code added with lines merged PRs added; the two sides aren't matched line by line, so it's a ratio, not attribution. Code accepted is the share of Claude's edit suggestions people accepted. AI lines per merged PR divides the lines Claude Code added by the PRs merged. Claude active hours is time spent actively in Claude Code sessions, not time saved. Commits reported by Claude Code sessions are recorded from this release on; earlier weeks rely on the trailer only.",
-                "mode": "markdown"
-              },
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              }
-            }
-          },
-          "transparent": true
-        }
-      },
       "panel-23": {
         "kind": "Panel",
         "spec": {
@@ -1909,44 +1833,6 @@
               }
             }
           }
-        }
-      },
-      "panel-27": {
-        "kind": "Panel",
-        "spec": {
-          "id": 27,
-          "title": "",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "text",
-            "version": "13.2.2",
-            "spec": {
-              "options": {
-                "code": {
-                  "language": "plaintext",
-                  "showLineNumbers": false,
-                  "showMiniMap": false
-                },
-                "content": "**${n_out_share}** of spend went to repositories outside this project, across **${n_out_repos}** repositories.\n\nClaude Code emits no repository attribute of its own, so this panel only exists once one is injected per checkout through `OTEL_RESOURCE_ATTRIBUTES`. Sessions run outside any repository report nothing and appear as the unidentified row rather than being dropped. Counts of people, not names: a row here is a question about where budget is going, not evidence about an individual.",
-                "mode": "markdown"
-              },
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              }
-            }
-          },
-          "transparent": true
         }
       },
       "panel-28": {
@@ -2976,346 +2862,6 @@
                 "defaults": {
                   "unit": "none",
                   "decimals": 0,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "text"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "text"
-                  },
-                  "noValue": "–"
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-40": {
-        "kind": "Panel",
-        "spec": {
-          "id": 40,
-          "title": "Avg PR size",
-          "description": "Average lines changed (additions plus deletions) of pull requests merged in the selected range (last 7 days by default). GitLab MRs are sized from their commits, merge commits excluded, as on the GitLab dashboards; environment promotion MRs and MRs whose commits weren't collected are left out.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "devlake-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged AS (\n  SELECT pr.id\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n)\n, long_lived_branches AS (\n  SELECT lb.base_repo_id, lb.base_ref\n  FROM pull_requests lb\n  WHERE lb.id LIKE 'gitlab:%' AND lb.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n  GROUP BY lb.base_repo_id, lb.base_ref\n  HAVING COUNT(*) >= 20\n)\n, gitlab_lines AS (\n  SELECT pr.id, SUM(c.additions) AS additions, SUM(c.deletions) AS deletions\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c ON c.sha = prc.commit_sha\n  WHERE pr.id IN (SELECT id FROM merged) AND pr.id LIKE 'gitlab:%'\n    AND (SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = c.sha) < 2\n    AND NOT EXISTS (SELECT 1 FROM long_lived_branches llb WHERE llb.base_repo_id = pr.base_repo_id AND llb.base_ref = pr.head_ref)\n  GROUP BY pr.id\n)\n, sized AS (\n  SELECT pr.additions + pr.deletions AS lines_changed FROM pull_requests pr WHERE pr.id IN (SELECT id FROM merged) AND pr.id NOT LIKE 'gitlab:%'\n  UNION ALL\n  SELECT gl.additions + gl.deletions FROM gitlab_lines gl\n)\nSELECT AVG(lines_changed) AS value FROM sized"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "13.2.2",
-            "spec": {
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "text": {},
-                "textMode": "value",
-                "wideLayout": true
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "none",
-                  "decimals": 0,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "text"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "text"
-                  },
-                  "noValue": "–"
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-41": {
-        "kind": "Panel",
-        "spec": {
-          "id": 41,
-          "title": "Biggest PR",
-          "description": "Most lines changed in one pull request merged in the selected range (last 7 days by default). GitLab MRs are sized from their commits, merge commits excluded, as on the GitLab dashboards; environment promotion MRs and MRs whose commits weren't collected are left out.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "devlake-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged AS (\n  SELECT pr.id\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n)\n, long_lived_branches AS (\n  SELECT lb.base_repo_id, lb.base_ref\n  FROM pull_requests lb\n  WHERE lb.id LIKE 'gitlab:%' AND lb.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n  GROUP BY lb.base_repo_id, lb.base_ref\n  HAVING COUNT(*) >= 20\n)\n, gitlab_lines AS (\n  SELECT pr.id, SUM(c.additions) AS additions, SUM(c.deletions) AS deletions\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c ON c.sha = prc.commit_sha\n  WHERE pr.id IN (SELECT id FROM merged) AND pr.id LIKE 'gitlab:%'\n    AND (SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = c.sha) < 2\n    AND NOT EXISTS (SELECT 1 FROM long_lived_branches llb WHERE llb.base_repo_id = pr.base_repo_id AND llb.base_ref = pr.head_ref)\n  GROUP BY pr.id\n)\n, sized AS (\n  SELECT pr.additions + pr.deletions AS lines_changed FROM pull_requests pr WHERE pr.id IN (SELECT id FROM merged) AND pr.id NOT LIKE 'gitlab:%'\n  UNION ALL\n  SELECT gl.additions + gl.deletions FROM gitlab_lines gl\n)\nSELECT MAX(lines_changed) AS value FROM sized"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "13.2.2",
-            "spec": {
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "text": {},
-                "textMode": "value",
-                "wideLayout": true
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "none",
-                  "decimals": 0,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "text"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "text"
-                  },
-                  "noValue": "–"
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-42": {
-        "kind": "Panel",
-        "spec": {
-          "id": 42,
-          "title": "Smallest PR",
-          "description": "Fewest lines changed in one pull request merged in the selected range (last 7 days by default). GitLab MRs are sized from their commits, merge commits excluded, as on the GitLab dashboards; environment promotion MRs and MRs whose commits weren't collected are left out.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "devlake-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged AS (\n  SELECT pr.id\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n)\n, long_lived_branches AS (\n  SELECT lb.base_repo_id, lb.base_ref\n  FROM pull_requests lb\n  WHERE lb.id LIKE 'gitlab:%' AND lb.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n  GROUP BY lb.base_repo_id, lb.base_ref\n  HAVING COUNT(*) >= 20\n)\n, gitlab_lines AS (\n  SELECT pr.id, SUM(c.additions) AS additions, SUM(c.deletions) AS deletions\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c ON c.sha = prc.commit_sha\n  WHERE pr.id IN (SELECT id FROM merged) AND pr.id LIKE 'gitlab:%'\n    AND (SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = c.sha) < 2\n    AND NOT EXISTS (SELECT 1 FROM long_lived_branches llb WHERE llb.base_repo_id = pr.base_repo_id AND llb.base_ref = pr.head_ref)\n  GROUP BY pr.id\n)\n, sized AS (\n  SELECT pr.additions + pr.deletions AS lines_changed FROM pull_requests pr WHERE pr.id IN (SELECT id FROM merged) AND pr.id NOT LIKE 'gitlab:%'\n  UNION ALL\n  SELECT gl.additions + gl.deletions FROM gitlab_lines gl\n)\nSELECT MIN(lines_changed) AS value FROM sized"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "13.2.2",
-            "spec": {
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "text": {},
-                "textMode": "value",
-                "wideLayout": true
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "none",
-                  "decimals": 0,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "text"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "text"
-                  },
-                  "noValue": "–"
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "panel-43": {
-        "kind": "Panel",
-        "spec": {
-          "id": 43,
-          "title": "Commits / PR",
-          "description": "Average commits per pull request merged in the selected range (last 7 days by default).",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "devlake-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged AS (\n  SELECT pr.id\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n)\nSELECT COUNT(prc.commit_sha) / NULLIF(COUNT(DISTINCT m.id), 0) AS value\nFROM merged m\nLEFT JOIN pull_request_commits prc ON prc.pull_request_id = m.id"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "13.2.2",
-            "spec": {
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": false,
-                "text": {},
-                "textMode": "value",
-                "wideLayout": true
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "none",
-                  "decimals": 1,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -5393,7 +4939,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nSELECT CONCAT(dc.environment, ' · ', DATE_FORMAT(dc.finished_date, '%Y-%m-%d %H:%i'), ' · ', LEFT(dc.commit_sha, 7)) AS value\nFROM cicd_deployment_commits dc\nWHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n  AND dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%' AND dc.finished_date < NOW()\nORDER BY dc.finished_date DESC\nLIMIT 1"
+                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nSELECT CONCAT(DATE_FORMAT(dc.finished_date, '%Y-%m-%d %H:%i'), ' · ', LEFT(dc.commit_sha, 7)) AS value\nFROM cicd_deployment_commits dc\nWHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n  AND dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%' AND dc.finished_date < NOW()\nORDER BY dc.finished_date DESC\nLIMIT 1"
                       }
                     },
                     "refId": "A",
@@ -5841,95 +5387,6 @@
           }
         }
       },
-      "panel-64": {
-        "kind": "Panel",
-        "spec": {
-          "id": 64,
-          "title": "",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "devlake-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "WITH\nproject_repos AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_boards AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_cicd AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n),\nissue_base AS (\n  SELECT DISTINCT pb.project_name, pb.board_id, i.id, i.issue_key, i.title, i.url, i.priority, i.type, i.status, i.original_status,\n    i.assignee_id, i.assignee_name, i.created_date, i.id LIKE 'jira:%' AS is_jira,\n    COALESCE(i.updated_date, i.created_date) AS last_activity, i.updated_date\n  FROM project_boards pb\n  JOIN board_issues bi ON bi.board_id = pb.board_id\n  JOIN issues i ON i.id = bi.issue_id\n  WHERE i.status <> 'DONE' AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Closed', 'Cancelled', 'Invalid')\n    AND COALESCE(i.updated_date, i.created_date) >= NOW() - INTERVAL 90 DAY\n),\nstatus_now AS (\n  SELECT h.issue_id, MAX(h.start_date) AS since\n  FROM issue_status_history h\n  WHERE h.is_current_status = 1 AND h.issue_id IN (SELECT id FROM issue_base)\n  GROUP BY h.issue_id\n),\nfirst_progress AS (\n  SELECT h.issue_id, MIN(h.start_date) AS started\n  FROM issue_status_history h\n  WHERE h.status = 'IN_PROGRESS' AND h.issue_id IN (SELECT id FROM issue_base)\n  GROUP BY h.issue_id\n),\nopen_issues AS (\n  SELECT DISTINCT ib.project_name, ib.board_id, ib.id, ib.issue_key, ib.title, ib.url, ib.priority, ib.type, ib.status, ib.original_status,\n    ib.assignee_id, ib.assignee_name, ib.created_date, ib.is_jira, ib.last_activity,\n    COALESCE(sn.since, ib.updated_date, ib.created_date) AS status_since\n  FROM issue_base ib\n  LEFT JOIN status_now sn ON sn.issue_id = ib.id\n)\n, merged_90 AS (\n  SELECT DISTINCT pr.id, pr.base_repo_id AS repo_id, TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) AS merge_min\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM project_repos)\n    AND pr.merged_date >= NOW() - INTERVAL 90 DAY AND pr.merged_date < NOW()\n),\nrepo_med AS (\n  SELECT repo_id,\n    MAX(CASE WHEN kind = 'merge' AND rn = CEIL(0.5 * n) THEN v END) AS merge_median,\n    MAX(CASE WHEN kind = 'pickup' AND rn = CEIL(0.5 * n) THEN v END) AS pickup_median\n  FROM (\n    SELECT repo_id, kind, v,\n      ROW_NUMBER() OVER (PARTITION BY repo_id, kind ORDER BY v) AS rn,\n      COUNT(*) OVER (PARTITION BY repo_id, kind) AS n\n    FROM (\n      SELECT repo_id, 'merge' AS kind, merge_min AS v FROM merged_90\n      UNION ALL\n      SELECT m.repo_id, 'pickup', MIN(ppm.pr_pickup_time)\n      FROM merged_90 m\n      JOIN project_pr_metrics ppm ON ppm.id = m.id\n      WHERE ppm.pr_pickup_time IS NOT NULL\n      GROUP BY m.id, m.repo_id\n    ) vals\n  ) ranked\n  GROUP BY repo_id\n),\nopen_prs_all AS (\n  SELECT DISTINCT pr.id, pr.base_repo_id AS repo_id, pp.project_name, CONCAT('#', pr.pull_request_key) AS item, pr.title, pr.url,\n    pr.created_date, TIMESTAMPDIFF(MINUTE, pr.created_date, NOW()) AS age_min,\n    COALESCE(NULLIF(a.full_name, ''), NULLIF(a.user_name, ''), pr.author_name) AS owner\n  FROM pull_requests pr\n  JOIN project_repos pp ON pp.repo_id = pr.base_repo_id\n  LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE pr.status = 'OPEN' AND COALESCE(pr.is_draft, 0) = 0 AND pr.created_date < NOW()\n),\npr_comment_last AS (\n  SELECT c.pull_request_id, MAX(c.created_date) AS last_at\n  FROM pull_request_comments c\n  WHERE c.pull_request_id IN (SELECT id FROM open_prs_all)\n  GROUP BY c.pull_request_id\n),\npr_commit_last AS (\n  SELECT prc.pull_request_id, MAX(prc.commit_authored_date) AS last_at\n  FROM pull_request_commits prc\n  WHERE prc.pull_request_id IN (SELECT id FROM open_prs_all)\n  GROUP BY prc.pull_request_id\n),\nopen_prs AS (\n  SELECT DISTINCT x.id, x.repo_id, x.project_name, x.item, x.title, x.url, x.created_date, x.age_min, x.owner, x.last_activity\n  FROM (\n    SELECT op.id, op.repo_id, op.project_name, op.item, op.title, op.url, op.created_date, op.age_min, op.owner,\n      GREATEST(op.created_date, COALESCE(cl.last_at, op.created_date), COALESCE(kl.last_at, op.created_date)) AS last_activity\n    FROM open_prs_all op\n    LEFT JOIN pr_comment_last cl ON cl.pull_request_id = op.id\n    LEFT JOIN pr_commit_last kl ON kl.pull_request_id = op.id\n  ) x\n  WHERE x.age_min >= 0 AND x.last_activity >= NOW() - INTERVAL 90 DAY\n),\nstale_prs AS (\n  SELECT op.id, op.project_name, op.item, op.title, op.url, op.owner, op.age_min, op.last_activity\n  FROM open_prs op\n  LEFT JOIN repo_med rm ON rm.repo_id = op.repo_id\n  WHERE op.age_min > COALESCE(2 * rm.merge_median, 14 * 1440)\n),\nwaiting_reviews AS (\n  SELECT op.id, op.project_name, op.item, op.title, op.url, op.age_min, op.last_activity,\n    GROUP_CONCAT(DISTINCT COALESCE(NULLIF(prr.name, ''), prr.user_name) ORDER BY COALESCE(NULLIF(prr.name, ''), prr.user_name) SEPARATOR ', ') AS reviewers\n  FROM open_prs op\n  JOIN pull_request_reviewers prr ON prr.pull_request_id = op.id\n  WHERE op.age_min > 2 * 1440\n    AND NOT EXISTS (\n      SELECT 1 FROM pull_request_comments c\n      WHERE c.pull_request_id = op.id AND c.account_id = prr.reviewer_id AND c.type IN ('REVIEW', 'DIFF'))\n  GROUP BY op.id, op.project_name, op.item, op.title, op.url, op.age_min, op.last_activity\n),\nresolved_90 AS (\n  SELECT DISTINCT i.id, bi.board_id, i.resolution_date\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  WHERE bi.board_id IN (SELECT board_id FROM project_boards)\n    AND i.resolution_date >= NOW() - INTERVAL 90 DAY AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC' AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n),\nresolved_start AS (\n  SELECT h.issue_id, MIN(h.start_date) AS started\n  FROM issue_status_history h\n  WHERE h.status = 'IN_PROGRESS' AND h.issue_id IN (SELECT id FROM resolved_90)\n  GROUP BY h.issue_id\n),\nboard_med AS (\n  SELECT board_id, MAX(CASE WHEN rn = CEIL(0.5 * n) THEN days END) AS median_days\n  FROM (\n    SELECT r.board_id, TIMESTAMPDIFF(MINUTE, rs.started, r.resolution_date) / 1440 AS days,\n      ROW_NUMBER() OVER (PARTITION BY r.board_id ORDER BY TIMESTAMPDIFF(MINUTE, rs.started, r.resolution_date)) AS rn,\n      COUNT(*) OVER (PARTITION BY r.board_id) AS n\n    FROM resolved_90 r\n    JOIN resolved_start rs ON rs.issue_id = r.id\n  ) ranked\n  GROUP BY board_id\n),\nstalled AS (\n  SELECT oi.project_name, oi.id, oi.issue_key, oi.title, oi.url, oi.assignee_name, oi.last_activity,\n    TIMESTAMPDIFF(HOUR, COALESCE(fp.started, oi.status_since), NOW()) / 24 AS days_in_progress,\n    COALESCE(2 * bm.median_days, 14) AS threshold_days\n  FROM open_issues oi\n  LEFT JOIN first_progress fp ON fp.issue_id = oi.id\n  LEFT JOIN board_med bm ON bm.board_id = oi.board_id\n  WHERE oi.is_jira AND oi.status = 'IN_PROGRESS'\n    AND COALESCE(oi.original_status, '') NOT IN ('Closed', 'To Do', 'To do', 'Todo', 'Ready for Development')\n    AND NOT oi.original_status IN ('Blocked', 'Tech Block', 'Business Block')\n),\nmulti_sprint AS (\n  SELECT si.issue_id, COUNT(DISTINCT si.sprint_id) AS sprints, MIN(s.started_date) AS first_start\n  FROM sprint_issues si\n  JOIN sprints s ON s.id = si.sprint_id\n  GROUP BY si.issue_id\n  HAVING COUNT(DISTINCT si.sprint_id) >= 2\n),\nscope_added AS (\n  SELECT ic.issue_id, MAX(ic.created_date) AS added_at\n  FROM (SELECT DISTINCT id FROM open_issues WHERE is_jira) oj\n  JOIN issue_changelogs ic ON ic.issue_id = oj.id AND ic.field_name = 'Sprint'\n  JOIN sprints s ON s.status = 'ACTIVE' AND FIND_IN_SET(s.id, ic.original_to_value) AND NOT FIND_IN_SET(s.id, COALESCE(ic.original_from_value, ''))\n  WHERE ic.created_date > s.started_date AND (s.completed_date IS NULL OR ic.created_date < s.completed_date)\n    AND NOT EXISTS (\n      SELECT 1 FROM sprints p\n      WHERE FIND_IN_SET(p.id, COALESCE(ic.original_from_value, ''))\n        AND p.completed_date BETWEEN ic.created_date - INTERVAL 1 HOUR AND ic.created_date + INTERVAL 1 HOUR)\n  GROUP BY ic.issue_id\n),\nlatest_deploy AS (\n  SELECT scope_id, env, sha, url, ts, failed, ROW_NUMBER() OVER (PARTITION BY scope_id, env ORDER BY ts DESC) AS rn\n  FROM prod_deploys\n),\natt_raw AS (\n  SELECT 'High' AS severity, 2 AS severity_rank, 'Unapproved PR' AS category, 2 AS cat_rank, op.item, op.title,\n    CONCAT('Open ', FLOOR(op.age_min / 1440), 'd, no approving review') AS reason, FLOOR(op.age_min / 1440) AS age_days,\n    op.project_name, op.owner, op.url, CONCAT('pr:', op.id) AS ref, op.last_activity\n  FROM open_prs op\n  LEFT JOIN repo_med rm ON rm.repo_id = op.repo_id\n  WHERE op.age_min > COALESCE(rm.pickup_median, 2 * 1440)\n    AND NOT EXISTS (SELECT 1 FROM pull_request_comments c WHERE c.pull_request_id = op.id AND c.status = 'APPROVED')\n  UNION ALL\n  SELECT CASE WHEN sp.age_min > 30 * 1440 AND sp.last_activity < NOW() - INTERVAL 30 DAY THEN 'Low' ELSE 'High' END,\n    CASE WHEN sp.age_min > 30 * 1440 AND sp.last_activity < NOW() - INTERVAL 30 DAY THEN 4 ELSE 2 END,\n    'Stale PR', 3, sp.item, sp.title,\n    CASE WHEN sp.age_min > 30 * 1440 AND sp.last_activity < NOW() - INTERVAL 30 DAY\n      THEN CONCAT('Open ', FLOOR(sp.age_min / 1440), 'd, no activity for ', TIMESTAMPDIFF(DAY, sp.last_activity, NOW()), 'd')\n      ELSE CONCAT('Open ', FLOOR(sp.age_min / 1440), 'd, past twice the repo median to merge') END,\n    FLOOR(sp.age_min / 1440), sp.project_name, sp.owner, sp.url, CONCAT('pr:', sp.id), sp.last_activity\n  FROM stale_prs sp\n  UNION ALL\n  SELECT CASE WHEN wr.age_min > 3 * 1440 THEN 'High' ELSE 'Medium' END, CASE WHEN wr.age_min > 3 * 1440 THEN 2 ELSE 3 END,\n    'Review waiting', 1, wr.item, wr.title, CONCAT('Open ', FLOOR(wr.age_min / 1440), 'd, requested reviewer has not reviewed'),\n    FLOOR(wr.age_min / 1440), wr.project_name, wr.reviewers, wr.url, CONCAT('pr:', wr.id), wr.last_activity\n  FROM waiting_reviews wr\n  UNION ALL\n  SELECT CASE WHEN TIMESTAMPDIFF(HOUR, oi.status_since, NOW()) > 7 * 24 THEN 'Critical' ELSE 'High' END,\n    CASE WHEN TIMESTAMPDIFF(HOUR, oi.status_since, NOW()) > 7 * 24 THEN 1 ELSE 2 END,\n    'Blocked ticket', 4, oi.issue_key, oi.title,\n    CONCAT(oi.original_status, ' for ', GREATEST(TIMESTAMPDIFF(DAY, oi.status_since, NOW()), 0), 'd'),\n    GREATEST(TIMESTAMPDIFF(DAY, oi.status_since, NOW()), 0), oi.project_name, NULLIF(oi.assignee_name, ''), oi.url, CONCAT('issue:', oi.id), oi.last_activity\n  FROM open_issues oi\n  WHERE oi.is_jira AND oi.original_status IN ('Blocked', 'Tech Block', 'Business Block')\n  UNION ALL\n  SELECT 'High', 2, 'Stalled ticket', 5, st.issue_key, st.title,\n    CONCAT('In progress ', FLOOR(st.days_in_progress), 'd, limit ', FLOOR(st.threshold_days), 'd'),\n    FLOOR(st.days_in_progress), st.project_name, NULLIF(st.assignee_name, ''), st.url, CONCAT('issue:', st.id), st.last_activity\n  FROM stalled st\n  WHERE st.days_in_progress > st.threshold_days\n  UNION ALL\n  SELECT 'Medium', 3, 'Not closing', 6, oi.issue_key, oi.title, CONCAT('In ', ms.sprints, ' sprints without closing'),\n    GREATEST(TIMESTAMPDIFF(DAY, ms.first_start, NOW()), 0), oi.project_name, NULLIF(oi.assignee_name, ''), oi.url, CONCAT('issue:', oi.id), oi.last_activity\n  FROM open_issues oi\n  JOIN multi_sprint ms ON ms.issue_id = oi.id\n  WHERE oi.is_jira\n  UNION ALL\n  SELECT CASE oi.priority WHEN 'Highest' THEN 'Critical' WHEN 'High' THEN 'High' WHEN 'Medium' THEN 'Medium' ELSE 'Low' END,\n    CASE oi.priority WHEN 'Highest' THEN 1 WHEN 'High' THEN 2 WHEN 'Medium' THEN 3 ELSE 4 END,\n    'Open bug', 7, oi.issue_key, oi.title,\n    CONCAT(COALESCE(NULLIF(oi.priority, ''), 'Unprioritised'), ' bug open ', GREATEST(TIMESTAMPDIFF(DAY, oi.created_date, NOW()), 0), 'd'),\n    GREATEST(TIMESTAMPDIFF(DAY, oi.created_date, NOW()), 0), oi.project_name, NULLIF(oi.assignee_name, ''), oi.url, CONCAT('issue:', oi.id), oi.last_activity\n  FROM open_issues oi\n  WHERE (oi.type = 'BUG' OR EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = oi.id AND il.label_name IN ('bug','Production-Bug')))\n  UNION ALL\n  SELECT 'Medium', 3, 'Unassigned in Ready', 8, oi.issue_key, oi.title,\n    CONCAT(oi.original_status, ' for ', GREATEST(TIMESTAMPDIFF(DAY, oi.status_since, NOW()), 0), 'd, no assignee'),\n    GREATEST(TIMESTAMPDIFF(DAY, oi.status_since, NOW()), 0), oi.project_name, NULL, oi.url, CONCAT('issue:', oi.id), oi.last_activity\n  FROM open_issues oi\n  WHERE oi.is_jira AND (oi.original_status IN ('Selected for Development', 'Dev Ready', 'Ready for Dev', 'Ready for Development') OR (oi.original_status IN ('To do', 'To Do', 'Todo') AND oi.id IN (SELECT si_r.issue_id FROM sprint_issues si_r JOIN sprints sp_r ON sp_r.id = si_r.sprint_id WHERE sp_r.status = 'ACTIVE'))) AND COALESCE(oi.assignee_id, '') = ''\n  UNION ALL\n  SELECT 'Critical', 1, 'Failed deploy', 9, CONCAT(ld.env, ' · ', LEFT(ld.sha, 7)), CONCAT(cs.name, ' · ', ld.env),\n    CONCAT('Latest prod deployment failed ', GREATEST(TIMESTAMPDIFF(DAY, ld.ts, NOW()), 0), 'd ago, no success since'),\n    GREATEST(TIMESTAMPDIFF(DAY, ld.ts, NOW()), 0), pc.project_name, NULL, ld.url, CONCAT('deploy:', ld.scope_id, ':', ld.env), ld.ts\n  FROM latest_deploy ld\n  JOIN project_cicd pc ON pc.scope_id = ld.scope_id\n  JOIN cicd_scopes cs ON cs.id = ld.scope_id\n  WHERE ld.rn = 1 AND ld.failed = 1 AND ld.ts >= NOW() - INTERVAL 90 DAY\n  UNION ALL\n  SELECT 'Medium', 3, 'Scope added', 10, oi.issue_key, oi.title, CONCAT('Added to the active sprint ', GREATEST(TIMESTAMPDIFF(DAY, sa.added_at, NOW()), 0), 'd ago'),\n    GREATEST(TIMESTAMPDIFF(DAY, sa.added_at, NOW()), 0), oi.project_name, NULLIF(oi.assignee_name, ''), oi.url, CONCAT('issue:', oi.id), oi.last_activity\n  FROM open_issues oi\n  JOIN scope_added sa ON sa.issue_id = oi.id\n  WHERE oi.is_jira\n),\nattention AS (\n  SELECT severity, severity_rank, category, item, ref, title, reason, age_days, project_name, owner, url, last_activity\n  FROM (\n    SELECT ar.severity, ar.severity_rank, ar.category, ar.item, ar.ref, ar.title, ar.reason, ar.age_days, ar.project_name, ar.owner, ar.url, ar.last_activity,\n      ROW_NUMBER() OVER (PARTITION BY ar.project_name, ar.ref ORDER BY ar.severity_rank, ar.cat_rank) AS pick\n    FROM att_raw ar\n  ) ranked_items\n  WHERE pick = 1\n)\nSELECT CASE WHEN COUNT(DISTINCT ref) = 0 THEN 'Nothing is waiting on a decision.'\n  ELSE CONCAT('**', FORMAT(COUNT(DISTINCT ref), 0), '** ', IF(COUNT(DISTINCT ref) = 1, 'item is', 'items are'), ' waiting on a decision. The oldest has been open **', MAX(age_days),\n    '** days, and the one to pick up first is **', (SELECT item FROM attention ORDER BY severity_rank, category = 'Failed deploy' DESC, age_days DESC, item, project_name LIMIT 1), '**.') END AS n_queue_sentence\nFROM attention"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "table",
-            "version": "13.2.2",
-            "spec": {
-              "options": {
-                "cellHeight": "sm",
-                "footer": {
-                  "countRows": false,
-                  "fields": "",
-                  "reducer": [
-                    "sum"
-                  ],
-                  "show": false
-                },
-                "frameIndex": 0,
-                "showHeader": false
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "text"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "noValue": "–",
-                  "custom": {
-                    "align": "auto",
-                    "cellOptions": {
-                      "type": "markdown"
-                    },
-                    "footer": {
-                      "reducers": []
-                    },
-                    "inspect": false,
-                    "wrapText": true
-                  }
-                },
-                "overrides": []
-              }
-            }
-          },
-          "transparent": true
-        }
-      },
       "panel-66": {
         "kind": "Panel",
         "spec": {
@@ -6309,44 +5766,6 @@
           }
         }
       },
-      "panel-68": {
-        "kind": "Panel",
-        "spec": {
-          "id": 68,
-          "title": "What these numbers mean",
-          "description": "",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "text",
-            "version": "13.2.2",
-            "spec": {
-              "options": {
-                "code": {
-                  "language": "plaintext",
-                  "showLineNumbers": false,
-                  "showMiniMap": false
-                },
-                "content": "**No targets.** Nothing is compared with a target, because there is nowhere to store an agreed one.\n\n**Grouping and progress.** Progress groups by label, board, milestone or epic; label is the default because every tracker has it. GitHub and GitLab issues are only open or closed, so they count as in progress when a linked pull request is open, otherwise when they have an assignee. Jira uses its own status, and blocked tickets count as in progress. A ticket with several labels is counted under each. Milestone is Jira's first fix version or a GitHub milestone; GitLab has none. The date is the latest ticket due date.\n\n**Capacity, not ranking.** The contribution table counts effort and gives no score. People are matched by display name, and Verified is Jira only.\n\n**Needs attention** holds ten kinds of item: unapproved PRs, stale PRs, reviews waiting, blocked tickets, stalled tickets, tickets not closing, open bugs, unassigned tickets in Ready, failed production deploys and scope added mid-sprint. A PR is unapproved once it is older than its repository's median time to first review (2 days with no history) and stale once it is older than twice its median time to merge (14 days with no history), from PRs merged in the last 90 days. A review is waiting when a requested reviewer has not commented after 2 days, counted from the PR opening. A ticket is stalled after twice its board's median cycle time (14 days with no history). Blocked means Blocked, Tech Block or Business Block. An item that matches several rules appears once, at its highest severity. This tab leaves out items with no activity in 90 days; the full list has them.\n\n**Severity.** Critical: a failed production deploy, a Highest-priority bug, a ticket blocked over 7 days. High: unapproved or stale PRs, stalled tickets, reviews waiting over 3 days, High-priority bugs. Medium: not closing, scope added, unassigned in Ready, Medium-priority bugs. Low: other bugs, and stale PRs with no activity for 30 days.\n\n**PR cycle time** runs from first commit to merge, not to production, because few PRs are linked to a production deployment. **Tickets done** is the share of tickets created in the selected range that are now done.\n\n**AI-assisted** means a merged PR with a commit carrying a Claude co-author trailer or reported by a Claude Code session; the trailer is matched in any case. It counts AI-assisted work only, with no comparison against unassisted work. Commits reported by Claude Code sessions are recorded from this release on; earlier weeks rely on the trailer only. **AI spend** is the exporter's estimate, not billed spend.\n\n**Rework rate** is commits authored after a PR's first review comment, over commits on reviewed PRs. **Rollbacks** are production deployments that ship a different commit from the one before and one shipped earlier. **Change failure** is the share of production deployments followed, before the next one, by a merged revert or hotfix PR. **Failed deploy recovery** runs from a failed production deployment to the next success, so it measures recovery from failed deploys, not incidents.\n\n**Type, priority and size** are as recorded in the tracker. PR size is lines added plus deleted.\n\n**Time range.** The picker sets the period for counts, rates and medians (last 7 days by default); short ranges can make medians and rates swing. Trend charts follow the picker too: one point per day up to 31 days, one per week beyond. These show what's open now, whatever the range: Needs attention, Open bugs, Last prod deploy and Code quality; the Deployed column looks back 90 days. Ranges over 28 days are allowed but some panels get slow.",
-                "mode": "markdown"
-              },
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              }
-            }
-          },
-          "transparent": true
-        }
-      },
       "panel-7": {
         "kind": "Panel",
         "spec": {
@@ -6559,40 +5978,50 @@
             }
           }
         }
+      },
+      "panel-68": {
+        "kind": "Panel",
+        "spec": {
+          "id": 68,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                },
+                "content": "",
+                "mode": "markdown"
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
       }
     },
     "layout": {
       "kind": "RowsLayout",
       "spec": {
         "rows": [
-          {
-            "kind": "RowsLayoutRow",
-            "spec": {
-              "title": "Headline",
-              "collapse": false,
-              "hideHeader": true,
-              "layout": {
-                "kind": "GridLayout",
-                "spec": {
-                  "items": [
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "x": 0,
-                        "y": 0,
-                        "width": 24,
-                        "height": 2,
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-1"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
           {
             "kind": "RowsLayoutRow",
             "spec": {
@@ -6666,6 +6095,34 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-8"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Spacer",
+              "collapse": false,
+              "hideHeader": true,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 1,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-68"
                         }
                       }
                     }
@@ -6780,8 +6237,8 @@
                               "name": "grouping",
                               "query": "Label,Board,Milestone,Epic",
                               "current": {
-                                "text": "Label",
-                                "value": "Label"
+                                "text": "Board",
+                                "value": "Board"
                               },
                               "options": [],
                               "multi": false,
@@ -6809,7 +6266,7 @@
                                 "spec": {
                                   "x": 0,
                                   "y": 0,
-                                  "width": 5,
+                                  "width": 4,
                                   "height": 4,
                                   "element": {
                                     "kind": "ElementReference",
@@ -6820,9 +6277,9 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 5,
+                                  "x": 4,
                                   "y": 0,
-                                  "width": 5,
+                                  "width": 4,
                                   "height": 4,
                                   "element": {
                                     "kind": "ElementReference",
@@ -6833,9 +6290,9 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 10,
+                                  "x": 8,
                                   "y": 0,
-                                  "width": 5,
+                                  "width": 4,
                                   "height": 4,
                                   "element": {
                                     "kind": "ElementReference",
@@ -6846,13 +6303,26 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 15,
+                                  "x": 12,
                                   "y": 0,
-                                  "width": 5,
+                                  "width": 4,
                                   "height": 4,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-59"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 16,
+                                  "y": 0,
+                                  "width": 4,
+                                  "height": 4,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-44"
                                   }
                                 }
                               },
@@ -6905,71 +6375,6 @@
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-63"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 20,
-                                  "width": 5,
-                                  "height": 4,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-44"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 5,
-                                  "y": 20,
-                                  "width": 5,
-                                  "height": 4,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-40"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 10,
-                                  "y": 20,
-                                  "width": 5,
-                                  "height": 4,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-42"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 15,
-                                  "y": 20,
-                                  "width": 5,
-                                  "height": 4,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-41"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 20,
-                                  "y": 20,
-                                  "width": 4,
-                                  "height": 4,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-43"
                                   }
                                 }
                               }
@@ -7336,32 +6741,6 @@
                                     "name": "panel-29"
                                   }
                                 }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 23,
-                                  "width": 12,
-                                  "height": 8,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-27"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 12,
-                                  "y": 23,
-                                  "width": 12,
-                                  "height": 8,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-22"
-                                  }
-                                }
                               }
                             ]
                           }
@@ -7382,19 +6761,6 @@
                                   "x": 0,
                                   "y": 0,
                                   "width": 24,
-                                  "height": 2,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-64"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 2,
-                                  "width": 24,
                                   "height": 4,
                                   "element": {
                                     "kind": "ElementReference",
@@ -7406,25 +6772,12 @@
                                 "kind": "GridLayoutItem",
                                 "spec": {
                                   "x": 0,
-                                  "y": 6,
+                                  "y": 4,
                                   "width": 24,
                                   "height": 14,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-67"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 20,
-                                  "width": 24,
-                                  "height": 12,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-68"
                                   }
                                 }
                               }
@@ -7521,278 +6874,6 @@
           "multi": true,
           "includeAll": true,
           "allowCustomValue": false
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "name": "n_prs",
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "hide": "hideVariable",
-          "refresh": "onTimeRangeChanged",
-          "skipUrlSync": true,
-          "query": {
-            "kind": "DataQuery",
-            "group": "mysql",
-            "version": "v0",
-            "datasource": {
-              "name": "devlake-mysql"
-            },
-            "spec": {
-              "editorMode": "code",
-              "format": "table",
-              "rawQuery": true,
-              "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged AS (\n  SELECT pr.id\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n)\nSELECT COUNT(DISTINCT id) AS n_prs FROM merged"
-            }
-          },
-          "regex": "",
-          "regexApplyTo": "value",
-          "sort": "disabled",
-          "options": [],
-          "multi": false,
-          "includeAll": false,
-          "allowCustomValue": true
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "name": "n_tickets",
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "hide": "hideVariable",
-          "refresh": "onTimeRangeChanged",
-          "skipUrlSync": true,
-          "query": {
-            "kind": "DataQuery",
-            "group": "mysql",
-            "version": "v0",
-            "datasource": {
-              "name": "devlake-mysql"
-            },
-            "spec": {
-              "editorMode": "code",
-              "format": "table",
-              "rawQuery": true,
-              "rawSql": "WITH\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nclosed AS (\n  SELECT i.id, i.resolution_date\n  FROM issues i\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND i.resolution_date >= LEAST(NOW() - INTERVAL 70 DAY, ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND), $__timeFrom() - INTERVAL 63 DAY) AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n)\nSELECT COUNT(DISTINCT id) AS n_tickets FROM closed WHERE resolution_date >= $__timeFrom() AND resolution_date < $__timeTo()"
-            }
-          },
-          "regex": "",
-          "regexApplyTo": "value",
-          "sort": "disabled",
-          "options": [],
-          "multi": false,
-          "includeAll": false,
-          "allowCustomValue": true
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "name": "n_deploys",
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "hide": "hideVariable",
-          "refresh": "onTimeRangeChanged",
-          "skipUrlSync": true,
-          "query": {
-            "kind": "DataQuery",
-            "group": "mysql",
-            "version": "v0",
-            "datasource": {
-              "name": "devlake-mysql"
-            },
-            "spec": {
-              "editorMode": "code",
-              "format": "table",
-              "rawQuery": true,
-              "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nSELECT COUNT(DISTINCT dc.cicd_deployment_id) AS n_deploys\nFROM cicd_deployment_commits dc\nWHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n  AND dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%'\n  AND dc.finished_date >= $__timeFrom() AND dc.finished_date < $__timeTo()"
-            }
-          },
-          "regex": "",
-          "regexApplyTo": "value",
-          "sort": "disabled",
-          "options": [],
-          "multi": false,
-          "includeAll": false,
-          "allowCustomValue": true
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "name": "n_ai_share",
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "hide": "hideVariable",
-          "refresh": "onTimeRangeChanged",
-          "skipUrlSync": true,
-          "query": {
-            "kind": "DataQuery",
-            "group": "mysql",
-            "version": "v0",
-            "datasource": {
-              "name": "devlake-mysql"
-            },
-            "spec": {
-              "editorMode": "code",
-              "format": "table",
-              "rawQuery": true,
-              "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged AS (\n  SELECT pr.id\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n)\n, ai_prs AS (\n  SELECT DISTINCT prc.pull_request_id AS id\n  FROM pull_request_commits prc\n  LEFT JOIN commits c ON c.sha = prc.commit_sha\n  WHERE prc.pull_request_id IN (SELECT id FROM merged)\n    AND (LOWER(CONVERT(c.message USING utf8mb4)) LIKE '%co-authored-by: claude%anthropic.com%' OR CONVERT(c.message USING utf8mb4) LIKE '%Generated with [Claude Code]%'\n      OR prc.commit_sha IN (SELECT commit_sha FROM ai_commits))\n)\nSELECT COALESCE(CONCAT(ROUND(100 * (SELECT COUNT(*) FROM ai_prs) / NULLIF((SELECT COUNT(*) FROM merged), 0)), '%'), '–') AS n_ai_share"
-            }
-          },
-          "regex": "",
-          "regexApplyTo": "value",
-          "sort": "disabled",
-          "options": [],
-          "multi": false,
-          "includeAll": false,
-          "allowCustomValue": true
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "name": "n_adopt",
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "hide": "hideVariable",
-          "refresh": "onTimeRangeChanged",
-          "skipUrlSync": true,
-          "query": {
-            "kind": "DataQuery",
-            "group": "mysql",
-            "version": "v0",
-            "datasource": {
-              "name": "devlake-mysql"
-            },
-            "spec": {
-              "editorMode": "code",
-              "format": "table",
-              "rawQuery": true,
-              "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\ngh_emails AS (\n  SELECT author_email, MIN(author_id) AS gid\n  FROM _tool_github_commits\n  WHERE author_id > 0\n  GROUP BY author_email\n  HAVING COUNT(DISTINCT author_id) = 1\n)\n, authors AS (\n  SELECT DISTINCT CASE WHEN pr.author_id LIKE 'github:GithubAccount:%' THEN CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) ELSE pr.author_id END AS author_key\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n),\nai_users AS (\n  SELECT DISTINCT CONCAT('gh:', ge.gid) AS author_key\n  FROM ai_activities a\n  JOIN gh_emails ge ON ge.author_email = a.user_email\n  WHERE a.record_kind = 'canonical_activity' AND a.user_email <> ''\n    AND a.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND a.date > DATE($__timeFrom()) AND a.date <= DATE($__timeTo())\n)\nSELECT COALESCE(CONCAT(ROUND(100 * (SELECT COUNT(*) FROM ai_users WHERE author_key IN (SELECT author_key FROM authors)) / NULLIF((SELECT COUNT(*) FROM authors), 0)), '%'), '–') AS n_adopt"
-            }
-          },
-          "regex": "",
-          "regexApplyTo": "value",
-          "sort": "disabled",
-          "options": [],
-          "multi": false,
-          "includeAll": false,
-          "allowCustomValue": true
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "name": "n_out_share",
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "hide": "hideVariable",
-          "refresh": "onTimeRangeChanged",
-          "skipUrlSync": true,
-          "query": {
-            "kind": "DataQuery",
-            "group": "mysql",
-            "version": "v0",
-            "datasource": {
-              "name": "devlake-mysql"
-            },
-            "spec": {
-              "editorMode": "code",
-              "format": "table",
-              "rawQuery": true,
-              "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nrepo_spend AS (\n  SELECT p.repository_url,\n    COUNT(DISTINCT p.session_id) AS sessions,\n    COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS people,\n    SUM(p.estimated_cost_usd) AS cost,\n    EXISTS (SELECT 1 FROM repos r JOIN scoped_repos sr ON sr.repo_id = r.id WHERE LOWER(r.url) = p.repository_url) AS is_mapped\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND p.started_at >= $__timeFrom() AND p.started_at < $__timeTo()\n  GROUP BY p.repository_url\n)\nSELECT COALESCE(CONCAT(ROUND(100 * SUM(CASE WHEN repository_url IS NOT NULL AND NOT is_mapped THEN cost END) / NULLIF(SUM(cost), 0)), '%'), '–') AS n_out_share\nFROM repo_spend"
-            }
-          },
-          "regex": "",
-          "regexApplyTo": "value",
-          "sort": "disabled",
-          "options": [],
-          "multi": false,
-          "includeAll": false,
-          "allowCustomValue": true
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "name": "n_out_repos",
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "hide": "hideVariable",
-          "refresh": "onTimeRangeChanged",
-          "skipUrlSync": true,
-          "query": {
-            "kind": "DataQuery",
-            "group": "mysql",
-            "version": "v0",
-            "datasource": {
-              "name": "devlake-mysql"
-            },
-            "spec": {
-              "editorMode": "code",
-              "format": "table",
-              "rawQuery": true,
-              "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nrepo_spend AS (\n  SELECT p.repository_url,\n    COUNT(DISTINCT p.session_id) AS sessions,\n    COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS people,\n    SUM(p.estimated_cost_usd) AS cost,\n    EXISTS (SELECT 1 FROM repos r JOIN scoped_repos sr ON sr.repo_id = r.id WHERE LOWER(r.url) = p.repository_url) AS is_mapped\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND p.started_at >= $__timeFrom() AND p.started_at < $__timeTo()\n  GROUP BY p.repository_url\n)\nSELECT COUNT(*) AS n_out_repos FROM repo_spend WHERE repository_url IS NOT NULL AND NOT is_mapped"
-            }
-          },
-          "regex": "",
-          "regexApplyTo": "value",
-          "sort": "disabled",
-          "options": [],
-          "multi": false,
-          "includeAll": false,
-          "allowCustomValue": true
-        }
-      },
-      {
-        "kind": "QueryVariable",
-        "spec": {
-          "name": "n_attention_clause",
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "hide": "hideVariable",
-          "refresh": "onDashboardLoad",
-          "skipUrlSync": true,
-          "query": {
-            "kind": "DataQuery",
-            "group": "mysql",
-            "version": "v0",
-            "datasource": {
-              "name": "devlake-mysql"
-            },
-            "spec": {
-              "editorMode": "code",
-              "format": "table",
-              "rawQuery": true,
-              "rawSql": "WITH\nproject_repos AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_boards AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_cicd AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n),\nissue_base AS (\n  SELECT DISTINCT pb.project_name, pb.board_id, i.id, i.issue_key, i.title, i.url, i.priority, i.type, i.status, i.original_status,\n    i.assignee_id, i.assignee_name, i.created_date, i.id LIKE 'jira:%' AS is_jira,\n    COALESCE(i.updated_date, i.created_date) AS last_activity, i.updated_date\n  FROM project_boards pb\n  JOIN board_issues bi ON bi.board_id = pb.board_id\n  JOIN issues i ON i.id = bi.issue_id\n  WHERE i.status <> 'DONE' AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Closed', 'Cancelled', 'Invalid')\n    AND COALESCE(i.updated_date, i.created_date) >= NOW() - INTERVAL 90 DAY\n),\nstatus_now AS (\n  SELECT h.issue_id, MAX(h.start_date) AS since\n  FROM issue_status_history h\n  WHERE h.is_current_status = 1 AND h.issue_id IN (SELECT id FROM issue_base)\n  GROUP BY h.issue_id\n),\nfirst_progress AS (\n  SELECT h.issue_id, MIN(h.start_date) AS started\n  FROM issue_status_history h\n  WHERE h.status = 'IN_PROGRESS' AND h.issue_id IN (SELECT id FROM issue_base)\n  GROUP BY h.issue_id\n),\nopen_issues AS (\n  SELECT DISTINCT ib.project_name, ib.board_id, ib.id, ib.issue_key, ib.title, ib.url, ib.priority, ib.type, ib.status, ib.original_status,\n    ib.assignee_id, ib.assignee_name, ib.created_date, ib.is_jira, ib.last_activity,\n    COALESCE(sn.since, ib.updated_date, ib.created_date) AS status_since\n  FROM issue_base ib\n  LEFT JOIN status_now sn ON sn.issue_id = ib.id\n)\n, merged_90 AS (\n  SELECT DISTINCT pr.id, pr.base_repo_id AS repo_id, TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) AS merge_min\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM project_repos)\n    AND pr.merged_date >= NOW() - INTERVAL 90 DAY AND pr.merged_date < NOW()\n),\nrepo_med AS (\n  SELECT repo_id,\n    MAX(CASE WHEN kind = 'merge' AND rn = CEIL(0.5 * n) THEN v END) AS merge_median,\n    MAX(CASE WHEN kind = 'pickup' AND rn = CEIL(0.5 * n) THEN v END) AS pickup_median\n  FROM (\n    SELECT repo_id, kind, v,\n      ROW_NUMBER() OVER (PARTITION BY repo_id, kind ORDER BY v) AS rn,\n      COUNT(*) OVER (PARTITION BY repo_id, kind) AS n\n    FROM (\n      SELECT repo_id, 'merge' AS kind, merge_min AS v FROM merged_90\n      UNION ALL\n      SELECT m.repo_id, 'pickup', MIN(ppm.pr_pickup_time)\n      FROM merged_90 m\n      JOIN project_pr_metrics ppm ON ppm.id = m.id\n      WHERE ppm.pr_pickup_time IS NOT NULL\n      GROUP BY m.id, m.repo_id\n    ) vals\n  ) ranked\n  GROUP BY repo_id\n),\nopen_prs_all AS (\n  SELECT DISTINCT pr.id, pr.base_repo_id AS repo_id, pp.project_name, CONCAT('#', pr.pull_request_key) AS item, pr.title, pr.url,\n    pr.created_date, TIMESTAMPDIFF(MINUTE, pr.created_date, NOW()) AS age_min,\n    COALESCE(NULLIF(a.full_name, ''), NULLIF(a.user_name, ''), pr.author_name) AS owner\n  FROM pull_requests pr\n  JOIN project_repos pp ON pp.repo_id = pr.base_repo_id\n  LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE pr.status = 'OPEN' AND COALESCE(pr.is_draft, 0) = 0 AND pr.created_date < NOW()\n),\npr_comment_last AS (\n  SELECT c.pull_request_id, MAX(c.created_date) AS last_at\n  FROM pull_request_comments c\n  WHERE c.pull_request_id IN (SELECT id FROM open_prs_all)\n  GROUP BY c.pull_request_id\n),\npr_commit_last AS (\n  SELECT prc.pull_request_id, MAX(prc.commit_authored_date) AS last_at\n  FROM pull_request_commits prc\n  WHERE prc.pull_request_id IN (SELECT id FROM open_prs_all)\n  GROUP BY prc.pull_request_id\n),\nopen_prs AS (\n  SELECT DISTINCT x.id, x.repo_id, x.project_name, x.item, x.title, x.url, x.created_date, x.age_min, x.owner, x.last_activity\n  FROM (\n    SELECT op.id, op.repo_id, op.project_name, op.item, op.title, op.url, op.created_date, op.age_min, op.owner,\n      GREATEST(op.created_date, COALESCE(cl.last_at, op.created_date), COALESCE(kl.last_at, op.created_date)) AS last_activity\n    FROM open_prs_all op\n    LEFT JOIN pr_comment_last cl ON cl.pull_request_id = op.id\n    LEFT JOIN pr_commit_last kl ON kl.pull_request_id = op.id\n  ) x\n  WHERE x.age_min >= 0 AND x.last_activity >= NOW() - INTERVAL 90 DAY\n),\nstale_prs AS (\n  SELECT op.id, op.project_name, op.item, op.title, op.url, op.owner, op.age_min, op.last_activity\n  FROM open_prs op\n  LEFT JOIN repo_med rm ON rm.repo_id = op.repo_id\n  WHERE op.age_min > COALESCE(2 * rm.merge_median, 14 * 1440)\n),\nwaiting_reviews AS (\n  SELECT op.id, op.project_name, op.item, op.title, op.url, op.age_min, op.last_activity,\n    GROUP_CONCAT(DISTINCT COALESCE(NULLIF(prr.name, ''), prr.user_name) ORDER BY COALESCE(NULLIF(prr.name, ''), prr.user_name) SEPARATOR ', ') AS reviewers\n  FROM open_prs op\n  JOIN pull_request_reviewers prr ON prr.pull_request_id = op.id\n  WHERE op.age_min > 2 * 1440\n    AND NOT EXISTS (\n      SELECT 1 FROM pull_request_comments c\n      WHERE c.pull_request_id = op.id AND c.account_id = prr.reviewer_id AND c.type IN ('REVIEW', 'DIFF'))\n  GROUP BY op.id, op.project_name, op.item, op.title, op.url, op.age_min, op.last_activity\n),\nresolved_90 AS (\n  SELECT DISTINCT i.id, bi.board_id, i.resolution_date\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  WHERE bi.board_id IN (SELECT board_id FROM project_boards)\n    AND i.resolution_date >= NOW() - INTERVAL 90 DAY AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC' AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n),\nresolved_start AS (\n  SELECT h.issue_id, MIN(h.start_date) AS started\n  FROM issue_status_history h\n  WHERE h.status = 'IN_PROGRESS' AND h.issue_id IN (SELECT id FROM resolved_90)\n  GROUP BY h.issue_id\n),\nboard_med AS (\n  SELECT board_id, MAX(CASE WHEN rn = CEIL(0.5 * n) THEN days END) AS median_days\n  FROM (\n    SELECT r.board_id, TIMESTAMPDIFF(MINUTE, rs.started, r.resolution_date) / 1440 AS days,\n      ROW_NUMBER() OVER (PARTITION BY r.board_id ORDER BY TIMESTAMPDIFF(MINUTE, rs.started, r.resolution_date)) AS rn,\n      COUNT(*) OVER (PARTITION BY r.board_id) AS n\n    FROM resolved_90 r\n    JOIN resolved_start rs ON rs.issue_id = r.id\n  ) ranked\n  GROUP BY board_id\n),\nstalled AS (\n  SELECT oi.project_name, oi.id, oi.issue_key, oi.title, oi.url, oi.assignee_name, oi.last_activity,\n    TIMESTAMPDIFF(HOUR, COALESCE(fp.started, oi.status_since), NOW()) / 24 AS days_in_progress,\n    COALESCE(2 * bm.median_days, 14) AS threshold_days\n  FROM open_issues oi\n  LEFT JOIN first_progress fp ON fp.issue_id = oi.id\n  LEFT JOIN board_med bm ON bm.board_id = oi.board_id\n  WHERE oi.is_jira AND oi.status = 'IN_PROGRESS'\n    AND COALESCE(oi.original_status, '') NOT IN ('Closed', 'To Do', 'To do', 'Todo', 'Ready for Development')\n    AND NOT oi.original_status IN ('Blocked', 'Tech Block', 'Business Block')\n),\nmulti_sprint AS (\n  SELECT si.issue_id, COUNT(DISTINCT si.sprint_id) AS sprints, MIN(s.started_date) AS first_start\n  FROM sprint_issues si\n  JOIN sprints s ON s.id = si.sprint_id\n  GROUP BY si.issue_id\n  HAVING COUNT(DISTINCT si.sprint_id) >= 2\n),\nscope_added AS (\n  SELECT ic.issue_id, MAX(ic.created_date) AS added_at\n  FROM (SELECT DISTINCT id FROM open_issues WHERE is_jira) oj\n  JOIN issue_changelogs ic ON ic.issue_id = oj.id AND ic.field_name = 'Sprint'\n  JOIN sprints s ON s.status = 'ACTIVE' AND FIND_IN_SET(s.id, ic.original_to_value) AND NOT FIND_IN_SET(s.id, COALESCE(ic.original_from_value, ''))\n  WHERE ic.created_date > s.started_date AND (s.completed_date IS NULL OR ic.created_date < s.completed_date)\n    AND NOT EXISTS (\n      SELECT 1 FROM sprints p\n      WHERE FIND_IN_SET(p.id, COALESCE(ic.original_from_value, ''))\n        AND p.completed_date BETWEEN ic.created_date - INTERVAL 1 HOUR AND ic.created_date + INTERVAL 1 HOUR)\n  GROUP BY ic.issue_id\n),\nlatest_deploy AS (\n  SELECT scope_id, env, sha, url, ts, failed, ROW_NUMBER() OVER (PARTITION BY scope_id, env ORDER BY ts DESC) AS rn\n  FROM prod_deploys\n),\natt_raw AS (\n  SELECT 'High' AS severity, 2 AS severity_rank, 'Unapproved PR' AS category, 2 AS cat_rank, op.item, op.title,\n    CONCAT('Open ', FLOOR(op.age_min / 1440), 'd, no approving review') AS reason, FLOOR(op.age_min / 1440) AS age_days,\n    op.project_name, op.owner, op.url, CONCAT('pr:', op.id) AS ref, op.last_activity\n  FROM open_prs op\n  LEFT JOIN repo_med rm ON rm.repo_id = op.repo_id\n  WHERE op.age_min > COALESCE(rm.pickup_median, 2 * 1440)\n    AND NOT EXISTS (SELECT 1 FROM pull_request_comments c WHERE c.pull_request_id = op.id AND c.status = 'APPROVED')\n  UNION ALL\n  SELECT CASE WHEN sp.age_min > 30 * 1440 AND sp.last_activity < NOW() - INTERVAL 30 DAY THEN 'Low' ELSE 'High' END,\n    CASE WHEN sp.age_min > 30 * 1440 AND sp.last_activity < NOW() - INTERVAL 30 DAY THEN 4 ELSE 2 END,\n    'Stale PR', 3, sp.item, sp.title,\n    CASE WHEN sp.age_min > 30 * 1440 AND sp.last_activity < NOW() - INTERVAL 30 DAY\n      THEN CONCAT('Open ', FLOOR(sp.age_min / 1440), 'd, no activity for ', TIMESTAMPDIFF(DAY, sp.last_activity, NOW()), 'd')\n      ELSE CONCAT('Open ', FLOOR(sp.age_min / 1440), 'd, past twice the repo median to merge') END,\n    FLOOR(sp.age_min / 1440), sp.project_name, sp.owner, sp.url, CONCAT('pr:', sp.id), sp.last_activity\n  FROM stale_prs sp\n  UNION ALL\n  SELECT CASE WHEN wr.age_min > 3 * 1440 THEN 'High' ELSE 'Medium' END, CASE WHEN wr.age_min > 3 * 1440 THEN 2 ELSE 3 END,\n    'Review waiting', 1, wr.item, wr.title, CONCAT('Open ', FLOOR(wr.age_min / 1440), 'd, requested reviewer has not reviewed'),\n    FLOOR(wr.age_min / 1440), wr.project_name, wr.reviewers, wr.url, CONCAT('pr:', wr.id), wr.last_activity\n  FROM waiting_reviews wr\n  UNION ALL\n  SELECT CASE WHEN TIMESTAMPDIFF(HOUR, oi.status_since, NOW()) > 7 * 24 THEN 'Critical' ELSE 'High' END,\n    CASE WHEN TIMESTAMPDIFF(HOUR, oi.status_since, NOW()) > 7 * 24 THEN 1 ELSE 2 END,\n    'Blocked ticket', 4, oi.issue_key, oi.title,\n    CONCAT(oi.original_status, ' for ', GREATEST(TIMESTAMPDIFF(DAY, oi.status_since, NOW()), 0), 'd'),\n    GREATEST(TIMESTAMPDIFF(DAY, oi.status_since, NOW()), 0), oi.project_name, NULLIF(oi.assignee_name, ''), oi.url, CONCAT('issue:', oi.id), oi.last_activity\n  FROM open_issues oi\n  WHERE oi.is_jira AND oi.original_status IN ('Blocked', 'Tech Block', 'Business Block')\n  UNION ALL\n  SELECT 'High', 2, 'Stalled ticket', 5, st.issue_key, st.title,\n    CONCAT('In progress ', FLOOR(st.days_in_progress), 'd, limit ', FLOOR(st.threshold_days), 'd'),\n    FLOOR(st.days_in_progress), st.project_name, NULLIF(st.assignee_name, ''), st.url, CONCAT('issue:', st.id), st.last_activity\n  FROM stalled st\n  WHERE st.days_in_progress > st.threshold_days\n  UNION ALL\n  SELECT 'Medium', 3, 'Not closing', 6, oi.issue_key, oi.title, CONCAT('In ', ms.sprints, ' sprints without closing'),\n    GREATEST(TIMESTAMPDIFF(DAY, ms.first_start, NOW()), 0), oi.project_name, NULLIF(oi.assignee_name, ''), oi.url, CONCAT('issue:', oi.id), oi.last_activity\n  FROM open_issues oi\n  JOIN multi_sprint ms ON ms.issue_id = oi.id\n  WHERE oi.is_jira\n  UNION ALL\n  SELECT CASE oi.priority WHEN 'Highest' THEN 'Critical' WHEN 'High' THEN 'High' WHEN 'Medium' THEN 'Medium' ELSE 'Low' END,\n    CASE oi.priority WHEN 'Highest' THEN 1 WHEN 'High' THEN 2 WHEN 'Medium' THEN 3 ELSE 4 END,\n    'Open bug', 7, oi.issue_key, oi.title,\n    CONCAT(COALESCE(NULLIF(oi.priority, ''), 'Unprioritised'), ' bug open ', GREATEST(TIMESTAMPDIFF(DAY, oi.created_date, NOW()), 0), 'd'),\n    GREATEST(TIMESTAMPDIFF(DAY, oi.created_date, NOW()), 0), oi.project_name, NULLIF(oi.assignee_name, ''), oi.url, CONCAT('issue:', oi.id), oi.last_activity\n  FROM open_issues oi\n  WHERE (oi.type = 'BUG' OR EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = oi.id AND il.label_name IN ('bug','Production-Bug')))\n  UNION ALL\n  SELECT 'Medium', 3, 'Unassigned in Ready', 8, oi.issue_key, oi.title,\n    CONCAT(oi.original_status, ' for ', GREATEST(TIMESTAMPDIFF(DAY, oi.status_since, NOW()), 0), 'd, no assignee'),\n    GREATEST(TIMESTAMPDIFF(DAY, oi.status_since, NOW()), 0), oi.project_name, NULL, oi.url, CONCAT('issue:', oi.id), oi.last_activity\n  FROM open_issues oi\n  WHERE oi.is_jira AND (oi.original_status IN ('Selected for Development', 'Dev Ready', 'Ready for Dev', 'Ready for Development') OR (oi.original_status IN ('To do', 'To Do', 'Todo') AND oi.id IN (SELECT si_r.issue_id FROM sprint_issues si_r JOIN sprints sp_r ON sp_r.id = si_r.sprint_id WHERE sp_r.status = 'ACTIVE'))) AND COALESCE(oi.assignee_id, '') = ''\n  UNION ALL\n  SELECT 'Critical', 1, 'Failed deploy', 9, CONCAT(ld.env, ' · ', LEFT(ld.sha, 7)), CONCAT(cs.name, ' · ', ld.env),\n    CONCAT('Latest prod deployment failed ', GREATEST(TIMESTAMPDIFF(DAY, ld.ts, NOW()), 0), 'd ago, no success since'),\n    GREATEST(TIMESTAMPDIFF(DAY, ld.ts, NOW()), 0), pc.project_name, NULL, ld.url, CONCAT('deploy:', ld.scope_id, ':', ld.env), ld.ts\n  FROM latest_deploy ld\n  JOIN project_cicd pc ON pc.scope_id = ld.scope_id\n  JOIN cicd_scopes cs ON cs.id = ld.scope_id\n  WHERE ld.rn = 1 AND ld.failed = 1 AND ld.ts >= NOW() - INTERVAL 90 DAY\n  UNION ALL\n  SELECT 'Medium', 3, 'Scope added', 10, oi.issue_key, oi.title, CONCAT('Added to the active sprint ', GREATEST(TIMESTAMPDIFF(DAY, sa.added_at, NOW()), 0), 'd ago'),\n    GREATEST(TIMESTAMPDIFF(DAY, sa.added_at, NOW()), 0), oi.project_name, NULLIF(oi.assignee_name, ''), oi.url, CONCAT('issue:', oi.id), oi.last_activity\n  FROM open_issues oi\n  JOIN scope_added sa ON sa.issue_id = oi.id\n  WHERE oi.is_jira\n),\nattention AS (\n  SELECT severity, severity_rank, category, item, ref, title, reason, age_days, project_name, owner, url, last_activity\n  FROM (\n    SELECT ar.severity, ar.severity_rank, ar.category, ar.item, ar.ref, ar.title, ar.reason, ar.age_days, ar.project_name, ar.owner, ar.url, ar.last_activity,\n      ROW_NUMBER() OVER (PARTITION BY ar.project_name, ar.ref ORDER BY ar.severity_rank, ar.cat_rank) AS pick\n    FROM att_raw ar\n  ) ranked_items\n  WHERE pick = 1\n)\nSELECT CASE WHEN COUNT(DISTINCT ref) = 0 THEN 'Nothing needs attention.'\n  ELSE CONCAT('**', FORMAT(COUNT(DISTINCT ref), 0), '** ', IF(COUNT(DISTINCT ref) = 1, 'item needs', 'items need'), ' attention now, of which **',\n    FORMAT(COUNT(DISTINCT CASE WHEN severity = 'Critical' THEN ref END), 0), '** ', IF(COUNT(DISTINCT CASE WHEN severity = 'Critical' THEN ref END) = 1, 'is', 'are'), ' critical.') END AS n_attention_clause\nFROM attention"
-            }
-          },
-          "regex": "",
-          "regexApplyTo": "value",
-          "sort": "disabled",
-          "options": [],
-          "multi": false,
-          "includeAll": false,
-          "allowCustomValue": true
         }
       }
     ]
