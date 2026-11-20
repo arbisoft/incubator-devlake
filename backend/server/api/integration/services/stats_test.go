@@ -122,28 +122,28 @@ func (f *fakeRepos) PullRequestsByGroup(email string, from, to time.Time, group 
 	return f.prGroups[group], f.record("PullRequestsByGroup", email, from, to, group)
 }
 
-func (f *fakeRepos) Providers(email, firstDay, lastDay string) ([]repositories.AIProviderRow, errors.Error) {
-	return f.providers, f.record("Providers", email, firstDay, lastDay)
+func (f *fakeRepos) Providers(email, fromDay, toDay string) ([]repositories.AIProviderRow, errors.Error) {
+	return f.providers, f.record("Providers", email, fromDay, toDay)
 }
 
-func (f *fakeRepos) ToolDecisions(email, firstDay, lastDay string) (repositories.AIToolDecisionCounts, errors.Error) {
-	return f.decisions, f.record("ToolDecisions", email, firstDay, lastDay)
+func (f *fakeRepos) ToolDecisions(email, fromDay, toDay string) (repositories.AIToolDecisionCounts, errors.Error) {
+	return f.decisions, f.record("ToolDecisions", email, fromDay, toDay)
 }
 
-func (f *fakeRepos) Monthly(email, firstDay, lastDay string) ([]repositories.AIMonthlyRow, errors.Error) {
-	return f.monthly, f.record("Monthly", email, firstDay, lastDay)
+func (f *fakeRepos) Monthly(email, fromDay, toDay string) ([]repositories.AIMonthlyRow, errors.Error) {
+	return f.monthly, f.record("Monthly", email, fromDay, toDay)
 }
 
-func (f *fakeRepos) ModelCosts(email, firstDay, lastDay string) ([]repositories.AIModelCostRow, errors.Error) {
-	return f.modelCosts, f.record("ModelCosts", email, firstDay, lastDay)
+func (f *fakeRepos) ModelCosts(email, fromDay, toDay string) ([]repositories.AIModelCostRow, errors.Error) {
+	return f.modelCosts, f.record("ModelCosts", email, fromDay, toDay)
 }
 
-func (f *fakeRepos) TotalCost(email, firstDay, lastDay string) (string, errors.Error) {
-	return f.totalCost, f.record("TotalCost", email, firstDay, lastDay)
+func (f *fakeRepos) TotalCost(email, fromDay, toDay string) (string, errors.Error) {
+	return f.totalCost, f.record("TotalCost", email, fromDay, toDay)
 }
 
-func (f *fakeRepos) MonthlyCosts(email, firstDay, lastDay string) ([]repositories.AIMonthlyCostRow, errors.Error) {
-	return f.monthlyCosts, f.record("MonthlyCosts", email, firstDay, lastDay)
+func (f *fakeRepos) MonthlyCosts(email, fromDay, toDay string) ([]repositories.AIMonthlyCostRow, errors.Error) {
+	return f.monthlyCosts, f.record("MonthlyCosts", email, fromDay, toDay)
 }
 
 func newService(t *testing.T, repos *fakeRepos) *StatsService {
@@ -232,10 +232,10 @@ func TestStatsServicePassesTheLowercasedEmailAndWindow(t *testing.T) {
 		if c.email != "abc@arbisoft.com" {
 			t.Errorf("%s got email %q, want abc@arbisoft.com", c.method, c.email)
 		}
-		// AI methods get the inclusive day range; the others get the exact window.
+		// AI methods get the half-open range of days that start in the window; the others get the exact window.
 		want := []interface{}{from, fixedNow}
 		if _, isDay := c.args[0].(string); isDay {
-			want = []interface{}{"2026-11-03", "2026-11-10"}
+			want = []interface{}{"2026-11-04", "2026-11-11"}
 		}
 		if !reflect.DeepEqual(c.args[:2], want) {
 			t.Errorf("%s got %v, want %v", c.method, c.args[:2], want)
@@ -403,6 +403,33 @@ func TestAIUsageActiveInLastMonth(t *testing.T) {
 			}
 			if got.ActiveInLastMonth != tc.want {
 				t.Errorf("ActiveInLastMonth = %v, want %v", got.ActiveInLastMonth, tc.want)
+			}
+		})
+	}
+}
+
+func TestAIDaysAreHalfOpen(t *testing.T) {
+	tests := []struct {
+		name, from, to, wantFrom, wantTo, wantLastMonth string
+	}{
+		{"a month from midnight to midnight", "2026-11-01T00:00:00Z", "2026-12-01T00:00:00Z", "2026-11-01", "2026-12-01", "2026-11"},
+		{"a part day at either end", "2026-11-03T12:00:00Z", "2026-11-10T12:00:00Z", "2026-11-04", "2026-11-11", "2026-11"},
+		{"an offset is read in UTC", "2026-11-01T02:00:00+05:00", "2026-11-02T02:00:00+05:00", "2026-11-01", "2026-11-02", "2026-11"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repos := &fakeRepos{monthly: []repositories.AIMonthlyRow{{Provider: "claude", Month: tc.wantLastMonth, ActiveDays: 1}}}
+			got, err := newService(t, repos).AIUsage("abc@arbisoft.com", utils.Period{From: tc.from, To: tc.to})
+			if err != nil {
+				t.Fatalf("AIUsage() error = %v", err)
+			}
+			for _, c := range repos.calls {
+				if want := []interface{}{tc.wantFrom, tc.wantTo}; !reflect.DeepEqual(c.args[:2], want) {
+					t.Errorf("%s got days %v, want %v", c.method, c.args[:2], want)
+				}
+			}
+			if !got.ActiveInLastMonth {
+				t.Errorf("ActiveInLastMonth = false, want true for activity in %s", tc.wantLastMonth)
 			}
 		})
 	}

@@ -215,6 +215,7 @@ func TestAIMonthlyOnMySQL(t *testing.T) {
 		activity("5", "cursor", "Repo-Test-User@example.invalid", "2026-11-03", 1, 3, 1),
 		activity("6", "cursor", dbTestOther, "2026-11-03", 9, 99, 99),
 		activity("7", "cursor", dbTestUser, "2026-09-30", 9, 99, 99), // before the first day
+		activity("8", "cursor", dbTestUser, "2026-11-10", 9, 99, 99), // on toDay, which the range leaves out
 	)
 	r := mustRepo(t, NewAI, rowsReader(tx))
 

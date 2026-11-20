@@ -51,7 +51,7 @@ func idLike(source string) (string, errors.Error) {
 }
 
 // The repositories match emails case-insensitively and expect them lowercased, because the stored emails are not.
-// Every window is half-open, [from, to), except the AI ones, which are inclusive day ranges.
+// Every window is half-open, [from, to). The AI ones are ranges of whole days.
 
 // Activity reads when an engineer was first active. It is safe for concurrent use.
 type Activity struct {

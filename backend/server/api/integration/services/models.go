@@ -124,8 +124,9 @@ type GitHubBreakdown struct {
 	PullRequestsMergedSharePct float64 `json:"pullRequestsMergedSharePct"`
 }
 
-// AIProviderUsage is one AI provider's activity for the engineer. AI data is daily, so the window covers whole UTC
-// days from the day of From to the day of To.
+// AIProviderUsage is one AI provider's activity for the engineer. AI data is daily, so the window covers the whole
+// UTC days that start at or after From and before To. A range from 2026-11-01T00:00:00Z to 2026-12-01T00:00:00Z
+// covers November only.
 type AIProviderUsage struct {
 	Provider     string `json:"provider" example:"cursor"`
 	ActiveDays   int64  `json:"activeDays"`
@@ -149,7 +150,7 @@ type AIUsageStats struct {
 	ToolEditsRejected int64 `json:"toolEditsRejected"`
 	// Monthly is the activity per provider and UTC month, oldest first. It is empty, never null, without data.
 	Monthly []AIMonthlyUsage `json:"monthly"`
-	// ActiveInLastMonth is true when the engineer has activity in the UTC month the window ends in.
+	// ActiveInLastMonth is true when the engineer has activity in the UTC month of the last day the window covers.
 	ActiveInLastMonth bool `json:"activeInLastMonth"`
 }
 

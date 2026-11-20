@@ -71,7 +71,7 @@ func codeRepo(t *testing.T, db rowsReader, source string) *Code {
 
 func repoCalls(t *testing.T) []repoCall {
 	t.Helper()
-	const email, firstDay, lastDay = "abc@arbisoft.com", "2026-11-03", "2026-11-10"
+	const email, fromDay, toDay = "abc@arbisoft.com", "2026-11-03", "2026-11-10"
 	activity := func(db rowsReader) *Activity { return mustRepo(t, NewActivity, db) }
 	jira := func(db rowsReader) *Issues { return issuesRepo(t, db, SourceJira) }
 	github := func(db rowsReader) *Code { return codeRepo(t, db, SourceGitHub) }
@@ -106,12 +106,12 @@ func repoCalls(t *testing.T) []repoCall {
 			_, err := github(db).PullRequestsByGroup(email, repoFrom, repoTo, GroupByRepo)
 			return err
 		}, "read github pull requests by group"},
-		{"Providers", func(db rowsReader) errors.Error { _, err := ai(db).Providers(email, firstDay, lastDay); return err }, "read ai activities"},
-		{"ToolDecisions", func(db rowsReader) errors.Error { _, err := ai(db).ToolDecisions(email, firstDay, lastDay); return err }, "read ai tool decisions"},
-		{"Monthly", func(db rowsReader) errors.Error { _, err := ai(db).Monthly(email, firstDay, lastDay); return err }, "read ai monthly activity"},
-		{"ModelCosts", func(db rowsReader) errors.Error { _, err := ai(db).ModelCosts(email, firstDay, lastDay); return err }, "read ai model costs"},
-		{"TotalCost", func(db rowsReader) errors.Error { _, err := ai(db).TotalCost(email, firstDay, lastDay); return err }, "read ai total cost"},
-		{"MonthlyCosts", func(db rowsReader) errors.Error { _, err := ai(db).MonthlyCosts(email, firstDay, lastDay); return err }, "read ai monthly costs"},
+		{"Providers", func(db rowsReader) errors.Error { _, err := ai(db).Providers(email, fromDay, toDay); return err }, "read ai activities"},
+		{"ToolDecisions", func(db rowsReader) errors.Error { _, err := ai(db).ToolDecisions(email, fromDay, toDay); return err }, "read ai tool decisions"},
+		{"Monthly", func(db rowsReader) errors.Error { _, err := ai(db).Monthly(email, fromDay, toDay); return err }, "read ai monthly activity"},
+		{"ModelCosts", func(db rowsReader) errors.Error { _, err := ai(db).ModelCosts(email, fromDay, toDay); return err }, "read ai model costs"},
+		{"TotalCost", func(db rowsReader) errors.Error { _, err := ai(db).TotalCost(email, fromDay, toDay); return err }, "read ai total cost"},
+		{"MonthlyCosts", func(db rowsReader) errors.Error { _, err := ai(db).MonthlyCosts(email, fromDay, toDay); return err }, "read ai monthly costs"},
 	}
 }
 

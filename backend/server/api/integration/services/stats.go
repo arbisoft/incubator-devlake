@@ -68,14 +68,14 @@ type versionControlStatsReader interface {
 	PullRequestsByGroup(email string, from, to time.Time, group repositories.Group) ([]repositories.PullRequestGroupRow, errors.Error)
 }
 
-// aiReader reads AI activity and cost over an inclusive range of days. repositories.AI satisfies it.
+// aiReader reads AI activity and cost over a half-open range of days, [fromDay, toDay). repositories.AI satisfies it.
 type aiReader interface {
-	Providers(email, firstDay, lastDay string) ([]repositories.AIProviderRow, errors.Error)
-	ToolDecisions(email, firstDay, lastDay string) (repositories.AIToolDecisionCounts, errors.Error)
-	Monthly(email, firstDay, lastDay string) ([]repositories.AIMonthlyRow, errors.Error)
-	ModelCosts(email, firstDay, lastDay string) ([]repositories.AIModelCostRow, errors.Error)
-	TotalCost(email, firstDay, lastDay string) (string, errors.Error)
-	MonthlyCosts(email, firstDay, lastDay string) ([]repositories.AIMonthlyCostRow, errors.Error)
+	Providers(email, fromDay, toDay string) ([]repositories.AIProviderRow, errors.Error)
+	ToolDecisions(email, fromDay, toDay string) (repositories.AIToolDecisionCounts, errors.Error)
+	Monthly(email, fromDay, toDay string) ([]repositories.AIMonthlyRow, errors.Error)
+	ModelCosts(email, fromDay, toDay string) ([]repositories.AIModelCostRow, errors.Error)
+	TotalCost(email, fromDay, toDay string) (string, errors.Error)
+	MonthlyCosts(email, fromDay, toDay string) ([]repositories.AIMonthlyCostRow, errors.Error)
 }
 
 var (
@@ -313,9 +313,20 @@ func convert[R, D any](rows []R, to func(R) D) []D {
 	return out
 }
 
-// days returns the inclusive day range the daily AI tables use for the window.
-func days(w StatsWindow) (first, last string) {
-	return w.From.Format(dayLayout), w.To.Format(dayLayout)
+// days returns the half-open range of UTC days, [fromDay, toDay), that the daily AI tables use for the window. A day
+// is in the range when it starts inside the window. So a window from one midnight to another covers exactly those
+// days, and back-to-back windows never share a day.
+func days(w StatsWindow) (fromDay, toDay time.Time) {
+	return ceilDay(w.From), ceilDay(w.To)
+}
+
+// ceilDay returns the first UTC midnight at or after t.
+func ceilDay(t time.Time) time.Time {
+	day := t.UTC().Truncate(24 * time.Hour)
+	if day.Before(t) {
+		day = day.AddDate(0, 0, 1)
+	}
+	return day
 }
 
 // AIUsage returns the AI usage stats for email over the period, at day granularity.
@@ -324,16 +335,17 @@ func (s *StatsService) AIUsage(email string, p utils.Period) (*AIUsageStats, err
 	if err != nil {
 		return nil, err
 	}
-	firstDay, lastDay := days(w)
-	providers, err := s.ai.Providers(w.Email, firstDay, lastDay)
+	start, end := days(w)
+	fromDay, toDay := start.Format(dayLayout), end.Format(dayLayout)
+	providers, err := s.ai.Providers(w.Email, fromDay, toDay)
 	if err != nil {
 		return nil, err
 	}
-	decisions, err := s.ai.ToolDecisions(w.Email, firstDay, lastDay)
+	decisions, err := s.ai.ToolDecisions(w.Email, fromDay, toDay)
 	if err != nil {
 		return nil, err
 	}
-	monthly, err := s.ai.Monthly(w.Email, firstDay, lastDay)
+	monthly, err := s.ai.Monthly(w.Email, fromDay, toDay)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +356,8 @@ func (s *StatsService) AIUsage(email string, p utils.Period) (*AIUsageStats, err
 		ToolEditsRejected: decisions.ToolEditsRejected,
 		Monthly:           convert(monthly, func(r repositories.AIMonthlyRow) AIMonthlyUsage { return AIMonthlyUsage(r) }),
 	}
-	lastMonth := w.To.Format(monthLayout)
+	// The last month is the month of the last day in the range, so a November range is judged on November.
+	lastMonth := end.AddDate(0, 0, -1).Format(monthLayout)
 	for _, m := range out.Monthly {
 		if m.Month == lastMonth {
 			out.ActiveInLastMonth = true
@@ -360,16 +373,17 @@ func (s *StatsService) AICost(email string, p utils.Period) (*AICostStats, error
 	if err != nil {
 		return nil, err
 	}
-	firstDay, lastDay := days(w)
-	models, err := s.ai.ModelCosts(w.Email, firstDay, lastDay)
+	start, end := days(w)
+	fromDay, toDay := start.Format(dayLayout), end.Format(dayLayout)
+	models, err := s.ai.ModelCosts(w.Email, fromDay, toDay)
 	if err != nil {
 		return nil, err
 	}
-	total, err := s.ai.TotalCost(w.Email, firstDay, lastDay)
+	total, err := s.ai.TotalCost(w.Email, fromDay, toDay)
 	if err != nil {
 		return nil, err
 	}
-	monthly, err := s.ai.MonthlyCosts(w.Email, firstDay, lastDay)
+	monthly, err := s.ai.MonthlyCosts(w.Email, fromDay, toDay)
 	if err != nil {
 		return nil, err
 	}
