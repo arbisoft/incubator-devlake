@@ -981,12 +981,12 @@
       },
       "id": 17,
       "panels": [],
-      "title": "Merged PR Details",
+      "title": "Merged PRs by Author",
       "type": "row"
     },
     {
       "datasource": "mysql",
-      "description": "Merged pull requests in the selected project(s) and time range, by merge date, with one row per repository and author, most PRs first. Use it to compare how much each person merged and how much of it Claude co-authored.\n\n- **PRs** is the number of merged PRs.\n- **Branches** counts the distinct head branches those PRs were merged from.\n- **Approvers** counts the distinct reviewers whose latest approve, request-changes or dismissed review on at least one of the PRs is an approval, so an approval that was later withdrawn or dismissed isn't counted. GitHub reviews and GitLab approvals are recorded; Bitbucket and Bitbucket Server PRs count none.\n- **Files Changed** counts distinct file paths across the PRs' single-parent commits, which include a squash or rebase merge result, so a file touched by several PRs counts once. A two-parent merge commit is skipped. It needs commit file data from the git extractor (`SKIP_COMMIT_FILES=false`; the default is `true`) and shows *n/a* when none of the PRs' commits have it. For rebase-merged PRs whose branch was deleted, only the last rebased commit is in the clone, so the count is low.\n- **Claude Co-Authored** is the share of PRs where any commit, or the merge commit, has a `Co-Authored-By:` line with `noreply@anthropic.com`. Commit messages come from the cloned repository and, for GitHub, from the PR commits the GitHub plugin collects, so squash- and rebase-merged PRs are still checked after their branch is deleted. PRs with no commit message found are left out of the percentage, and it shows *Unknown* when none of the PRs have one. Release and back-merge PRs carry every commit they promote, so they count when any of those commits are co-authored.",
+      "description": "Merged pull requests in the selected project(s) and time range, by merge date, with one row per repository and author, most PRs first. Use it to compare how much each person merged and how much of it Claude co-authored. Click a PRs value to open those PRs in the Merged PR Details dashboard.\n\n- **PRs** is the number of merged PRs. The total can differ from the **PRs Merged** stat above, which counts only PRs in `project_pr_metrics`, and only the DORA plugin fills that table.\n- **Branches** counts the distinct head branches those PRs were merged from.\n- **Approvers** counts the distinct reviewers whose latest approve, request-changes or dismissed review on at least one of the PRs is an approval, so an approval that was later withdrawn or dismissed isn't counted. GitHub reviews and GitLab approvals are recorded. Bitbucket and Bitbucket Server don't record reviews, so they show *n/a*. For GitHub, the GraphQL collector reads at most 100 reviews per PR.\n- **Files Changed** counts distinct file paths across the PRs' single-parent commits, which include a squash or rebase merge result, so a file touched by several PRs counts once. A two-parent merge commit is skipped. It needs commit file data from the git extractor (`SKIP_COMMIT_FILES=false`; the default is `true`) and shows *n/a* when none of the PRs' commits have it. For rebase-merged PRs whose branch was deleted, only the last rebased commit is in the clone, so the count is low.\n- **PRs with File Data** is how many of the PRs have that file data. When it is lower than PRs, Files Changed covers only those PRs.\n- **Claude Co-Authored** is the share of PRs where any commit, or the merge commit, has a `Co-Authored-By:` line with `noreply@anthropic.com`. Commit messages come from the cloned repository and, for GitHub, from the PR commits the GitHub plugin collects, so squash- and rebase-merged PRs are still checked after their branch is deleted. For GitHub, the GraphQL collector reads only the first 100 commits of a PR. A two-parent merge commit without that line isn't counted as a No, so a GitLab MR whose only stored commit is its merge commit is left out. PRs with no commit message found are left out of the percentage, and it shows *Unknown* when none of the PRs have one. Release and back-merge PRs carry every commit they promote, so they count when any of those commits are co-authored.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -1031,6 +1031,15 @@
               {
                 "id": "custom.width",
                 "value": 90
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open these PRs in Merged PR Details",
+                    "url": "/d/merged_pr_details/merged-pr-details?orgId=1&${project:queryparam}&var-repo_id=${__data.fields.repo_id}&var-developer=${__data.fields.developer}&${__url_time_range}"
+                  }
+                ]
               }
             ]
           },
@@ -1055,6 +1064,21 @@
               {
                 "id": "custom.width",
                 "value": 100
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "n/a",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
               }
             ]
           },
@@ -1142,6 +1166,42 @@
                 ]
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PRs with File Data"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repo_id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "developer"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1179,7 +1239,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH prs AS (\n  SELECT pr.id, pr.base_repo_id, pr.pull_request_key, pr.url, pr.title, pr.head_ref, pr.author_id, pr.author_name, pr.merged_date, pr.merge_commit_sha\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT pm.row_id FROM project_mapping pm WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)))\n    AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n    AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n),\npr_commits AS (\n  SELECT prc.pull_request_id, prc.commit_sha FROM pull_request_commits prc WHERE prc.pull_request_id IN (SELECT id FROM prs)\n  UNION\n  SELECT id, merge_commit_sha FROM prs WHERE merge_commit_sha <> ''\n),\nclaude AS (\n  SELECT m.pull_request_id, SUM(m.claude) AS commits\n  FROM (\n    SELECT pc.pull_request_id, CONVERT(c.message USING utf8mb4) LIKE '%noreply@anthropic.com%' AND REGEXP_LIKE(CONVERT(c.message USING utf8mb4), 'co-authored-by:.*noreply@anthropic[.]com', 'i') AS claude\n    FROM pr_commits pc JOIN commits c ON c.sha = pc.commit_sha\n    UNION ALL\n    SELECT pc.pull_request_id, gc.message LIKE '%noreply@anthropic.com%' AND REGEXP_LIKE(gc.message, 'co-authored-by:.*noreply@anthropic[.]com', 'i')\n    FROM pr_commits pc JOIN _tool_github_commits gc ON gc.sha = pc.commit_sha\n  ) m\n  GROUP BY m.pull_request_id\n),\nfile_commits AS (\n  SELECT pc.pull_request_id, pc.commit_sha\n  FROM pr_commits pc\n  WHERE EXISTS (SELECT 1 FROM commit_files cf WHERE cf.commit_sha = pc.commit_sha)\n    AND (SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = pc.commit_sha) <= 1\n),\nfiles AS (\n  SELECT prs.base_repo_id, prs.author_id, COUNT(DISTINCT cf.file_path) AS files\n  FROM prs\n  JOIN file_commits fc ON fc.pull_request_id = prs.id\n  JOIN commit_files cf ON cf.commit_sha = fc.commit_sha\n  GROUP BY prs.base_repo_id, prs.author_id\n),\nlatest_reviews AS (\n  SELECT c.pull_request_id, c.account_id, c.status,\n    ROW_NUMBER() OVER (PARTITION BY c.pull_request_id, c.account_id ORDER BY c.created_date DESC, c.id DESC) AS rn\n  FROM pull_request_comments c\n  WHERE c.status IN ('APPROVED', 'CHANGES_REQUESTED', 'DISMISSED') AND c.pull_request_id IN (SELECT id FROM prs)\n),\napprovers AS (\n  SELECT prs.base_repo_id, prs.author_id, COUNT(DISTINCT lr.account_id) AS approvers\n  FROM latest_reviews lr JOIN prs ON prs.id = lr.pull_request_id\n  WHERE lr.rn = 1 AND lr.status = 'APPROVED'\n  GROUP BY prs.base_repo_id, prs.author_id\n),\ngrouped AS (\n  SELECT prs.base_repo_id, prs.author_id, MAX(prs.author_name) AS author_name,\n    COUNT(*) AS prs,\n    COUNT(DISTINCT prs.head_ref) AS branches,\n    SUM(cl.commits > 0) AS claude_prs,\n    COUNT(cl.pull_request_id) AS known_prs\n  FROM prs\n  LEFT JOIN claude cl ON cl.pull_request_id = prs.id\n  GROUP BY prs.base_repo_id, prs.author_id\n)\nSELECT\n  r.name AS \"Repository\",\n  COALESCE(NULLIF(au.full_name, ''), g.author_name) AS \"Author\",\n  g.prs AS \"PRs\",\n  g.branches AS \"Branches\",\n  COALESCE(ap.approvers, 0) AS \"Approvers\",\n  f.files AS \"Files Changed\",\n  100 * g.claude_prs / NULLIF(g.known_prs, 0) AS \"Claude Co-Authored\"\nFROM grouped g\nLEFT JOIN repos r ON r.id = g.base_repo_id\nLEFT JOIN accounts au ON au.id = g.author_id\nLEFT JOIN files f ON f.base_repo_id = g.base_repo_id AND f.author_id <=> g.author_id\nLEFT JOIN approvers ap ON ap.base_repo_id = g.base_repo_id AND ap.author_id <=> g.author_id\nORDER BY g.prs DESC, r.name, 2",
+          "rawSql": "WITH prs AS (\n  SELECT pr.id, pr.base_repo_id, pr.head_ref, pr.author_id, pr.author_name, pr.merge_commit_sha\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT pm.row_id FROM project_mapping pm WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)))\n    AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n    AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n),\npr_commits AS (\n  SELECT prc.pull_request_id, prc.commit_sha FROM pull_request_commits prc WHERE prc.pull_request_id IN (SELECT id FROM prs)\n  UNION\n  SELECT id, merge_commit_sha FROM prs WHERE merge_commit_sha <> ''\n),\nmerge_commits AS (\n  -- The PRs' two-parent merge commits, found once for claude and file_commits.\n  SELECT cp.commit_sha FROM commit_parents cp\n  WHERE cp.commit_sha IN (SELECT commit_sha FROM pr_commits)\n  GROUP BY cp.commit_sha HAVING COUNT(*) > 1\n),\nclaude AS (\n  SELECT m.pull_request_id, SUM(m.claude) AS commits\n  FROM (\n    SELECT pc.pull_request_id, CONVERT(c.message USING utf8mb4) LIKE '%noreply@anthropic.com%' AND REGEXP_LIKE(CONVERT(c.message USING utf8mb4), 'co-authored-by:[^\\\\n\\\\\\\\]*noreply@anthropic[.]com', 'i') AS claude,\n      pc.commit_sha IN (SELECT commit_sha FROM merge_commits) AS is_merge\n    FROM pr_commits pc JOIN commits c ON c.sha = pc.commit_sha\n    UNION ALL\n    -- The column is utf8mb4_bin, so it is converted for the LIKE to ignore case, as above.\n    SELECT pc.pull_request_id, CONVERT(gc.message USING utf8mb4) LIKE '%noreply@anthropic.com%' AND REGEXP_LIKE(CONVERT(gc.message USING utf8mb4), 'co-authored-by:[^\\\\n\\\\\\\\]*noreply@anthropic[.]com', 'i'), 0\n    FROM pr_commits pc JOIN _tool_github_commits gc ON gc.sha = pc.commit_sha\n  ) m\n  -- A two-parent merge commit counts only when it has the trailer. Its \"Merge branch\" message isn't\n  -- evidence for No, so a GitLab MR whose only stored commit is its merge commit stays Unknown.\n  WHERE m.claude OR NOT m.is_merge\n  GROUP BY m.pull_request_id\n),\nfile_commits AS (\n  SELECT pc.pull_request_id, pc.commit_sha\n  FROM pr_commits pc\n  WHERE EXISTS (SELECT 1 FROM commit_files cf WHERE cf.commit_sha = pc.commit_sha)\n    AND pc.commit_sha NOT IN (SELECT commit_sha FROM merge_commits)\n),\nfiles AS (\n  -- prs counts the PRs that have commit file data, so a partial Files Changed can be seen as such.\n  SELECT prs.base_repo_id, prs.author_id, COUNT(DISTINCT cf.file_path) AS files, COUNT(DISTINCT fc.pull_request_id) AS prs\n  FROM prs\n  JOIN file_commits fc ON fc.pull_request_id = prs.id\n  JOIN commit_files cf ON cf.commit_sha = fc.commit_sha\n  GROUP BY prs.base_repo_id, prs.author_id\n),\nlatest_reviews AS (\n  SELECT c.pull_request_id, c.account_id, c.status,\n    ROW_NUMBER() OVER (PARTITION BY c.pull_request_id, c.account_id ORDER BY c.created_date DESC, c.id DESC) AS rn\n  FROM pull_request_comments c\n  WHERE c.status IN ('APPROVED', 'CHANGES_REQUESTED', 'DISMISSED') AND c.pull_request_id IN (SELECT id FROM prs)\n),\napprovers AS (\n  SELECT prs.base_repo_id, prs.author_id, COUNT(DISTINCT lr.account_id) AS approvers\n  FROM latest_reviews lr JOIN prs ON prs.id = lr.pull_request_id\n  WHERE lr.rn = 1 AND lr.status = 'APPROVED'\n  GROUP BY prs.base_repo_id, prs.author_id\n),\ngrouped AS (\n  -- The default 256KB join buffer makes the join with claude spill to disk over long ranges.\n  SELECT /*+ SET_VAR(join_buffer_size=67108864) */ prs.base_repo_id, prs.author_id, MAX(prs.author_name) AS author_name,\n    COUNT(*) AS prs,\n    COUNT(DISTINCT prs.head_ref) AS branches,\n    SUM(cl.commits > 0) AS claude_prs,\n    COUNT(cl.pull_request_id) AS known_prs\n  FROM prs\n  LEFT JOIN claude cl ON cl.pull_request_id = prs.id\n  GROUP BY prs.base_repo_id, prs.author_id\n)\nSELECT\n  r.name AS \"Repository\",\n  COALESCE(NULLIF(au.full_name, ''), g.author_name) AS \"Author\",\n  g.prs AS \"PRs\",\n  g.branches AS \"Branches\",\n  -- Bitbucket and Bitbucket Server don't record reviews, so NULL shows n/a there instead of 0.\n  IF(g.base_repo_id LIKE 'bitbucket%', NULL, COALESCE(ap.approvers, 0)) AS \"Approvers\",\n  f.files AS \"Files Changed\",\n  COALESCE(f.prs, 0) AS \"PRs with File Data\",\n  100 * g.claude_prs / NULLIF(g.known_prs, 0) AS \"Claude Co-Authored\",\n  -- Hidden; the PRs link opens Merged PR Details on this repository and author. Authors without a\n  -- GitHub account can't be picked there, so they open it for all developers.\n  g.base_repo_id AS \"repo_id\",\n  IF(g.author_id LIKE 'github:GithubAccount:%', CONCAT('gh:', SUBSTRING_INDEX(g.author_id, ':', -1)), CONCAT('$', '__all')) AS \"developer\"\nFROM grouped g\nLEFT JOIN repos r ON r.id = g.base_repo_id\nLEFT JOIN accounts au ON au.id = g.author_id\nLEFT JOIN files f ON f.base_repo_id = g.base_repo_id AND f.author_id <=> g.author_id\nLEFT JOIN approvers ap ON ap.base_repo_id = g.base_repo_id AND ap.author_id <=> g.author_id\nORDER BY g.prs DESC, r.name, 2",
           "refId": "A"
         }
       ],
