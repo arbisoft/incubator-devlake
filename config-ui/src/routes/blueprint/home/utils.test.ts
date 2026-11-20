@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 
 import { IBPMode } from '@/types';
 
-import { STATUS_FILTER, TYPE_FILTER_ALL } from './constants';
+import { STATUS_FILTER } from './constants';
 import { buildBlueprintCreatePayload, buildBlueprintQuery, getTypeOptions, toEnableParam, toStatusKey } from './utils';
 
 describe('routes/blueprint/home/utils', () => {
@@ -53,29 +53,31 @@ describe('blueprint list query', () => {
     expect(toStatusKey(false)).toBe(STATUS_FILTER.DISABLED);
   });
 
-  it('keeps the list query and upper-cases the type as before', () => {
-    expect(buildBlueprintQuery(QUERY, { type: 'Daily', status: STATUS_FILTER.ENABLED })).toEqual({
+  const NO_FILTERS = { connection: [], type: [], projectName: [], status: STATUS_FILTER.ALL };
+
+  it('keeps the list query, upper-cases the types and passes the other filters through', () => {
+    expect(
+      buildBlueprintQuery(QUERY, {
+        connection: ['github:1'],
+        type: ['Daily', 'Weekly'],
+        projectName: ['alpha'],
+        status: STATUS_FILTER.ENABLED,
+      }),
+    ).toEqual({
       ...QUERY,
-      type: 'DAILY',
+      connection: ['github:1'],
+      type: ['DAILY', 'WEEKLY'],
+      projectName: ['alpha'],
       enable: true,
     });
   });
 
-  it('sends the all type and no enable filter by default', () => {
-    expect(buildBlueprintQuery(QUERY, { type: TYPE_FILTER_ALL, status: STATUS_FILTER.ALL })).toMatchObject({
-      type: 'ALL',
-      enable: undefined,
-    });
+  it('sends no type, connection or enable filter by default', () => {
+    expect(buildBlueprintQuery(QUERY, NO_FILTERS)).toMatchObject({ type: undefined, enable: undefined });
   });
 
-  it('offers all, then every frequency, as type options', () => {
-    expect(getTypeOptions().map(({ value }) => value)).toEqual([
-      TYPE_FILTER_ALL,
-      'Manual',
-      'Daily',
-      'Weekly',
-      'Monthly',
-      'Custom',
-    ]);
+  it('offers every frequency as a filter option', () => {
+    expect(getTypeOptions().map(({ value }) => value)).toEqual(['Manual', 'Daily', 'Weekly', 'Monthly', 'Custom']);
+    expect(getTypeOptions().every(({ text, value }) => text === value)).toBe(true);
   });
 });

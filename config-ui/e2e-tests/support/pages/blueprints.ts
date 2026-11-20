@@ -20,7 +20,7 @@ import { Locator } from '@playwright/test';
 import { BLUEPRINT_HOME_COPY as COPY } from '../app-copy';
 
 import { BlueprintViews, type BlueprintViewKey } from './blueprint-detail';
-import { BasePage, Screen, firstCellTexts, segmentedOption, urlEndingWith } from './common';
+import { BasePage, Screen, clearColumnFilter, filterColumn, firstCellTexts, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
 export class BlueprintPage extends BasePage implements Screen {
@@ -46,8 +46,12 @@ export class BlueprintPage extends BasePage implements Screen {
     await box.press('Enter');
   }
 
-  async filterByStatus(label: string): Promise<void> {
-    await segmentedOption(this.page, label).click();
+  async filterColumn(columnName: string, optionTexts: string[]): Promise<void> {
+    await filterColumn(this.page, columnName, optionTexts);
+  }
+
+  async clearColumnFilter(columnName: string): Promise<void> {
+    await clearColumnFilter(this.page, columnName);
   }
 
   noResults(): Locator {

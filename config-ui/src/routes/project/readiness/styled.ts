@@ -18,7 +18,7 @@
 
 import styled, { type DefaultTheme } from 'styled-components';
 
-import { textStyle } from '@/ui/style-helpers';
+import { CountTag } from '@/ui/list-popover';
 
 import { SIGNAL_STATE } from './constants';
 import type { ReadinessSignalState } from './types';
@@ -42,10 +42,4 @@ export const IconBox = styled.span<{ $state: ReadinessSignalState; $large: boole
   border-radius: ${({ theme }) => theme.radius.pill}px;
 `;
 
-export const Tag = styled.span`
-  ${textStyle('captionStrong')}
-  padding: 0 ${({ theme }) => theme.space.xs}px;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  background: ${({ theme }) => theme.colors.bgElevated};
-  border-radius: ${({ theme }) => theme.radius.sm}px;
-`;
+export const Tag = CountTag;

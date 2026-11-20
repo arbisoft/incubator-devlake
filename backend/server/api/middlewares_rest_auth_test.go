@@ -219,3 +219,29 @@ func TestRestAuthPercentEncodedPathReachesHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestPathAllowedMatchesTheWholePath(t *testing.T) {
+	tests := []struct {
+		pattern, path string
+		want          bool
+	}{
+		{".*", "/stats/abc@arbisoft.com/jira", true},
+		{"^/(is_valid|stats/.+)$", "/is_valid", true},
+		{"^/(is_valid|stats/.+)$", "/stats/abc@arbisoft.com/ai_cost", true},
+		{"^/(is_valid|stats/.+)$", "/api-keys", false},
+		{"/stats/.+", "/stats/abc@arbisoft.com/jira", true},
+		{"/stats/.+", "/push/api_keys?x=/stats/a", false},
+		{"/projects", "/projects/x", false},
+		{"/projects|/blueprints", "/blueprints", true},
+		{"/projects|/blueprints", "/blueprints/1/trigger", false},
+	}
+	for _, tc := range tests {
+		got, err := pathAllowed(tc.pattern, tc.path)
+		if err != nil || got != tc.want {
+			t.Errorf("pathAllowed(%q, %q) = (%v, %v), want %v", tc.pattern, tc.path, got, err, tc.want)
+		}
+	}
+	if _, err := pathAllowed("(", "/x"); err == nil {
+		t.Error("pathAllowed with a bad pattern returned no error")
+	}
+}

@@ -356,22 +356,24 @@ func (c *rawConverter) replayBatch(batch *models.OtelMetricBatch, rangeStart, ra
 			return c.replayBatchFailure(batch, permanentConversionError(errorUnsupportedTemporality, "replay batch %d contains cumulative telemetry; a predecessor checkpoint is required", batch.ID))
 		}
 	}
-	for _, update := range prepared.updates {
-		if update.hour.Before(rangeStart) || !update.hour.Before(rangeEnd) {
-			continue
-		}
-		key := hourlyAggregateKey(update)
-		aggregate := aggregates[key]
-		if aggregate == nil {
-			aggregate = &hourlyAggregate{update: update, value: new(big.Rat), lastObservedAt: update.observedAt}
-			aggregates[key] = aggregate
-		}
-		aggregate.value.Add(aggregate.value, update.value.value)
-		if update.observedAt.Before(aggregate.update.observedAt) {
-			aggregate.update.observedAt = update.observedAt
-		}
-		if update.observedAt.After(aggregate.lastObservedAt) {
-			aggregate.lastObservedAt = update.observedAt
+	for _, point := range prepared.updates {
+		for _, update := range pointFacts(point) {
+			if update.hour.Before(rangeStart) || !update.hour.Before(rangeEnd) {
+				continue
+			}
+			key := hourlyAggregateKey(update)
+			aggregate := aggregates[key]
+			if aggregate == nil {
+				aggregate = &hourlyAggregate{update: update, value: new(big.Rat), lastObservedAt: update.observedAt}
+				aggregates[key] = aggregate
+			}
+			aggregate.value.Add(aggregate.value, update.value.value)
+			if update.observedAt.Before(aggregate.update.observedAt) {
+				aggregate.update.observedAt = update.observedAt
+			}
+			if update.observedAt.After(aggregate.lastObservedAt) {
+				aggregate.lastObservedAt = update.observedAt
+			}
 		}
 	}
 	return true, nil, nil
@@ -385,8 +387,9 @@ func (c *rawConverter) replayBatchFailure(batch *models.OtelMetricBatch, err err
 }
 
 func hourlyAggregateKey(update factUpdate) string {
-	return fmt.Sprintf("%d\x00%d\x00%s\x00%d\x00%s\x00%s\x00%s\x00%s\x00%s",
-		update.fact, update.connection.ID, update.identity.key, update.hour.Unix(), update.model, update.query, update.tool, update.language, update.column)
+	return fmt.Sprintf("%d\x00%d\x00%s\x00%d\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s",
+		update.fact, update.connection.ID, update.identity.key, update.hour.Unix(), update.model, update.query, update.tool, update.language,
+		update.effort, update.agent, update.skill, update.decisionSource, update.sessionID, update.startType, update.column)
 }
 
 // commitReplayDay fences both leases and replaces one completed UTC day atomically. The
@@ -434,7 +437,7 @@ func (c *rawConverter) lockReplayLeases(tx dal.Transaction, requestID uint64, le
 
 func (c *rawConverter) replaceReplayRange(tx dal.Transaction, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate) error {
 	hourRange := dal.Where("hour_start >= ? AND hour_start < ?", rangeStart, rangeEnd)
-	for _, fact := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}} {
+	for _, fact := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}, &models.OtelHourlySessionStart{}} {
 		if err := tx.Delete(fact, hourRange); err != nil {
 			return fmt.Errorf("delete hourly facts for replay: %w", err)
 		}
@@ -459,6 +462,10 @@ func (c *rawConverter) replaceReplayRange(tx dal.Transaction, rangeStart, rangeE
 	}
 	updates := make([]factUpdate, 0, len(aggregates))
 	for _, aggregate := range aggregates {
+		// An unchanged cumulative session count starts no session.
+		if aggregate.update.fact == hourlySessionStartFact && aggregate.value.Sign() == 0 {
+			continue
+		}
 		if err := upsertHourlyFact(tx, aggregate.update, metricNumber{value: aggregate.value}, aggregate.lastObservedAt); err != nil {
 			return fmt.Errorf("write replayed hourly facts: %w", err)
 		}

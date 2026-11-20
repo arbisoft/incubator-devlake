@@ -22,17 +22,22 @@ import { useMemo, useRef } from 'react';
 
 import { BLUEPRINT_VIEW, getCron, PATHS } from '@/config';
 import { PipelineStatusBadge } from '@/routes/pipeline';
-import { RowLink } from '@/ui';
+import { RowLink, listFilterProps, type ListFilterOption } from '@/ui';
 import { formatTime } from '@/utils';
 
 import type { ProjectReadiness } from '../readiness';
 
 import { ConnectionsCell, ReadinessCell } from './components';
-import { COPY, NO_CONNECTIONS, PROJECT_COLUMN } from './constants';
-import type { ProjectRow } from './types';
+import { COPY, LAST_RUN_STATUS_OPTIONS, NO_CONNECTIONS, PROJECT_COLUMN } from './constants';
+import type { ProjectFilters, ProjectRow } from './types';
 import { getConnectionEntries } from './utils';
 
-export const useProjectColumns = (onConfigure: (name: string) => void, readiness: Map<string, ProjectReadiness>) => {
+export const useProjectColumns = (
+  onConfigure: (name: string) => void,
+  readiness: Map<string, ProjectReadiness>,
+  filters: ProjectFilters,
+  connectionOptions: ListFilterOption[],
+) => {
   const nameRef = useRef<HTMLAnchorElement>(null);
   const connectionRef = useRef<HTMLButtonElement>(null);
   const configRef = useRef<HTMLButtonElement>(null);
@@ -53,6 +58,7 @@ export const useProjectColumns = (onConfigure: (name: string) => void, readiness
       {
         key: PROJECT_COLUMN.CONNECTIONS,
         title: COPY.columns.connections,
+        ...listFilterProps<ProjectRow>(filters.connection, connectionOptions, { search: true }),
         render: (_, row) => {
           const entries = getConnectionEntries(row);
           return entries.length === 0 ? (
@@ -90,6 +96,7 @@ export const useProjectColumns = (onConfigure: (name: string) => void, readiness
         key: PROJECT_COLUMN.LAST_RUN_STATUS,
         title: COPY.columns.lastRunStatus,
         dataIndex: 'lastRunStatus',
+        ...listFilterProps<ProjectRow>(filters.lastRunStatus, LAST_RUN_STATUS_OPTIONS),
         render: (status?: ProjectRow['lastRunStatus']) => (status ? <PipelineStatusBadge status={status} /> : '-'),
       },
       {
@@ -109,7 +116,7 @@ export const useProjectColumns = (onConfigure: (name: string) => void, readiness
         ),
       },
     ],
-    [onConfigure, readiness],
+    [onConfigure, readiness, filters.connection, filters.lastRunStatus, connectionOptions],
   );
 
   return { columns, tourRefs: { nameRef, connectionRef, configRef } };

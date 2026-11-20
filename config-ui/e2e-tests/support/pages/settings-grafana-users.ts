@@ -53,8 +53,12 @@ export class GrafanaUserRow {
     });
   }
 
-  get moreActionsButton(): Locator {
-    return this.root.getByRole('button', { name: GRAFANA_USERS_COPY.actions.moreFor(this.email), exact: true });
+  get editDetailsButton(): Locator {
+    return this.root.getByRole('button', { name: GRAFANA_USERS_COPY.actions.editDetailsFor(this.email), exact: true });
+  }
+
+  get setPasswordButton(): Locator {
+    return this.root.getByRole('button', { name: GRAFANA_USERS_COPY.actions.setPasswordFor(this.email), exact: true });
   }
 
   get disableButton(): Locator {
@@ -72,11 +76,6 @@ export class GrafanaUserRow {
   async chooseRole(role: string): Promise<void> {
     await this.roleSelect.click();
     await chooseOption(this.page, role);
-  }
-
-  async openMoreAction(label: string): Promise<void> {
-    await this.moreActionsButton.click();
-    await this.page.getByRole('menuitem', { name: label, exact: true }).click();
   }
 
   async requestDisable(): Promise<void> {
@@ -119,6 +118,18 @@ export class SettingsGrafanaUsersPage extends BasePage {
 
   get table(): Locator {
     return this.usersCard.getByRole('table', { name: GRAFANA_USERS_COPY.tableLabel, exact: true });
+  }
+
+  get tableScroller(): Locator {
+    return this.usersCard.locator('.ant-table-content');
+  }
+
+  async tableScrollsSideways(): Promise<boolean> {
+    return this.tableScroller.evaluate((element) => element.scrollWidth > element.clientWidth);
+  }
+
+  async resizeViewport(width: number, height: number): Promise<void> {
+    await this.page.setViewportSize({ width, height });
   }
 
   get addUserButton(): Locator {
@@ -204,12 +215,12 @@ export class SettingsGrafanaUsersPage extends BasePage {
   }
 
   async openDetails(email: string): Promise<GrafanaUserFormDialog> {
-    await (await this.openUser(email)).openMoreAction(GRAFANA_USERS_COPY.actions.editDetails);
+    await (await this.openUser(email)).editDetailsButton.click();
     return new GrafanaUserFormDialog(this.page, GRAFANA_USERS_COPY.details.title, GRAFANA_USERS_COPY.details.submit);
   }
 
   async openSetPassword(email: string): Promise<GrafanaUserFormDialog> {
-    await (await this.openUser(email)).openMoreAction(GRAFANA_USERS_COPY.actions.setPassword);
+    await (await this.openUser(email)).setPasswordButton.click();
     return new GrafanaUserFormDialog(
       this.page,
       GRAFANA_USERS_COPY.setPassword.title,

@@ -17,7 +17,7 @@
  */
 
 import { intersection } from 'lodash';
-import { redirect } from 'react-router-dom';
+import { redirect, type ShouldRevalidateFunction } from 'react-router-dom';
 
 import API from '@/api';
 import { PATHS } from '@/config';
@@ -61,3 +61,14 @@ export const layoutLoader = async ({ request }: Props) => {
     access,
   };
 };
+
+// A search-only change on the same page leaves the shell data unchanged
+export const layoutShouldRevalidate: ShouldRevalidateFunction = ({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}) =>
+  !formMethod && currentUrl.pathname === nextUrl.pathname && currentUrl.search !== nextUrl.search
+    ? false
+    : defaultShouldRevalidate;

@@ -35,7 +35,7 @@ vi.mock('@/hooks', () => ({
   useAppSelector: () => undefined,
   useRefreshData: () => ({ ready: true, data: CONFIGS, error: undefined }),
 }));
-vi.mock('@/plugins/utils', () => ({ getPluginConfig: () => ({ icon: () => null }) }));
+vi.mock('@/plugins/utils', () => ({ getConnectorVisual: () => ({ icon: () => null }) }));
 vi.mock('../connection-modal', () => ({ ConnectionModal: () => null }));
 vi.mock('../scope-config-form', () => ({ ScopeConfigForm: () => null }));
 
