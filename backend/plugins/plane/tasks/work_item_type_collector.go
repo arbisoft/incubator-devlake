@@ -38,22 +38,12 @@ var CollectWorkItemTypesMeta = plugin.SubTaskMeta{
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }
 
-func CollectWorkItemTypes(taskCtx plugin.SubTaskContext) errors.Error {
-	data := taskCtx.GetData().(*PlaneTaskData)
-
-	collector, err := api.NewApiCollector(api.ApiCollectorArgs{
-		RawDataSubTaskArgs: api.RawDataSubTaskArgs{
-			Ctx: taskCtx,
-			Params: PlaneApiParams{
-				ConnectionId:  data.Options.ConnectionId,
-				WorkspaceSlug: data.Project.WorkspaceSlug,
-				ProjectId:     data.Options.ProjectId,
-			},
-			Table: RAW_WORK_ITEM_TYPE_TABLE,
-		},
-		ApiClient:   data.ApiClient,
-		PageSize:    100,
-		UrlTemplate: "api/v1/workspaces/{{ .Params.WorkspaceSlug }}/projects/{{ .Params.ProjectId }}/work-item-types/",
+func planeWorkItemTypeCollectorArgs(apiClient api.RateLimitedApiClient) api.ApiCollectorArgs {
+	return api.ApiCollectorArgs{
+		ApiClient:     apiClient,
+		PageSize:      100,
+		AfterResponse: ignoreHTTPStatus404,
+		UrlTemplate:   "api/v1/workspaces/{{ .Params.WorkspaceSlug }}/projects/{{ .Params.ProjectId }}/work-item-types/",
 		Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
 			query := url.Values{}
 			query.Set("limit", "100")
@@ -80,7 +70,23 @@ func CollectWorkItemTypes(taskCtx plugin.SubTaskContext) errors.Error {
 			}
 			return result, nil
 		},
-	})
+	}
+}
+
+func CollectWorkItemTypes(taskCtx plugin.SubTaskContext) errors.Error {
+	data := taskCtx.GetData().(*PlaneTaskData)
+
+	args := planeWorkItemTypeCollectorArgs(data.ApiClient)
+	args.RawDataSubTaskArgs = api.RawDataSubTaskArgs{
+		Ctx: taskCtx,
+		Params: PlaneApiParams{
+			ConnectionId:  data.Options.ConnectionId,
+			WorkspaceSlug: data.Project.WorkspaceSlug,
+			ProjectId:     data.Options.ProjectId,
+		},
+		Table: RAW_WORK_ITEM_TYPE_TABLE,
+	}
+	collector, err := api.NewApiCollector(args)
 	if err != nil {
 		return err
 	}

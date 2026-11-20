@@ -148,6 +148,7 @@ func TestRollupSessionWithoutSessionIDSkipsModeQueries(t *testing.T) {
 	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
 	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Return(nil).Once()
 	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptTool"), mock.Anything).Return(nil).Once()
+	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiCommit"), mock.Anything).Return(nil).Once()
 	expectStoredAccount(tx, &crossdomain.Account{})
 
 	target := &sessionTarget{connectionID: 1, userKey: "uuid:u1", promptIDs: map[string]struct{}{"p1": {}}}
@@ -183,6 +184,7 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptTool"), mock.Anything).Return(nil).Once()
+			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiCommit"), mock.Anything).Return(nil).Once()
 			expectStoredAccount(tx, &crossdomain.Account{})
 			if modeChanged {
 				tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPermissionModeChange")).Return(nil).Once()
@@ -676,6 +678,7 @@ func TestWritePromptRollupReplacesFailures(t *testing.T) {
 			}).Return(test.clearErr).Once()
 			if test.clearErr == nil && test.writeErr == nil {
 				tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptTool"), mock.Anything).Return(nil).Once()
+				tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiCommit"), mock.Anything).Return(nil).Once()
 			}
 			for range test.wantCalls[1:] {
 				tx.EXPECT().Create(mock.AnythingOfType("[]*ai.AiPromptFailure")).Run(func(entity interface{}, _ ...dal.Clause) {

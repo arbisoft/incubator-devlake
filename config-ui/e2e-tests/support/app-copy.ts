@@ -75,3 +75,4 @@ export { COPY as OTEL_MODAL_COPY, OPTION_COPY as OTEL_OPTION_COPY } from '../../
 export { REPLAY_COPY } from '../../src/routes/otel/replay-constants';
 export { OTEL_INGESTION_STATE, OTEL_REPLAY_KIND, OTEL_STATUS } from '../../src/api/otel/constants';
 export type { OtelReplayKind } from '../../src/api/otel/types';
+export { PIPELINE_STATUS_COPY } from '../../src/routes/pipeline/status-tone';

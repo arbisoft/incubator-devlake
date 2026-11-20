@@ -63,51 +63,10 @@ export const PercentLabel = styled.span`
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
-export const PopoverBody = styled.div<{ $width: number }>`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.sm}px;
-  width: ${({ $width }) => $width}px;
-  max-width: 100%;
-`;
-
-export const PopoverHead = styled.div`
-  ${textStyle('bodyMedium')}
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.sm}px;
-  color: ${({ theme }) => theme.colors.text};
-`;
-
-export const PopoverCount = styled(Tag)`
-  border-radius: ${({ theme }) => theme.radius.pill}px;
-`;
-
 export const PopoverSubtitle = styled.p`
   ${textStyle('caption')}
   margin: 0;
   color: ${({ theme }) => theme.colors.textSecondary};
-`;
-
-export const PopoverList = styled.ul`
-  display: flex;
-  flex-direction: column;
-  max-height: ${({ theme }) => theme.layout.popoverListMaxHeight}px;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  list-style: none;
-`;
-
-export const PopoverRow = styled.li`
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.sm}px;
-  padding: ${({ theme }) => theme.space.xs}px 0;
-
-  & + & {
-    border-top: 1px solid ${({ theme }) => theme.colors.borderSubtle};
-  }
 `;
 
 export const RowCopy = styled.div`

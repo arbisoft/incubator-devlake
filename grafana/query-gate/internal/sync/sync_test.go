@@ -42,6 +42,12 @@ type dash struct {
 	spec        string
 }
 
+type v2Dash struct {
+	spec string
+	// generation overrides the list generation to simulate a change between the two reads.
+	generation int
+}
+
 const listPageSize = 2
 
 type fakeGrafana struct {
@@ -55,6 +61,15 @@ type fakeGrafana struct {
 	listCalls int
 	// failUsers makes that many user searches answer 500 before they succeed.
 	failUsers int
+	// conversionFailed marks list items whose v1 conversion failed; the list then serves an empty spec.
+	conversionFailed map[string]bool
+	// storedVersion marks list items with a stored version in their conversion status.
+	storedVersion map[string]string
+	// v2 is served by the v2 dashboard endpoint; a uid without an entry answers 404.
+	v2 map[string]v2Dash
+	// v2Status overrides the v2 endpoint's answer when non-zero.
+	v2Status int
+	v2Calls  []string
 	// appSubURL is served by /api/frontend/settings; nil leaves the endpoint missing.
 	appSubURL *string
 }
@@ -121,7 +136,15 @@ func (f *fakeGrafana) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if d.annotations != nil {
 				meta["annotations"] = d.annotations
 			}
-			items = append(items, map[string]any{"metadata": meta, "spec": json.RawMessage(d.spec)})
+			item := map[string]any{"metadata": meta, "spec": json.RawMessage(d.spec)}
+			if f.conversionFailed[uid] {
+				item["spec"] = json.RawMessage(`{}`)
+				item["status"] = map[string]any{"conversion": map[string]any{"failed": true}}
+			}
+			if sv, ok := f.storedVersion[uid]; ok {
+				item["status"] = map[string]any{"conversion": map[string]any{"failed": f.conversionFailed[uid], "storedVersion": sv}}
+			}
+			items = append(items, item)
 		}
 		next := ""
 		if end < len(uids) {
@@ -129,7 +152,29 @@ func (f *fakeGrafana) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"kind": "DashboardList", "metadata": map[string]any{"continue": next}, "items": items})
 	default:
-		http.NotFound(w, r)
+		const v2Prefix = "/apis/dashboard.grafana.app/v2/namespaces/default/dashboards/"
+		uid, isV2 := strings.CutPrefix(r.URL.Path, v2Prefix)
+		d, known := f.v2[uid]
+		if !isV2 {
+			http.NotFound(w, r)
+			return
+		}
+		f.v2Calls = append(f.v2Calls, uid)
+		if f.v2Status != 0 {
+			http.Error(w, "down", f.v2Status)
+			return
+		}
+		if !known {
+			http.NotFound(w, r)
+			return
+		}
+		base := f.dashboard[uid]
+		gen := base.generation
+		if d.generation != 0 {
+			gen = d.generation
+		}
+		meta := map[string]any{"name": uid, "generation": gen, "annotations": base.annotations}
+		_ = json.NewEncoder(w).Encode(map[string]any{"metadata": meta, "spec": json.RawMessage(d.spec)})
 	}
 }
 
@@ -532,6 +577,135 @@ func TestRootPathCheck(t *testing.T) {
 			got := s.Status().RootPathOK
 			if (got == nil) != (tt.want == nil) || (got != nil && *got != *tt.want) {
 				t.Fatalf("RootPathOK = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func v2Spec(title, sql string) string {
+	q, _ := json.Marshal(sql)
+	return fmt.Sprintf(`{"title":%q,"elements":{"panel-1":{"kind":"Panel","spec":{"title":"P","data":{"kind":"QueryGroup","spec":{"queries":[{"kind":"PanelQuery","spec":{"refId":"A","query":{"kind":"DataQuery","spec":{"rawSql":%s}}}}]}}}}}}`, title, q)
+}
+
+func v2TabSpec(title, sql string) string {
+	q, _ := json.Marshal(sql)
+	return fmt.Sprintf(`{"title":%q,"elements":{"panel-1":{"kind":"Panel","spec":{"title":"P","data":{"kind":"QueryGroup","spec":{"queries":[{"kind":"PanelQuery","spec":{"refId":"A","query":{"kind":"DataQuery","spec":{"rawSql":%s}}}}]}}}}},`+
+		`"layout":{"kind":"TabsLayout","spec":{"tabs":[{"kind":"TabsLayoutTab","spec":{"title":"T","variables":[{"kind":"CustomVariable","spec":{"name":"grp","query":"a,b"}}],`+
+		`"layout":{"kind":"GridLayout","spec":{"items":[{"kind":"GridLayoutItem","spec":{"element":{"kind":"ElementReference","name":"panel-1"}}}]}}}}]}}}`, title, q)
+}
+
+func TestSyncStoredV2FetchesV2Spec(t *testing.T) {
+	caller := templates.Caller{Login: "alice"}
+	tabSQL := "SELECT g FROM t WHERE o = ${__user.login:sqlstring} AND g = '$grp'"
+	f := newFake()
+	f.dashboard = map[string]dash{
+		"tabbed":  {2, by("user:u-root"), dashJSON("Tabbed", tabSQL)},
+		"classic": {1, by("user:u-root"), dashJSON("Classic", own)},
+	}
+	f.storedVersion = map[string]string{"tabbed": "v2", "classic": "v1beta1"}
+	f.v2 = map[string]v2Dash{"tabbed": {spec: v2TabSpec("Tabbed", tabSQL)}}
+	s := newSyncer(t, f, "svc", nil)
+	if err := s.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for sql, want := range map[string]bool{
+		"SELECT g FROM t WHERE o = 'alice' AND g = 'a'":   true,
+		"SELECT g FROM t WHERE o = 'alice' AND g = 'b'":   true,
+		"SELECT g FROM t WHERE o = 'alice' AND g = 'zzz'": false,
+		"SELECT a FROM t WHERE owner = 'alice'":           true,
+	} {
+		if got := s.Current().Match(sql, caller).Accepted; got != want {
+			t.Errorf("%q accepted = %v, want %v", sql, got, want)
+		}
+	}
+	if strings.Join(f.v2Calls, ",") != "tabbed" {
+		t.Fatalf("v2 fetches = %v", f.v2Calls)
+	}
+}
+
+func TestSyncLoadsV2SpecWhenConversionFailed(t *testing.T) {
+	caller := templates.Caller{Login: "alice"}
+	f := newFake()
+	f.dashboard = map[string]dash{
+		"admin":  {2, by("user:u-root"), `{}`},
+		"editor": {2, by("user:u-ed"), `{}`},
+	}
+	f.conversionFailed = map[string]bool{"admin": true, "editor": true}
+	f.v2 = map[string]v2Dash{
+		"admin":  {spec: v2Spec("Admin", own)},
+		"editor": {spec: v2Spec("Editor", "SELECT editor WHERE owner = ${__user.login:sqlstring}")},
+	}
+	s := newSyncer(t, f, "svc", nil)
+	if err := s.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !s.Current().Match("SELECT a FROM t WHERE owner = 'alice'", caller).Accepted {
+		t.Fatal("admin-saved v2 query not accepted")
+	}
+	if s.Current().Match("SELECT editor WHERE owner = 'alice'", caller).Accepted {
+		t.Fatal("editor-saved v2 query accepted")
+	}
+	if s.Current().Len() != 1 || strings.Join(f.v2Calls, ",") != "admin" {
+		t.Fatalf("Len = %d, v2 fetches = %v", s.Current().Len(), f.v2Calls)
+	}
+	if err := s.RunOnce(context.Background()); err != nil || len(f.v2Calls) != 1 {
+		t.Fatalf("cached generation refetched: err = %v, fetches = %v", err, f.v2Calls)
+	}
+}
+
+func TestSyncSkipsV2DashboardChangedDuringSync(t *testing.T) {
+	caller := templates.Caller{Login: "alice"}
+	f := newFake()
+	f.dashboard = map[string]dash{"d": {2, by("user:u-root"), `{}`}}
+	f.conversionFailed = map[string]bool{"d": true}
+	f.v2 = map[string]v2Dash{"d": {spec: v2Spec("D", own), generation: 3}}
+	s := newSyncer(t, f, "svc", nil)
+	var buf bytes.Buffer
+	s.logger = slog.New(slog.NewJSONHandler(&buf, nil))
+	if err := s.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if s.Current().Match("SELECT a FROM t WHERE owner = 'alice'", caller).Accepted || s.cache["d"] != nil || s.compiles != 0 {
+		t.Fatalf("changed dashboard trusted: cache = %v, compiles = %d", s.cache["d"], s.compiles)
+	}
+	if !strings.Contains(buf.String(), "dashboard skipped: changed during sync") || strings.Contains(buf.String(), "dashboard trusted") {
+		t.Fatalf("log = %s", buf.String())
+	}
+	f.edit(func() { f.v2["d"] = v2Dash{spec: v2Spec("D", own)} })
+	if err := s.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !s.Current().Match("SELECT a FROM t WHERE owner = 'alice'", caller).Accepted || s.compiles != 1 {
+		t.Fatalf("next sync did not trust the dashboard: compiles = %d", s.compiles)
+	}
+}
+
+func TestSyncV2FetchFailureSkipsOnlyThatDashboard(t *testing.T) {
+	caller := templates.Caller{Login: "alice"}
+	for name, status := range map[string]int{"missing": 0, "error": http.StatusInternalServerError} {
+		t.Run(name, func(t *testing.T) {
+			f := newFake()
+			okJSON := dashJSON("Ok", "SELECT ok WHERE o = ${__user.login:sqlstring}")
+			f.dashboard = map[string]dash{"ok": {1, by("user:u-root"), okJSON}}
+			s := newSyncer(t, f, "svc", nil)
+			if err := s.RunOnce(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if !s.Current().Match("SELECT ok WHERE o = 'alice'", caller).Accepted {
+				t.Fatal("first sync did not accept the query")
+			}
+			f.edit(func() {
+				f.dashboard["ok"] = dash{2, by("user:u-ed"), okJSON}
+				f.dashboard["v2"] = dash{1, by("user:u-root"), `{}`}
+				f.conversionFailed = map[string]bool{"v2": true}
+				f.v2 = map[string]v2Dash{}
+				f.v2Status = status
+			})
+			if err := s.RunOnce(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if s.Current().Match("SELECT ok WHERE o = 'alice'", caller).Accepted || s.Current().Len() != 0 || s.cache["v2"] != nil {
+				t.Fatalf("revocation frozen: Len = %d, cache[v2] = %v", s.Current().Len(), s.cache["v2"])
 			}
 		})
 	}

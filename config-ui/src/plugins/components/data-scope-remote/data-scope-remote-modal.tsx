@@ -20,7 +20,7 @@ import { Alert, Button, Skeleton } from 'antd';
 import { useState } from 'react';
 
 import API from '@/api';
-import { getPluginConfig } from '@/plugins/utils';
+import { getConnectorVisual } from '@/plugins/utils';
 import { COMMON_COPY, FormModal, MODAL_WIDTH, PluginIcon, toUserMessage } from '@/ui';
 import { operator } from '@/utils';
 
@@ -42,7 +42,6 @@ export const DataScopeRemoteModal = ({
 }: DataScopeRemoteModalProps) => {
   const [selectedScope, setSelectedScope] = useState<ScopeItem[]>([]);
   const [operating, setOperating] = useState(false);
-  const { icon } = getPluginConfig(plugin);
   const membershipContent = () => {
     if (loadingScopes) return <Skeleton active />;
     if (scopesLoadFailed) {
@@ -91,7 +90,7 @@ export const DataScopeRemoteModal = ({
     <FormModal
       open={open}
       title={title}
-      icon={<PluginIcon icon={icon} size="sm" />}
+      icon={<PluginIcon {...getConnectorVisual(plugin)} size="sm" />}
       width={MODAL_WIDTH.LG}
       submitLabel={COPY.submit}
       loading={operating}

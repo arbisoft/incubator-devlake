@@ -19,12 +19,18 @@ import { Locator, Page } from '@playwright/test';
 
 import { COMMON_COPY, SETTINGS_COPY, USER_MANAGEMENT_COPY } from '../app-copy';
 
-import { BasePage, Screen, firstCellTexts, modalWithText, selectBox, chooseOption, urlEndingWith } from './common';
+import {
+  ANTD_FILTER_OK,
+  ANTD_FILTER_RESET,
+  BasePage,
+  Screen,
+  firstCellTexts,
+  modalWithText,
+  selectBox,
+  chooseOption,
+  urlEndingWith,
+} from './common';
 import { PATHS } from './paths';
-
-// antd's own labels for the column filter buttons.
-const ANTD_FILTER_OK = 'OK';
-const ANTD_FILTER_RESET = 'Reset';
 
 // The one-time password dialog shown after a local user is created or reset.
 export class OneTimePasswordDialog {

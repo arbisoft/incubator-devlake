@@ -1,0 +1,490 @@
+{
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "engineering_delivery_ai_usage"
+  },
+  "spec": {
+    "title": "Engineering Delivery & AI Usage",
+    "tags": [
+      "devlake",
+      "engineering",
+      "delivery",
+      "ai"
+    ],
+    "variables": [
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "project",
+          "label": "Project",
+          "current": {
+            "text": [
+              "All"
+            ],
+            "value": [
+              "$__all"
+            ]
+          },
+          "hide": "dontHide",
+          "refresh": "onDashboardLoad",
+          "skipUrlSync": false,
+          "query": {
+            "kind": "DataQuery",
+            "group": "mysql",
+            "version": "v0",
+            "datasource": {
+              "name": "devlake-mysql"
+            },
+            "spec": {
+              "rawSql": "SELECT p.name AS __text, p.name AS __value\nFROM projects p\nWHERE p.name IN (SELECT upm.project_name FROM user_project_mapping upm WHERE upm.user_login = ${__user.login:sqlstring})\nORDER BY p.name",
+              "format": "table",
+              "rawQuery": true,
+              "editorMode": "code"
+            }
+          },
+          "regex": "",
+          "sort": "disabled",
+          "options": [],
+          "multi": true,
+          "includeAll": true,
+          "allowCustomValue": false
+        }
+      },
+      {
+        "kind": "CustomVariable",
+        "spec": {
+          "name": "grouping",
+          "label": "Group by",
+          "current": {
+            "text": "Label",
+            "value": "Label"
+          },
+          "hide": "dontHide",
+          "skipUrlSync": false,
+          "query": "Label,Board,Milestone,Epic",
+          "valuesFormat": "csv",
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": false
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "n_prs",
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "hide": "hideVariable",
+          "refresh": "onDashboardLoad",
+          "skipUrlSync": true,
+          "query": {
+            "kind": "DataQuery",
+            "group": "mysql",
+            "version": "v0",
+            "datasource": {
+              "name": "devlake-mysql"
+            },
+            "spec": {
+              "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged AS (\n  SELECT pr.id\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= NOW() - INTERVAL 7 DAY AND pr.merged_date < NOW()\n)\nSELECT COUNT(DISTINCT id) AS n_prs FROM merged",
+              "format": "table",
+              "rawQuery": true,
+              "editorMode": "code"
+            }
+          },
+          "regex": "",
+          "sort": "disabled",
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": true
+        }
+      }
+    ],
+    "elements": {
+      "panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "id": 1,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "mode": "markdown",
+                "content": "Last week the teams merged **${n_prs}** pull requests and closed **${n_tickets}** tickets, shipping **${n_deploys}** deployments to production. **${n_ai_share}** of merged PRs had AI-assisted commits, and **${n_adopt}** of engineers used Claude Code. ${n_attention_clause}",
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "id": 2,
+          "title": "Prod deploys",
+          "description": "Successful prod deployments, last 7 days, vs the 7 before.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, deploys AS (\n  SELECT dc.cicd_deployment_id, dc.finished_date\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%'\n    AND dc.finished_date >= NOW() - INTERVAL 14 DAY AND dc.finished_date < NOW()\n)\nSELECT NOW() - INTERVAL 7 DAY AS time, COUNT(DISTINCT cicd_deployment_id) AS value FROM deploys WHERE finished_date < NOW() - INTERVAL 7 DAY\nUNION ALL\nSELECT NOW() AS time, COUNT(DISTINCT cicd_deployment_id) AS value FROM deploys WHERE finished_date >= NOW() - INTERVAL 7 DAY",
+                        "format": "table",
+                        "rawQuery": true,
+                        "editorMode": "code"
+                      }
+                    }
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "graphMode": "none",
+                "colorMode": "value",
+                "justifyMode": "center",
+                "textMode": "value",
+                "orientation": "auto",
+                "wideLayout": true,
+                "showPercentChange": true,
+                "percentChangeColorMode": "standard",
+                "text": {}
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "text"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "text",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "mappings": [],
+                  "noValue": "–",
+                  "unit": "none",
+                  "decimals": 0
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-33": {
+        "kind": "Panel",
+        "spec": {
+          "id": 33,
+          "title": "By state",
+          "description": "Tickets open now or resolved in the last 28 days, per group, split into done, in progress and to do. Jira uses its status; GitHub and GitLab issues count as in progress when a linked pull request is open, otherwise when they have an assignee. Blocked tickets count as in progress. Hover a bar for the done, in progress and to do counts.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "rawSql": "WITH\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nopen_pr_issues AS (\n  SELECT DISTINCT pri.issue_id\n  FROM pull_request_issues pri\n  JOIN pull_requests p2 ON p2.id = pri.pull_request_id AND p2.status = 'OPEN'\n)\n, tickets AS (\n  SELECT i.id, i.due_date, i.fix_versions, i.epic_key, i.id LIKE 'jira:%' AS is_jira, CASE WHEN i.original_status = 'Closed' THEN 'DONE' WHEN i.original_status IN ('To Do', 'To do', 'Todo') THEN 'TODO' WHEN i.original_status = 'Ready for Development' THEN 'TODO' WHEN i.id NOT LIKE 'jira:%' AND i.status <> 'DONE' THEN CASE WHEN i_opr.issue_id IS NOT NULL THEN 'IN_PROGRESS' WHEN COALESCE(i.assignee_id, '') <> '' THEN 'IN_PROGRESS' ELSE 'TODO' END ELSE i.status END AS bucket\n  FROM issues i\n  LEFT JOIN open_pr_issues i_opr ON i_opr.issue_id = i.id\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND (i.resolution_date IS NULL\n      OR (i.resolution_date >= NOW() - INTERVAL 28 DAY AND i.resolution_date < NOW()\n        AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')))\n),\nepics AS (\n  SELECT e.issue_key, MIN(e.title) AS title\n  FROM issues e\n  WHERE e.type = 'EPIC' AND e.issue_key <> '' AND e.id IN (SELECT issue_id FROM scoped_issues)\n  GROUP BY e.issue_key\n),\ngrouped AS (\n  SELECT t.id, COALESCE(il.label_name, 'Unlabelled') AS grp, NULL AS due\n  FROM tickets t LEFT JOIN issue_labels il ON il.issue_id = t.id\n  WHERE '$grouping' = 'Label'\n  UNION\n  SELECT bi.issue_id, b.name, NULL\n  FROM scoped_boards sb\n  JOIN board_issues bi ON bi.board_id = sb.board_id\n  JOIN boards b ON b.id = bi.board_id\n  WHERE '$grouping' = 'Board'\n  UNION\n  SELECT t.id, COALESCE(NULLIF(TRIM(SUBSTRING_INDEX(t.fix_versions, ',', 1)), ''), 'No milestone'), IF(NULLIF(TRIM(SUBSTRING_INDEX(t.fix_versions, ',', 1)), '') IS NULL, NULL, t.due_date)\n  FROM tickets t\n  WHERE '$grouping' = 'Milestone' AND t.is_jira\n  UNION\n  SELECT t.id, COALESCE(s.name, 'No milestone'), IF(s.name IS NULL, NULL, s.ended_date)\n  FROM tickets t\n  LEFT JOIN sprint_issues si ON si.issue_id = t.id\n  LEFT JOIN sprints s ON s.id = si.sprint_id\n  WHERE '$grouping' = 'Milestone' AND NOT t.is_jira\n  UNION\n  SELECT t.id, COALESCE(e.title, 'No epic'), IF(e.title IS NULL, NULL, t.due_date)\n  FROM tickets t\n  LEFT JOIN epics e ON e.issue_key = t.epic_key\n  WHERE '$grouping' = 'Epic'\n)\nSELECT CONCAT(g.grp, ' · ', COUNT(*), ' issues',\n    IF(MAX(g.due) IS NOT NULL, CONCAT(' · due ', DATE_FORMAT(MAX(g.due), '%e %b')), ''),\n    ' · ', ROUND(100 * SUM(t.bucket = 'DONE') / COUNT(*)), '% · ',\n    CASE WHEN SUM(t.is_jira) = COUNT(*) THEN 'Jira status' WHEN SUM(t.is_jira) = 0 THEN 'linked PRs or assignee' ELSE 'mixed' END) AS label,\n  SUM(t.bucket = 'DONE') AS Done,\n  SUM(t.bucket = 'IN_PROGRESS') AS \"In progress\",\n  SUM(t.bucket NOT IN ('DONE', 'IN_PROGRESS')) AS \"To do\"\nFROM grouped g\nJOIN tickets t ON t.id = g.id\nGROUP BY g.grp\nORDER BY COUNT(*) DESC, g.grp\nLIMIT 15",
+                        "format": "table",
+                        "rawQuery": true,
+                        "editorMode": "code"
+                      }
+                    }
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "barchart",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "orientation": "horizontal",
+                "xField": "label",
+                "stacking": "normal",
+                "showValue": "never",
+                "barWidth": 0.8,
+                "groupWidth": 0.7,
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 0,
+                "fullHighlight": false,
+                "legend": {
+                  "showLegend": true,
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "calcs": []
+                },
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "none",
+                  "hideZeros": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "lineWidth": 1,
+                    "fillOpacity": 80,
+                    "gradientMode": "none",
+                    "axisPlacement": "auto",
+                    "axisLabel": "",
+                    "axisSoftMin": 0,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "unit": "none",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "text",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "mappings": [],
+                  "noValue": "–",
+                  "decimals": 0
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Done"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "green"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "In progress"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "blue"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "To do"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "gray"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "layout": {
+      "kind": "RowsLayout",
+      "spec": {
+        "rows": [
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Headline",
+              "collapse": false,
+              "hideHeader": true,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-2"
+                        },
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 8
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Tabs",
+              "collapse": false,
+              "hideHeader": true,
+              "layout": {
+                "kind": "TabsLayout",
+                "spec": {
+                  "tabs": [
+                    {
+                      "kind": "TabsLayoutTab",
+                      "spec": {
+                        "title": "Progress",
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-33"
+                                  },
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 24,
+                                  "height": 8
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "TabsLayoutTab",
+                      "spec": {
+                        "title": "AI usage",
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-1"
+                                  },
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 24,
+                                  "height": 8
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

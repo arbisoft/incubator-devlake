@@ -79,16 +79,6 @@ func loadPlaneEstimatePointMap(db dal.Dal, connectionId uint64, projectId string
 	return estimateMap, nil
 }
 
-func ignoreHTTPStatus404(res *http.Response) errors.Error {
-	if res.StatusCode == http.StatusUnauthorized {
-		return errors.Unauthorized.New("authentication failed, please check your AccessToken")
-	}
-	if res.StatusCode == http.StatusNotFound {
-		return helperapi.ErrIgnoreAndContinue
-	}
-	return nil
-}
-
 func parsePlaneEstimateResults(response *http.Response) ([]json.RawMessage, errors.Error) {
 	page, err := parsePlaneEstimatePage(response)
 	if err != nil {

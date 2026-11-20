@@ -16,10 +16,9 @@
  *
  */
 
-import { theme } from 'antd';
-
 import { useAppSelector } from '@/hooks';
-import { getPluginConfig } from '@/plugins';
+import { getConnectorVisual } from '@/plugins/utils';
+import { PluginIcon } from '@/ui';
 
 import { COPY, WEBHOOK_PLUGIN } from '../constants';
 import { selectConnection, selectWebhook } from '../slice';
@@ -28,20 +27,15 @@ import { Wrapper } from './styled';
 import type { ConnectionNameProps } from './types';
 
 export const ConnectionName = ({ plugin, connectionId }: ConnectionNameProps) => {
-  const {
-    token: { colorPrimary },
-  } = theme.useToken();
-
   const connection = useAppSelector((state) => selectConnection(state, `${plugin}-${connectionId}`));
   const webhook = useAppSelector((state) =>
     plugin === WEBHOOK_PLUGIN ? selectWebhook(state, connectionId) : undefined,
   );
-  const config = getPluginConfig(plugin);
   const name = connection?.name ?? webhook?.name ?? COPY.connectionNameFallback(plugin, connectionId);
 
   return (
     <Wrapper>
-      <span className="icon">{config.icon({ color: colorPrimary })}</span>
+      <PluginIcon {...getConnectorVisual(plugin)} size="md" />
       <span className="name" title={name}>
         {name}
       </span>

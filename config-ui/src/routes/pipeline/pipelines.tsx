@@ -22,16 +22,19 @@ import { useMemo, useState } from 'react';
 import API from '@/api';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
-import { buildListEmpty, ListPage, PageHeader, SORT_ORDER, Toolbar, useListState, useRefreshVersion } from '@/ui';
+import {
+  buildListEmpty,
+  ListPage,
+  PageHeader,
+  SEARCH_DEBOUNCE_MS,
+  SORT_ORDER,
+  Toolbar,
+  useListState,
+  useRefreshVersion,
+} from '@/ui';
 
 import { PipelineTable } from './components';
-import {
-  BLUEPRINT_OPTIONS_LIMIT,
-  BLUEPRINT_SEARCH_DEBOUNCE_MS,
-  BLUEPRINT_TYPE_ALL,
-  COPY,
-  FILTER_PARAM,
-} from './constants';
+import { BLUEPRINT_OPTIONS_LIMIT, BLUEPRINT_TYPE_ALL, COPY, FILTER_PARAM } from './constants';
 import { BlueprintSelect } from './styled';
 import type { PipelineFilters, PipelineSortKey } from './types';
 import { buildPipelineQuery, toBlueprintOptions } from './utils';
@@ -48,7 +51,7 @@ export const Pipelines = () => {
     [version, list.query, filters.blueprintId],
   );
   const [searchInput, setSearch] = useState('');
-  const search = useDebounce(searchInput, { wait: BLUEPRINT_SEARCH_DEBOUNCE_MS });
+  const search = useDebounce(searchInput, { wait: SEARCH_DEBOUNCE_MS });
   const { data: blueprints } = useRefreshData(
     (signal) =>
       API.blueprint.list(

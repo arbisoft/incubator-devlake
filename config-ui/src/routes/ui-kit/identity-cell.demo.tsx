@@ -42,5 +42,10 @@ export const IdentityCellDemo = () => (
         <IdentityCell {...IDENTITY_LONG} />
       </Narrow>
     </DemoCase>
+    <DemoCase label={COPY.cases.wrapLongText}>
+      <Narrow>
+        <IdentityCell {...IDENTITY_LONG} wrap />
+      </Narrow>
+    </DemoCase>
   </DemoSection>
 );

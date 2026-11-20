@@ -20,7 +20,7 @@ import type { LabeledValue } from 'antd/es/select';
 
 import type { GrafanaOrphan, GrafanaUser } from '@/api/grafana-users/types';
 
-import type { DevlakeUserOption, GrafanaMenuAction, OneTimePassword } from '../types';
+import type { DevlakeUserOption, OneTimePassword } from '../types';
 
 export type OrphansNoticeProps = { count: number; onReview: () => void };
 
@@ -48,8 +48,3 @@ export type UserDialogProps = DialogBase & { user?: GrafanaUser };
 export type SetPasswordModalProps = UserDialogProps & { onPassword: (credential: OneTimePassword) => void };
 
 export type OrphansModalProps = DialogBase & { orphans: GrafanaOrphan[] };
-
-export type GrafanaMoreMenuProps = {
-  user: GrafanaUser;
-  onSelect: (action: GrafanaMenuAction) => void;
-};

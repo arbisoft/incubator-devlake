@@ -57,6 +57,8 @@ export const USER_COLUMN = {
   ACTIONS: 'actions',
 } as const;
 
+export const ACTIONS_LAYOUT = { TEXT: 'text', ICONS: 'icons' } as const;
+
 export const USER_FILTER = { STATUS: 'status' } as const;
 
 export const DOMAIN_COLUMN = { DOMAIN: 'domain', ROLE: 'defaultRole', STATUS: 'status', ACTIONS: 'actions' } as const;

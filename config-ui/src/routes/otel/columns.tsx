@@ -72,6 +72,7 @@ const renderProjects = ({ projects }: OtelConnectionResponse) => {
   return (
     <TagRow>
       <OverflowList
+        title={COPY.connections.columns.projects}
         max={PROJECT_CHIP_LIMIT}
         moreLabel={COPY.placement.more}
         items={projects.map(({ name }) => ({
