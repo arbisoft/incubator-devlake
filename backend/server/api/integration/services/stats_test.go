@@ -61,10 +61,10 @@ type fakeRepos struct {
 }
 
 var (
-	_ activityReader = (*fakeRepos)(nil)
-	_ jiraReader     = (*fakeRepos)(nil)
-	_ githubReader   = (*fakeRepos)(nil)
-	_ aiReader       = (*fakeRepos)(nil)
+	_ activityReader            = (*fakeRepos)(nil)
+	_ ticketStatsReader         = (*fakeRepos)(nil)
+	_ versionControlStatsReader = (*fakeRepos)(nil)
+	_ aiReader                  = (*fakeRepos)(nil)
 )
 
 // errRepo is the error a failing fake method returns.
@@ -158,22 +158,22 @@ func newService(t *testing.T, repos *fakeRepos) *StatsService {
 func TestNewStatsServiceRejectsNilDependencies(t *testing.T) {
 	f := &fakeRepos{}
 	tests := []struct {
-		name     string
-		activity activityReader
-		jira     jiraReader
-		github   githubReader
-		ai       aiReader
-		opts     []Option
+		name                string
+		activity            activityReader
+		ticketStats         ticketStatsReader
+		versionControlStats versionControlStatsReader
+		ai                  aiReader
+		opts                []Option
 	}{
-		{name: "nil activity", jira: f, github: f, ai: f},
-		{name: "nil jira", activity: f, github: f, ai: f},
-		{name: "nil github", activity: f, jira: f, ai: f},
-		{name: "nil ai", activity: f, jira: f, github: f},
-		{name: "nil clock", activity: f, jira: f, github: f, ai: f, opts: []Option{WithClock(nil)}},
+		{name: "nil activity", ticketStats: f, versionControlStats: f, ai: f},
+		{name: "nil ticket stats", activity: f, versionControlStats: f, ai: f},
+		{name: "nil version control stats", activity: f, ticketStats: f, ai: f},
+		{name: "nil ai", activity: f, ticketStats: f, versionControlStats: f},
+		{name: "nil clock", activity: f, ticketStats: f, versionControlStats: f, ai: f, opts: []Option{WithClock(nil)}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := NewStatsService(tc.activity, tc.jira, tc.github, tc.ai, tc.opts...); err == nil {
+			if _, err := NewStatsService(tc.activity, tc.ticketStats, tc.versionControlStats, tc.ai, tc.opts...); err == nil {
 				t.Error("NewStatsService() = nil error, want error")
 			}
 		})

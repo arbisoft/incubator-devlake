@@ -50,16 +50,16 @@ type activityReader interface {
 	FirstActivity(email, issueIDLike, codeIDLike string) (*time.Time, errors.Error)
 }
 
-// jiraReader reads Jira issues. repositories.Issues satisfies it.
-type jiraReader interface {
+// ticketStatsReader reads the issues of an engineer's ticket tracker, such as Jira. repositories.Issues satisfies it.
+type ticketStatsReader interface {
 	Assigned(email string, from, to time.Time) (repositories.AssignedCounts, errors.Error)
 	Created(email string, from, to time.Time) (int64, errors.Error)
 	ResolvedByType(email string, from, to time.Time) ([]repositories.IssueTypeRow, errors.Error)
 	ResolvedByTeam(email string, from, to time.Time) ([]repositories.IssueTeamRow, errors.Error)
 }
 
-// githubReader reads GitHub work. repositories.Code satisfies it.
-type githubReader interface {
+// versionControlStatsReader reads the work in an engineer's code host, such as GitHub. repositories.Code satisfies it.
+type versionControlStatsReader interface {
 	Commits(email string, from, to time.Time) (repositories.CommitCounts, errors.Error)
 	Authored(email string, from, to time.Time) (repositories.AuthoredCounts, errors.Error)
 	PullRequestsWithCommits(email string, from, to time.Time) (int64, errors.Error)
@@ -79,20 +79,20 @@ type aiReader interface {
 }
 
 var (
-	_ activityReader = (*repositories.Activity)(nil)
-	_ jiraReader     = (*repositories.Issues)(nil)
-	_ githubReader   = (*repositories.Code)(nil)
-	_ aiReader       = (*repositories.AI)(nil)
+	_ activityReader            = (*repositories.Activity)(nil)
+	_ ticketStatsReader         = (*repositories.Issues)(nil)
+	_ versionControlStatsReader = (*repositories.Code)(nil)
+	_ aiReader                  = (*repositories.AI)(nil)
 )
 
 // StatsService turns an engineer's email and period into stats: it validates the input, resolves the window, reads
 // through the repositories and shapes the response. It is safe for concurrent use.
 type StatsService struct {
-	activity activityReader
-	jira     jiraReader
-	github   githubReader
-	ai       aiReader
-	now      func() time.Time
+	activity            activityReader
+	ticketStats         ticketStatsReader
+	versionControlStats versionControlStatsReader
+	ai                  aiReader
+	now                 func() time.Time
 }
 
 // Option configures a StatsService.
@@ -104,11 +104,11 @@ func WithClock(now func() time.Time) Option {
 }
 
 // NewStatsService returns a service that reads through the given repositories, none of which may be nil.
-func NewStatsService(activity activityReader, jira jiraReader, github githubReader, ai aiReader, opts ...Option) (*StatsService, errors.Error) {
-	if activity == nil || jira == nil || github == nil || ai == nil {
+func NewStatsService(activity activityReader, ticketStats ticketStatsReader, versionControlStats versionControlStatsReader, ai aiReader, opts ...Option) (*StatsService, errors.Error) {
+	if activity == nil || ticketStats == nil || versionControlStats == nil || ai == nil {
 		return nil, errors.Default.New("stats service: nil repository")
 	}
-	s := &StatsService{activity: activity, jira: jira, github: github, ai: ai, now: time.Now}
+	s := &StatsService{activity: activity, ticketStats: ticketStats, versionControlStats: versionControlStats, ai: ai, now: time.Now}
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -173,19 +173,19 @@ func (s *StatsService) Jira(email string, p utils.Period) (*JiraStats, errors.Er
 	if err != nil {
 		return nil, err
 	}
-	assigned, err := s.jira.Assigned(w.Email, w.From, w.To)
+	assigned, err := s.ticketStats.Assigned(w.Email, w.From, w.To)
 	if err != nil {
 		return nil, err
 	}
-	created, err := s.jira.Created(w.Email, w.From, w.To)
+	created, err := s.ticketStats.Created(w.Email, w.From, w.To)
 	if err != nil {
 		return nil, err
 	}
-	byType, err := s.jira.ResolvedByType(w.Email, w.From, w.To)
+	byType, err := s.ticketStats.ResolvedByType(w.Email, w.From, w.To)
 	if err != nil {
 		return nil, err
 	}
-	byTeam, err := s.jira.ResolvedByTeam(w.Email, w.From, w.To)
+	byTeam, err := s.ticketStats.ResolvedByTeam(w.Email, w.From, w.To)
 	if err != nil {
 		return nil, err
 	}
@@ -208,19 +208,19 @@ func (s *StatsService) GitHub(email string, p utils.Period) (*GitHubStats, error
 	if err != nil {
 		return nil, err
 	}
-	commits, err := s.github.Commits(w.Email, w.From, w.To)
+	commits, err := s.versionControlStats.Commits(w.Email, w.From, w.To)
 	if err != nil {
 		return nil, err
 	}
-	authored, err := s.github.Authored(w.Email, w.From, w.To)
+	authored, err := s.versionControlStats.Authored(w.Email, w.From, w.To)
 	if err != nil {
 		return nil, err
 	}
-	withCommits, err := s.github.PullRequestsWithCommits(w.Email, w.From, w.To)
+	withCommits, err := s.versionControlStats.PullRequestsWithCommits(w.Email, w.From, w.To)
 	if err != nil {
 		return nil, err
 	}
-	reviews, err := s.github.Reviews(w.Email, w.From, w.To)
+	reviews, err := s.versionControlStats.Reviews(w.Email, w.From, w.To)
 	if err != nil {
 		return nil, err
 	}
@@ -252,11 +252,11 @@ func (s *StatsService) GitHub(email string, p utils.Period) (*GitHubStats, error
 // githubBreakdown merges the commit and pull request rows of each group into one entry, sorted by name, and works
 // out the engineer's share of each group.
 func (s *StatsService) githubBreakdown(w StatsWindow, group repositories.Group) ([]GitHubBreakdown, errors.Error) {
-	commits, err := s.github.CommitsByGroup(w.Email, w.From, w.To, group)
+	commits, err := s.versionControlStats.CommitsByGroup(w.Email, w.From, w.To, group)
 	if err != nil {
 		return nil, err
 	}
-	prs, err := s.github.PullRequestsByGroup(w.Email, w.From, w.To, group)
+	prs, err := s.versionControlStats.PullRequestsByGroup(w.Email, w.From, w.To, group)
 	if err != nil {
 		return nil, err
 	}
