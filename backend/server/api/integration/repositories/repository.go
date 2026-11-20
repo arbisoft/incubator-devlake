@@ -73,15 +73,28 @@ func (r *Activity) FirstActivity(email string) (*time.Time, errors.Error) {
 		dal.Select("MIN(activity) AS joined"),
 		dal.From(`(
 			SELECT CAST(i.created_date AS DATETIME) AS activity FROM issues i JOIN accounts a ON a.id = i.creator_id
-				WHERE i.id LIKE 'jira:%' AND LOWER(a.email) = ?
+				WHERE i.id LIKE 'jira:%'
+					AND LOWER(a.email) = ?
 			UNION ALL SELECT CAST(i.created_date AS DATETIME) FROM issues i JOIN accounts a ON a.id = i.assignee_id
-				WHERE i.id LIKE 'jira:%' AND LOWER(a.email) = ?
+				WHERE i.id LIKE 'jira:%'
+					AND LOWER(a.email) = ?
 			UNION ALL SELECT CAST(c.authored_date AS DATETIME) FROM commits c
-				WHERE LOWER(c.author_email) = ? AND EXISTS (SELECT 1 FROM repo_commits rc WHERE rc.commit_sha = c.sha AND rc.repo_id LIKE 'github:%')
-			UNION ALL SELECT CAST(p.created_date AS DATETIME) FROM pull_requests p JOIN accounts a ON a.id = p.author_id
-				WHERE p.id LIKE 'github:%' AND LOWER(a.email) = ?
-			UNION ALL SELECT CAST(date AS DATETIME) FROM ai_activities WHERE LOWER(user_email) = ?
-			UNION ALL SELECT CAST(date AS DATETIME) FROM ai_model_usages WHERE LOWER(user_email) = ?
+				WHERE LOWER(c.author_email) = ?
+					AND EXISTS (SELECT 1
+						FROM repo_commits rc
+						WHERE rc.commit_sha = c.sha
+							AND rc.repo_id LIKE 'github:%')
+			UNION ALL SELECT CAST(p.created_date AS DATETIME) 
+				FROM pull_requests p 
+				JOIN accounts a ON a.id = p.author_id
+				WHERE p.id LIKE 'github:%'
+					AND LOWER(a.email) = ?
+			UNION ALL SELECT CAST(date AS DATETIME) 
+				FROM ai_activities 
+				WHERE LOWER(user_email) = ?
+			UNION ALL SELECT CAST(date AS DATETIME) 
+				FROM ai_model_usages 
+				WHERE LOWER(user_email) = ?
 		) activities`, email, email, email, email, email, email),
 	); err != nil {
 		return nil, errors.Default.Wrap(err, "read the engineer's first activity")

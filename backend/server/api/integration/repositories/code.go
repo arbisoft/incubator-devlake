@@ -107,10 +107,16 @@ func NewCode(db rowsReader, source string) (*Code, errors.Error) {
 func (r *Code) Commits(email string, from, to time.Time) (CommitCounts, errors.Error) {
 	var rows []CommitCounts
 	if err := r.db.All(&rows,
-		dal.Select("COUNT(*) AS commits, COALESCE(SUM(c.additions), 0) AS additions, COALESCE(SUM(c.deletions), 0) AS deletions"),
+		dal.Select("COUNT(*) AS commits, "+
+			"COALESCE(SUM(c.additions), 0) AS additions, "+
+			"COALESCE(SUM(c.deletions), 0) AS deletions"),
 		dal.From("commits c"),
-		dal.Where(`LOWER(c.author_email) = ? AND c.authored_date >= ? AND c.authored_date < ?
-			AND EXISTS (SELECT 1 FROM repo_commits rc WHERE rc.commit_sha = c.sha AND rc.repo_id LIKE ?)`,
+		dal.Where(`LOWER(c.author_email) = ?
+			AND c.authored_date >= ?
+			AND c.authored_date < ?
+			AND EXISTS (SELECT 1
+						FROM repo_commits rc
+						WHERE rc.commit_sha = c.sha AND rc.repo_id LIKE ?)`,
 			email, from, to, r.idLike),
 	); err != nil {
 		return CommitCounts{}, errors.Default.Wrap(err, "read "+r.source+" commits")
@@ -124,7 +130,10 @@ func (r *Code) Authored(email string, from, to time.Time) (AuthoredCounts, error
 	if err := r.db.All(&rows,
 		dal.Select(`COALESCE(SUM(p.created_date >= ? AND p.created_date < ?), 0) AS pull_requests_opened,
 			COALESCE(SUM(p.merged_date >= ? AND p.merged_date < ?), 0) AS pull_requests_merged,
-			COALESCE(AVG(CASE WHEN p.merged_date >= ? AND p.merged_date < ? THEN TIMESTAMPDIFF(MINUTE, p.created_date, p.merged_date) END), 0) / 60 AS avg_pr_merge_hours`,
+			COALESCE(
+				AVG(CASE WHEN p.merged_date >= ? AND p.merged_date < ?
+				THEN TIMESTAMPDIFF(MINUTE, p.created_date, p.merged_date) END), 0
+				) / 60 AS avg_pr_merge_hours`,
 			from, to, from, to, from, to),
 		dal.From("pull_requests p JOIN accounts a ON a.id = p.author_id"),
 		dal.Where("p.id LIKE ? AND LOWER(a.email) = ?", r.idLike, email),
@@ -140,8 +149,10 @@ func (r *Code) PullRequestsWithCommits(email string, from, to time.Time) (int64,
 	if err := r.db.All(&rows,
 		dal.Select("COUNT(DISTINCT prc.pull_request_id) AS pull_requests_with_commits"),
 		dal.From("pull_request_commits prc"),
-		dal.Where(`prc.pull_request_id LIKE ? AND LOWER(prc.commit_author_email) = ?
-			AND prc.commit_authored_date >= ? AND prc.commit_authored_date < ?`, r.idLike, email, from, to),
+		dal.Where(`prc.pull_request_id LIKE ?
+			AND LOWER(prc.commit_author_email) = ?
+			AND prc.commit_authored_date >= ?
+			AND prc.commit_authored_date < ?`, r.idLike, email, from, to),
 	); err != nil {
 		return 0, errors.Default.Wrap(err, "read "+r.source+" pull requests with the engineer's commits")
 	}
@@ -157,10 +168,16 @@ func (r *Code) Reviews(email string, from, to time.Time) (ReviewCounts, errors.E
 		dal.Select(`COUNT(DISTINCT CASE WHEN pc.type = 'REVIEW' THEN pc.id END) AS reviews,
 			COUNT(DISTINCT CASE WHEN pc.type IN ('NORMAL', 'DIFF') THEN pc.id END) AS review_comments,
 			COUNT(DISTINCT pc.pull_request_id) AS pull_requests_reviewed`),
-		dal.From(`pull_request_comments pc JOIN accounts a ON a.id = pc.account_id
-			JOIN pull_requests p ON p.id = pc.pull_request_id LEFT JOIN accounts pa ON pa.id = p.author_id`),
-		dal.Where(`pc.id LIKE ? AND pc.type IN ('REVIEW', 'NORMAL', 'DIFF') AND LOWER(a.email) = ?
-			AND pc.created_date >= ? AND pc.created_date < ? AND (pa.email IS NULL OR LOWER(pa.email) <> ?)`,
+		dal.From(`pull_request_comments pc
+			JOIN accounts a ON a.id = pc.account_id
+			JOIN pull_requests p ON p.id = pc.pull_request_id
+			LEFT JOIN accounts pa ON pa.id = p.author_id`),
+		dal.Where(`pc.id LIKE ?
+			AND pc.type IN ('REVIEW', 'NORMAL', 'DIFF')
+			AND LOWER(a.email) = ?
+			AND pc.created_date >= ?
+			AND pc.created_date < ?
+			AND (pa.email IS NULL OR LOWER(pa.email) <> ?)`,
 			r.idLike, email, from, to, email),
 	); err != nil {
 		return ReviewCounts{}, errors.Default.Wrap(err, "read "+r.source+" reviews")
@@ -177,12 +194,16 @@ func (r *Code) CommitsByGroup(email string, from, to time.Time, group Group) ([]
 	}
 	var rows []CommitGroupRow
 	if err := r.db.All(&rows,
-		dal.Select(`t.name, COUNT(*) AS repo_commits, COALESCE(SUM(t.lines_changed), 0) AS repo_lines, COUNT(DISTINCT t.email) AS contributors,
-			COALESCE(SUM(t.email = ?), 0) AS engineer_commits, COALESCE(SUM(CASE WHEN t.email = ? THEN t.lines_changed END), 0) AS engineer_lines`,
+		dal.Select(`t.name, COUNT(*) AS repo_commits,
+			COALESCE(SUM(t.lines_changed), 0) AS repo_lines,
+			COUNT(DISTINCT t.email) AS contributors,
+			COALESCE(SUM(t.email = ?), 0) AS engineer_commits,
+			COALESCE(SUM(CASE WHEN t.email = ? THEN t.lines_changed END), 0) AS engineer_lines`,
 			email, email),
 		dal.From("(SELECT DISTINCT "+g.name+" AS name, c.sha, LOWER(c.author_email) AS email,"+
 			" COALESCE(c.additions, 0) + COALESCE(c.deletions, 0) AS lines_changed"+
-			" FROM commits c JOIN repo_commits rc ON rc.commit_sha = c.sha "+fmt.Sprintf(g.joinFormat, "rc.repo_id")+
+			" FROM commits c"+
+			" JOIN repo_commits rc ON rc.commit_sha = c.sha "+fmt.Sprintf(g.joinFormat, "rc.repo_id")+
 			" WHERE rc.repo_id LIKE ? AND c.authored_date >= ? AND c.authored_date < ?) t", r.idLike, from, to),
 		dal.Groupby("t.name"),
 		dal.Having("SUM(t.email = ?) > 0", email),
@@ -202,11 +223,15 @@ func (r *Code) PullRequestsByGroup(email string, from, to time.Time, group Group
 	}
 	var rows []PullRequestGroupRow
 	if err := r.db.All(&rows,
-		dal.Select(`t.name, COALESCE(SUM(t.opened), 0) AS repo_opened, COALESCE(SUM(t.merged), 0) AS repo_merged,
-			COALESCE(SUM(t.opened AND t.email = ?), 0) AS engineer_opened, COALESCE(SUM(t.merged AND t.email = ?), 0) AS engineer_merged`, email, email),
+		dal.Select(`t.name, COALESCE(SUM(t.opened), 0) AS repo_opened,
+			COALESCE(SUM(t.merged), 0) AS repo_merged,
+			COALESCE(SUM(t.opened AND t.email = ?), 0) AS engineer_opened,
+			COALESCE(SUM(t.merged AND t.email = ?), 0) AS engineer_merged`, email, email),
 		dal.From("(SELECT DISTINCT "+g.name+" AS name, p.id, LOWER(a.email) AS email,"+
-			" (p.created_date >= ? AND p.created_date < ?) AS opened, (p.merged_date >= ? AND p.merged_date < ?) AS merged"+
-			" FROM pull_requests p LEFT JOIN accounts a ON a.id = p.author_id "+fmt.Sprintf(g.joinFormat, "p.base_repo_id")+
+			" (p.created_date >= ? AND p.created_date < ?) AS opened, "+
+			"(p.merged_date >= ? AND p.merged_date < ?) AS merged"+
+			" FROM pull_requests p "+
+			" LEFT JOIN accounts a ON a.id = p.author_id "+fmt.Sprintf(g.joinFormat, "p.base_repo_id")+
 			" WHERE p.id LIKE ?) t", from, to, from, to, r.idLike),
 		dal.Groupby("t.name"),
 		dal.Having("SUM((t.opened OR t.merged) AND t.email = ?) > 0", email),
