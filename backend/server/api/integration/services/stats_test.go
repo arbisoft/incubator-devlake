@@ -78,8 +78,8 @@ func (f *fakeRepos) record(method, email string, args ...interface{}) errors.Err
 	return nil
 }
 
-func (f *fakeRepos) FirstActivity(email string) (*time.Time, errors.Error) {
-	return f.joined, f.record("FirstActivity", email)
+func (f *fakeRepos) FirstActivity(email, issueIDLike, codeIDLike string) (*time.Time, errors.Error) {
+	return f.joined, f.record("FirstActivity", email, issueIDLike, codeIDLike)
 }
 
 func (f *fakeRepos) Assigned(email string, from, to time.Time) (repositories.AssignedCounts, errors.Error) {

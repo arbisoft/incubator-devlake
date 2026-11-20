@@ -36,13 +36,18 @@ const (
 	dayLayout = "2006-01-02"
 	// monthLayout formats the months the monthly AI rows carry.
 	monthLayout = "2006-01"
+	// jiraIDLike is the LIKE pattern for the domain ids of the Jira issues that count as an engineer's activity.
+	jiraIDLike = "jira:%"
+	// githubIDLike is the LIKE pattern for the domain ids of the GitHub commits and pull requests that count as an
+	// engineer's activity.
+	githubIDLike = "github:%"
 	// zeroCost is the total for an engineer with no AI cost records.
 	zeroCost = "0.00000000"
 )
 
 // activityReader finds when an engineer was first active. repositories.Activity satisfies it.
 type activityReader interface {
-	FirstActivity(email string) (*time.Time, errors.Error)
+	FirstActivity(email, issueIDLike, codeIDLike string) (*time.Time, errors.Error)
 }
 
 // jiraReader reads Jira issues. repositories.Issues satisfies it.
@@ -141,7 +146,7 @@ func (s *StatsService) sinceWindow(email string, p utils.Period) (StatsWindow, e
 		return StatsWindow{}, errors.BadInput.New("give one of tf, since, or from and to")
 	}
 	to := s.now().UTC()
-	joined, err := s.activity.FirstActivity(email)
+	joined, err := s.activity.FirstActivity(email, jiraIDLike, githubIDLike)
 	if err != nil {
 		return StatsWindow{}, err
 	}

@@ -66,36 +66,38 @@ func NewActivity(db rowsReader) (*Activity, errors.Error) {
 	return &Activity{db: db}, nil
 }
 
-// FirstActivity returns the earliest Jira, GitHub or AI activity recorded for email, or nil when there is none.
-func (r *Activity) FirstActivity(email string) (*time.Time, errors.Error) {
+// FirstActivity returns the earliest issue, code or AI activity recorded for email, or nil when there is none.
+// issueIDLike and codeIDLike are the LIKE patterns for the domain ids of the issue tracker and the code host,
+// for example "jira:%" and "github:%".
+func (r *Activity) FirstActivity(email, issueIDLike, codeIDLike string) (*time.Time, errors.Error) {
 	var rows []struct{ Joined *time.Time }
 	if err := r.db.All(&rows,
 		dal.Select("MIN(activity) AS joined"),
 		dal.From(`(
 			SELECT CAST(i.created_date AS DATETIME) AS activity FROM issues i JOIN accounts a ON a.id = i.creator_id
-				WHERE i.id LIKE 'jira:%'
+				WHERE i.id LIKE ?
 					AND LOWER(a.email) = ?
 			UNION ALL SELECT CAST(i.created_date AS DATETIME) FROM issues i JOIN accounts a ON a.id = i.assignee_id
-				WHERE i.id LIKE 'jira:%'
+				WHERE i.id LIKE ?
 					AND LOWER(a.email) = ?
 			UNION ALL SELECT CAST(c.authored_date AS DATETIME) FROM commits c
 				WHERE LOWER(c.author_email) = ?
 					AND EXISTS (SELECT 1
 						FROM repo_commits rc
 						WHERE rc.commit_sha = c.sha
-							AND rc.repo_id LIKE 'github:%')
-			UNION ALL SELECT CAST(p.created_date AS DATETIME) 
-				FROM pull_requests p 
+							AND rc.repo_id LIKE ?)
+			UNION ALL SELECT CAST(p.created_date AS DATETIME)
+				FROM pull_requests p
 				JOIN accounts a ON a.id = p.author_id
-				WHERE p.id LIKE 'github:%'
+				WHERE p.id LIKE ?
 					AND LOWER(a.email) = ?
-			UNION ALL SELECT CAST(date AS DATETIME) 
-				FROM ai_activities 
+			UNION ALL SELECT CAST(date AS DATETIME)
+				FROM ai_activities
 				WHERE LOWER(user_email) = ?
-			UNION ALL SELECT CAST(date AS DATETIME) 
-				FROM ai_model_usages 
+			UNION ALL SELECT CAST(date AS DATETIME)
+				FROM ai_model_usages
 				WHERE LOWER(user_email) = ?
-		) activities`, email, email, email, email, email, email),
+		) activities`, issueIDLike, email, issueIDLike, email, email, codeIDLike, codeIDLike, email, email, email),
 	); err != nil {
 		return nil, errors.Default.Wrap(err, "read the engineer's first activity")
 	}
