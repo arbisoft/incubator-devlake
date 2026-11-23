@@ -40,6 +40,11 @@ var ConvertExecutionsMeta = plugin.SubTaskMeta{
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_CICD},
 }
 
+// isDeploymentAction reports whether the stage or action name matches the deployment pattern.
+func isDeploymentAction(enricher *helper.RegexEnricher, stageName, actionName string) bool {
+	return enricher.ReturnNameIfMatched(devops.DEPLOYMENT, stageName, actionName) != ""
+}
+
 // hasDeploymentAction reports whether a stage or action of the pipeline matches the deployment pattern.
 func hasDeploymentAction(db dal.Dal, data *AwsTaskData) (bool, errors.Error) {
 	var actions []models.AwsPipelineAction
@@ -48,7 +53,7 @@ func hasDeploymentAction(db dal.Dal, data *AwsTaskData) (bool, errors.Error) {
 		return false, errors.Default.Wrap(err, "load the pipeline actions")
 	}
 	for _, action := range actions {
-		if data.RegexEnricher.ReturnNameIfMatched(devops.DEPLOYMENT, action.StageName, action.ActionName) != "" {
+		if isDeploymentAction(data.RegexEnricher, action.StageName, action.ActionName) {
 			return true, nil
 		}
 	}

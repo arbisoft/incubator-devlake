@@ -1,0 +1,5 @@
+region,usage_type,publication_date,unit,price_usd,fetched_at
+us-east-2,Build-Min:Linux:g1.medium,2026-10-01T00:00:00.000+00:00,minutes,0.0200000000,2026-10-02T02:00:00.000+00:00
+us-east-2,Build-Min:Linux:g1.medium,2026-11-01T00:00:00.000+00:00,minutes,0.0100000000,2026-11-02T02:00:00.000+00:00
+us-east-2,actionExecutionMinute,2026-11-01T00:00:00.000+00:00,action-exec-minute,0.0020000000,2026-11-02T02:00:00.000+00:00
+us-west-2,Build-Min:Linux:g1.large,2026-11-01T00:00:00.000+00:00,minutes,0.0400000000,2026-11-02T02:00:00.000+00:00

@@ -59,6 +59,10 @@ type AwsCodebuildBuild struct {
 	LogGroup              string `gorm:"type:varchar(512)"`
 	LogStream             string `gorm:"type:varchar(512)"`
 	FailureMessage        string `gorm:"type:varchar(1024)"`
+	BilledMinutes         *int
+	PriceUsageType        string  `gorm:"type:varchar(128)"`
+	UnitPriceUsd          *string `gorm:"type:decimal(20,10)"`
+	EstimatedCostUsd      *string `gorm:"type:decimal(20,10)"`
 
 	archived.NoPKModel
 }

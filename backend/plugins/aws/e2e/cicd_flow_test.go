@@ -97,6 +97,8 @@ func TestAwsCicdFlow(t *testing.T) {
 
 	tester.FlushTabler(&models.AwsPipeline{})
 	tester.ImportNullableCsvIntoTabler("./seed_tables/_tool_aws_pipelines.csv", &models.AwsPipeline{})
+	tester.FlushTabler(&models.AwsPrice{})
+	tester.ImportCsvIntoTabler("./seed_tables/_tool_aws_prices.csv", &models.AwsPrice{})
 	tester.FlushTabler(&code.Repo{})
 	tester.ImportCsvIntoTabler("./seed_tables/repos.csv", &code.Repo{})
 	for _, table := range rawTables {
@@ -113,6 +115,7 @@ func TestAwsCicdFlow(t *testing.T) {
 		tester.Subtask(tasks.ExtractActionExecutionsMeta, data)
 		tester.Subtask(tasks.ExtractProjectsMeta, data)
 		tester.Subtask(tasks.ExtractBuildsMeta, data)
+		tester.Subtask(tasks.CalculateCostMeta, data)
 	}
 	tester.VerifyTableWithOptions(&models.AwsPipeline{}, e2ehelper.TableOptions{
 		CSVRelPath:  "./snapshot_tables/_tool_aws_pipelines.csv",

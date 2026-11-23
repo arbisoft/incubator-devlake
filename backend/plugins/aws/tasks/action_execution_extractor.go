@@ -58,6 +58,7 @@ func ExtractActionExecutions(taskCtx plugin.SubTaskContext) errors.Error {
 				StartTime:           awsEpochTime(detail.StartTime),
 				LastUpdateTime:      awsEpochTime(detail.LastUpdateTime),
 				Category:            detail.Input.ActionTypeId.Category,
+				Owner:               detail.Input.ActionTypeId.Owner,
 				Provider:            detail.Input.ActionTypeId.Provider,
 				ProjectName:         detail.Input.Configuration.ProjectName,
 				ExternalExecutionId: result.ExternalExecutionId,

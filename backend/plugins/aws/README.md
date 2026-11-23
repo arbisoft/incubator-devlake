@@ -68,6 +68,20 @@ Required permissions must be allowed for Test connection to pass. Optional ones 
 
 `logs:GetLogEvents` is limited to the `/aws/codebuild/*` log groups in the generated policy. Cost Explorer bills each request, so Test connection makes a single `GetCostAndUsage` call and does not call the other three.
 
+## Build log signals
+
+When the scope config sets a Trivy, smoke test or rollback pattern, the connector reads each finished CodeBuild log once, parses it in memory and keeps only the parsed values: Trivy totals by severity and target, smoke test results, rollback lines and how often each pattern matched. The log text is never stored. Smoke test and rollback patterns apply only to builds of actions that match the deployment pattern. Lines that echo a command (`echo ` or `${`) are ignored.
+
+CloudWatch Logs expire (about 14 days on the dev account), so signals start from go-live and builds whose log is already gone are recorded as not available rather than as zero matches. A normal run reads only builds that were never read. A full re-sync reads every build again, so changed log patterns are applied to builds still inside log retention; builds whose log has expired keep their earlier results.
+
+## Calculated cost
+
+CodeBuild builds and V2 pipeline actions get an estimated cost from the public AWS Price List, refreshed at most once a day per region and kept in `_tool_aws_prices`. Billed minutes are the duration rounded up to whole minutes. Only CI/CD compute is estimated: free tiers are ignored, and Lambda and fleet builds, V1 pipelines, approval actions and custom actions are not modelled. A usage type without a price leaves the cost empty rather than zero. The Price List is only reachable in the `aws` partition.
+
+## Cost Explorer
+
+With Cost Explorer on, the connector stores daily spend by service for the previous and the current month and the forecast to the end of the month, once a day per connection. Cost Explorer bills every request, so a night costs about two calls per connection (more only when the spend by service spans several pages) and nothing is retried. If access is denied the connector logs one warning and carries on without spend data.
+
 ## Good to know
 
 - Do not add two connections to the same AWS account to one project: the same deployments are collected twice and double-counted.

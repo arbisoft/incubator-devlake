@@ -21,6 +21,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/aws/models"
@@ -38,6 +39,7 @@ const (
 	awsCollectorPageSize = 100
 	awsBatchGetLimit     = 100
 	awsTextLimit         = 1024
+	awsInsertBatchSize   = 500
 )
 
 // CreateRawDataSubTaskArgs builds the raw table arguments shared by the subtasks of one scope.
@@ -66,4 +68,18 @@ func truncateText(text string, limit int) string {
 		return text
 	}
 	return string(runes[:limit])
+}
+
+// inBatches passes the rows to write in slices of at most size rows.
+func inBatches[T any](rows []T, size int, write func(batch []T) errors.Error) errors.Error {
+	for start := 0; start < len(rows); start += size {
+		end := start + size
+		if end > len(rows) {
+			end = len(rows)
+		}
+		if err := write(rows[start:end]); err != nil {
+			return err
+		}
+	}
+	return nil
 }

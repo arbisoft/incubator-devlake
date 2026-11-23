@@ -39,6 +39,10 @@ func (*addInitTables) Up(basicRes context.BasicRes) errors.Error {
 		&archived.AwsCodebuildProject{},
 		&archived.AwsCodebuildBuild{},
 		&archived.AwsCodebuildBuildPhase{},
+		&archived.AwsBuildLogSignal{},
+		&archived.AwsBuildLogPatternMatch{},
+		&archived.AwsPrice{},
+		&archived.AwsCostDaily{},
 	)
 }
 

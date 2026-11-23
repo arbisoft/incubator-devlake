@@ -35,11 +35,15 @@ type AwsActionExecution struct {
 	StartTime           *time.Time
 	LastUpdateTime      *time.Time
 	Category            string `gorm:"type:varchar(32)"`
+	Owner               string `gorm:"type:varchar(32)"`
 	Provider            string `gorm:"type:varchar(64)"`
 	ProjectName         string `gorm:"type:varchar(255)"`
 	ExternalExecutionId string `gorm:"type:varchar(255);index"`
 	ErrorCode           string `gorm:"type:varchar(128)"`
 	Summary             string `gorm:"type:varchar(1024)"`
+	BilledMinutes       *int
+	UnitPriceUsd        *string `gorm:"type:decimal(20,10)"`
+	EstimatedCostUsd    *string `gorm:"type:decimal(20,10)"`
 
 	archived.NoPKModel
 }

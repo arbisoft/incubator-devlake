@@ -80,6 +80,10 @@ func (p Aws) GetTablesInfo() []dal.Tabler {
 		&models.AwsCodebuildProject{},
 		&models.AwsCodebuildBuild{},
 		&models.AwsCodebuildBuildPhase{},
+		&models.AwsBuildLogSignal{},
+		&models.AwsBuildLogPatternMatch{},
+		&models.AwsPrice{},
+		&models.AwsCostDaily{},
 	}
 }
 
@@ -95,6 +99,10 @@ func (p Aws) SubTaskMetas() []plugin.SubTaskMeta {
 		tasks.ExtractProjectsMeta,
 		tasks.CollectBuildsMeta,
 		tasks.ExtractBuildsMeta,
+		tasks.RefreshPricesMeta,
+		tasks.CalculateCostMeta,
+		tasks.CollectBuildLogSignalsMeta,
+		tasks.CollectCostExplorerMeta,
 		tasks.ConvertPipelineScopeMeta,
 		tasks.ConvertExecutionsMeta,
 		tasks.ConvertActionExecutionsMeta,
@@ -147,12 +155,25 @@ func (p Aws) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]inte
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "unable to create the CodeBuild client")
 	}
+	logsClient, err := tasks.NewAwsApiClient(taskCtx.GetContext(), taskCtx, provider, tasks.AwsServiceLogs, scope.Region)
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "unable to create the CloudWatch Logs client")
+	}
+	var costExplorerClient *helper.ApiClient
+	if connection.UseCostExplorer {
+		costExplorerClient, err = tasks.NewAwsApiClient(taskCtx.GetContext(), taskCtx, provider, tasks.AwsServiceCostExplorer, scope.Region)
+		if err != nil {
+			return nil, errors.Default.Wrap(err, "unable to create the Cost Explorer client")
+		}
+	}
 	return &tasks.AwsTaskData{
 		Options:            op,
 		Connection:         connection,
 		Scope:              scope,
 		CodePipelineClient: codePipelineClient,
 		CodeBuildClient:    codeBuildClient,
+		LogsClient:         logsClient,
+		CostExplorerClient: costExplorerClient,
 		RegexEnricher:      regexEnricher,
 	}, nil
 }

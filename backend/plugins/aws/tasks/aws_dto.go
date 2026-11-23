@@ -45,6 +45,7 @@ type AwsGetPipelineInput struct {
 
 type AwsActionTypeId struct {
 	Category string `json:"category"`
+	Owner    string `json:"owner"`
 	Provider string `json:"provider"`
 }
 
@@ -232,8 +233,19 @@ type AwsBatchGetBuildsOutput struct {
 type AwsGetLogEventsInput struct {
 	LogGroupName  string `json:"logGroupName"`
 	LogStreamName string `json:"logStreamName"`
-	Limit         int    `json:"limit"`
+	Limit         int    `json:"limit,omitempty"`
 	StartFromHead bool   `json:"startFromHead"`
+	NextToken     string `json:"nextToken,omitempty"`
+}
+
+type AwsLogEvent struct {
+	Timestamp int64  `json:"timestamp"`
+	Message   string `json:"message"`
+}
+
+type AwsGetLogEventsOutput struct {
+	Events           []AwsLogEvent `json:"events"`
+	NextForwardToken string        `json:"nextForwardToken"`
 }
 
 type AwsCostTimePeriod struct {
@@ -241,8 +253,84 @@ type AwsCostTimePeriod struct {
 	End   string `json:"End"`
 }
 
+type AwsCostGroupDefinition struct {
+	Type string `json:"Type"`
+	Key  string `json:"Key"`
+}
+
 type AwsGetCostAndUsageInput struct {
+	TimePeriod    AwsCostTimePeriod        `json:"TimePeriod"`
+	Granularity   string                   `json:"Granularity"`
+	Metrics       []string                 `json:"Metrics"`
+	GroupBy       []AwsCostGroupDefinition `json:"GroupBy,omitempty"`
+	NextPageToken string                   `json:"NextPageToken,omitempty"`
+}
+
+type AwsCostAmount struct {
+	Amount string `json:"Amount"`
+	Unit   string `json:"Unit"`
+}
+
+type AwsCostGroup struct {
+	Keys    []string `json:"Keys"`
+	Metrics struct {
+		UnblendedCost AwsCostAmount `json:"UnblendedCost"`
+	} `json:"Metrics"`
+}
+
+type AwsCostResultByTime struct {
+	TimePeriod AwsCostTimePeriod `json:"TimePeriod"`
+	Estimated  bool              `json:"Estimated"`
+	Groups     []AwsCostGroup    `json:"Groups"`
+}
+
+type AwsGetCostAndUsageOutput struct {
+	ResultsByTime []AwsCostResultByTime `json:"ResultsByTime"`
+	NextPageToken string                `json:"NextPageToken"`
+}
+
+type AwsGetCostForecastInput struct {
 	TimePeriod  AwsCostTimePeriod `json:"TimePeriod"`
+	Metric      string            `json:"Metric"`
 	Granularity string            `json:"Granularity"`
-	Metrics     []string          `json:"Metrics"`
+}
+
+type AwsForecastResultByTime struct {
+	TimePeriod AwsCostTimePeriod `json:"TimePeriod"`
+	MeanValue  string            `json:"MeanValue"`
+}
+
+type AwsGetCostForecastOutput struct {
+	Total                 AwsCostAmount             `json:"Total"`
+	ForecastResultsByTime []AwsForecastResultByTime `json:"ForecastResultsByTime"`
+}
+
+type AwsPriceAttributes struct {
+	UsageType  string `json:"usagetype"`
+	RegionCode string `json:"regionCode"`
+}
+
+type AwsPriceProduct struct {
+	Sku        string             `json:"sku"`
+	Attributes AwsPriceAttributes `json:"attributes"`
+}
+
+type AwsPriceDimension struct {
+	Unit         string `json:"unit"`
+	PricePerUnit struct {
+		USD string `json:"USD"`
+	} `json:"pricePerUnit"`
+}
+
+type AwsPriceTerm struct {
+	PriceDimensions map[string]AwsPriceDimension `json:"priceDimensions"`
+}
+
+// AwsPriceListFile is the part of a Price List offer file the connector reads.
+type AwsPriceListFile struct {
+	PublicationDate string                     `json:"publicationDate"`
+	Products        map[string]AwsPriceProduct `json:"products"`
+	Terms           struct {
+		OnDemand map[string]map[string]AwsPriceTerm `json:"OnDemand"`
+	} `json:"terms"`
 }

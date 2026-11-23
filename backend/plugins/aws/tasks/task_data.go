@@ -36,6 +36,9 @@ type AwsTaskData struct {
 	Scope              *models.AwsPipeline
 	CodePipelineClient *helper.ApiAsyncClient
 	CodeBuildClient    *helper.ApiAsyncClient
+	// LogsClient and CostExplorerClient are plain clients that never retry; CostExplorerClient is nil when Cost Explorer is off.
+	LogsClient         *helper.ApiClient
+	CostExplorerClient *helper.ApiClient
 	RegexEnricher      *helper.RegexEnricher
 }
 

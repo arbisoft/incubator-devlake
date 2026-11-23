@@ -51,6 +51,15 @@ const (
 // AwsCategorySource is the category of source actions.
 const AwsCategorySource = "Source"
 
+// AwsCategoryApproval is the category of manual approval actions.
+const AwsCategoryApproval = "Approval"
+
+// AwsOwnerCustom is the owner of actions that run a customer-defined action type.
+const AwsOwnerCustom = "Custom"
+
+// AwsPipelineTypeV2 is the pipeline type that bills action execution minutes.
+const AwsPipelineTypeV2 = "V2"
+
 // AwsProviderCodeBuild is the action provider of CodeBuild actions.
 const AwsProviderCodeBuild = "CodeBuild"
 
