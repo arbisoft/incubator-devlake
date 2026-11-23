@@ -74,9 +74,7 @@ func (s *awsStub) call(service tasks.AwsService, region, name string, in, out in
 		o.Metadata.PipelineArn = "arn:aws:codepipeline:" + region + ":123456789012:web"
 	case *tasks.AwsListPipelineExecutionsOutput:
 		for i := 0; i < s.runs; i++ {
-			o.PipelineExecutionSummaries = append(o.PipelineExecutionSummaries, struct {
-				PipelineExecutionId string `json:"pipelineExecutionId"`
-			}{"exec-1"})
+			o.PipelineExecutionSummaries = append(o.PipelineExecutionSummaries, tasks.AwsPipelineExecutionSummary{PipelineExecutionId: "exec-1"})
 		}
 	case *tasks.AwsListActionExecutionsOutput:
 		detail := tasks.AwsActionExecutionDetail{}
@@ -86,12 +84,7 @@ func (s *awsStub) call(service tasks.AwsService, region, name string, in, out in
 		}
 		o.ActionExecutionDetails = []tasks.AwsActionExecutionDetail{detail}
 	case *tasks.AwsBatchGetBuildsOutput:
-		o.Builds = make([]struct {
-			Logs struct {
-				GroupName  string `json:"groupName"`
-				StreamName string `json:"streamName"`
-			} `json:"logs"`
-		}, 1)
+		o.Builds = make([]tasks.AwsBuildDetail, 1)
 		if s.hasLogs {
 			o.Builds[0].Logs.GroupName, o.Builds[0].Logs.StreamName = "/aws/codebuild/build", "stream-1"
 		}

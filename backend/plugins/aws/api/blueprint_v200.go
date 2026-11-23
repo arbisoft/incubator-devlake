@@ -20,8 +20,6 @@ package api
 import (
 	"github.com/apache/incubator-devlake/core/errors"
 	coreModels "github.com/apache/incubator-devlake/core/models"
-	"github.com/apache/incubator-devlake/core/models/domainlayer/devops"
-	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/core/utils"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
@@ -80,13 +78,10 @@ func makeScopesV200(
 	connection *models.AwsConnection,
 ) []plugin.Scope {
 	scopes := make([]plugin.Scope, 0, len(scopeDetails))
-	idgen := didgen.NewDomainIdGenerator(&models.AwsPipeline{})
 	for _, scopeDetail := range scopeDetails {
 		scope, scopeConfig := scopeDetail.Scope, scopeDetail.ScopeConfig
 		if utils.StringsContains(scopeConfig.Entities, plugin.DOMAIN_TYPE_CICD) {
-			cicdScope := devops.NewCicdScope(idgen.Generate(connection.ID, scope.Arn), scope.Name)
-			cicdScope.Url = scope.Url
-			scopes = append(scopes, cicdScope)
+			scopes = append(scopes, models.NewAwsCicdScope(connection.ID, &scope))
 		}
 	}
 	return scopes

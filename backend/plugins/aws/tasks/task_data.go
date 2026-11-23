@@ -31,8 +31,12 @@ type AwsOptions struct {
 }
 
 type AwsTaskData struct {
-	Options    *AwsOptions
-	Connection *models.AwsConnection
+	Options            *AwsOptions
+	Connection         *models.AwsConnection
+	Scope              *models.AwsPipeline
+	CodePipelineClient *helper.ApiAsyncClient
+	CodeBuildClient    *helper.ApiAsyncClient
+	RegexEnricher      *helper.RegexEnricher
 }
 
 func DecodeAndValidateTaskOptions(options map[string]interface{}) (*AwsOptions, errors.Error) {

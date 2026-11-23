@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	"github.com/apache/incubator-devlake/core/models/common"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/devops"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
 	"github.com/apache/incubator-devlake/core/plugin"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 )
@@ -32,6 +34,7 @@ type AwsPipeline struct {
 	Name          string `json:"name" mapstructure:"name" gorm:"type:varchar(255)"`
 	PipelineType  string `json:"pipelineType" mapstructure:"pipelineType" gorm:"type:varchar(16)"`
 	ExecutionMode string `json:"executionMode" mapstructure:"executionMode" gorm:"type:varchar(32)"`
+	Version       int    `json:"version" mapstructure:"version"`
 	Url           string `json:"url" mapstructure:"url" gorm:"type:varchar(512)"`
 }
 
@@ -72,4 +75,19 @@ func AwsPipelineConsoleUrl(region, name string) string {
 		return ""
 	}
 	return fmt.Sprintf("https://%s.console.aws.amazon.com/codesuite/codepipeline/pipelines/%s/view?region=%s", region, name, region)
+}
+
+// NewAwsCicdScope maps a pipeline scope to its domain CI/CD scope.
+func NewAwsCicdScope(connectionId uint64, scope *AwsPipeline) *devops.CicdScope {
+	cicdScope := devops.NewCicdScope(didgen.NewDomainIdGenerator(&AwsPipeline{}).Generate(connectionId, scope.Arn), scope.Name)
+	cicdScope.Url = scope.Url
+	return cicdScope
+}
+
+// AwsExecutionConsoleUrl returns the console link of a pipeline run, or "" outside the standard partition.
+func AwsExecutionConsoleUrl(region, name, executionId string) string {
+	if helper.AwsPartitionForRegion(region) != helper.AwsPartitionAws {
+		return ""
+	}
+	return fmt.Sprintf("https://%s.console.aws.amazon.com/codesuite/codepipeline/pipelines/%s/executions/%s/timeline?region=%s", region, name, executionId, region)
 }

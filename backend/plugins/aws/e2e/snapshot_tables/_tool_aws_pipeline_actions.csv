@@ -1,0 +1,7 @@
+connection_id,pipeline_arn,stage_name,action_name,category,provider,project_name,branch_name,full_repository_id
+1,arn:aws:codepipeline:us-east-2:111122223333:acme-ci-checks-pipeline,Source,GitHub_Source,Source,CodeStarSourceConnection,,develop,example-org/example-web
+1,arn:aws:codepipeline:us-east-2:111122223333:acme-ci-checks-pipeline,Test,Run_Tests,Build,CodeBuild,acme-ci-tests,,
+1,arn:aws:codepipeline:us-east-2:111122223333:acme-prod-backend-pipeline,Build,Build_Image,Build,CodeBuild,acme-prod-build,,
+1,arn:aws:codepipeline:us-east-2:111122223333:acme-prod-backend-pipeline,Deploy,Deploy_Service,Build,CodeBuild,acme-prod-deploy,,
+1,arn:aws:codepipeline:us-east-2:111122223333:acme-prod-backend-pipeline,Source,GitHub_ConfigSource,Source,CodeStarSourceConnection,,main,example-org/backend
+1,arn:aws:codepipeline:us-east-2:111122223333:acme-prod-backend-pipeline,Source,GitHub_Source,Source,CodeStarSourceConnection,,main,example-org/example-backend

@@ -1,0 +1,3 @@
+id,name,description,url
+aws:AwsPipeline:1:arn:aws:codepipeline:us-east-2:111122223333:acme-ci-checks-pipeline,acme-ci-checks-pipeline,,https://us-east-2.console.aws.amazon.com/codesuite/codepipeline/pipelines/acme-ci-checks-pipeline/view?region=us-east-2
+aws:AwsPipeline:1:arn:aws:codepipeline:us-east-2:111122223333:acme-prod-backend-pipeline,acme-prod-backend-pipeline,,https://us-east-2.console.aws.amazon.com/codesuite/codepipeline/pipelines/acme-prod-backend-pipeline/view?region=us-east-2

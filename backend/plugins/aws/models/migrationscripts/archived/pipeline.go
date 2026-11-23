@@ -29,6 +29,7 @@ type AwsPipeline struct {
 	Name          string `gorm:"type:varchar(255)"`
 	PipelineType  string `gorm:"type:varchar(16)"`
 	ExecutionMode string `gorm:"type:varchar(32)"`
+	Version       int
 	Url           string `gorm:"type:varchar(512)"`
 
 	archived.NoPKModel

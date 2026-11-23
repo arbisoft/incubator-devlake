@@ -25,6 +25,7 @@ import (
 
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/aws/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -105,6 +106,21 @@ func NewAwsApiClient(
 	client.SetAuthFunction(api.NewAwsSigner(provider, string(service), region).Sign)
 	client.SetAfterFunction(api.NewAwsAfterResponse(time.Sleep))
 	return client, nil
+}
+
+// NewAwsApiAsyncClient creates a rate-limited signing client for one service and region.
+func NewAwsApiAsyncClient(
+	taskCtx plugin.TaskContext,
+	connection *models.AwsConnection,
+	provider aws.CredentialsProvider,
+	service AwsService,
+	region string,
+) (*api.ApiAsyncClient, errors.Error) {
+	client, err := NewAwsApiClient(taskCtx.GetContext(), taskCtx, provider, service, region)
+	if err != nil {
+		return nil, err
+	}
+	return api.CreateAsyncApiClient(taskCtx, client, &api.ApiRateLimitCalculator{UserRateLimitPerHour: connection.RateLimitPerHour})
 }
 
 // PostAwsJson calls an action of a JSON 1.1 service and decodes the response into out.

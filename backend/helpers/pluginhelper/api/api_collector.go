@@ -78,6 +78,8 @@ type ApiCollectorArgs struct {
 	GetNextPageCustomData func(prevReqData *RequestData, prevPageResponse *http.Response) (interface{}, errors.Error)
 	// Incremental indicate if this is an incremental collection, the existing data won't get deleted if it was true
 	Incremental bool `comment:"indicate if this collection is incremental update"`
+	// PreserveRawData keeps the raw rows already collected for these params, even on a full sync; for sources that expire their own history
+	PreserveRawData bool
 	// ApiClient is a asynchronize api request client with qps
 	ApiClient       RateLimitedApiClient
 	MinTickInterval *time.Duration
@@ -168,7 +170,7 @@ func (collector *ApiCollector) Execute() errors.Error {
 		isIncremental = false
 	}
 	// flush data if not incremental collection
-	if !isIncremental {
+	if !isIncremental && !collector.args.PreserveRawData {
 		err = db.Delete(&RawData{}, dal.From(collector.table), dal.Where("params = ?", collector.params))
 		if err != nil {
 			return errors.Default.Wrap(err, "error deleting data from collector")

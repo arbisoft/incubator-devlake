@@ -32,6 +32,13 @@ func (*addInitTables) Up(basicRes context.BasicRes) errors.Error {
 		&archived.AwsConnection{},
 		&archived.AwsPipeline{},
 		&archived.AwsScopeConfig{},
+		&archived.AwsPipelineAction{},
+		&archived.AwsPipelineExecution{},
+		&archived.AwsExecutionSourceRevision{},
+		&archived.AwsActionExecution{},
+		&archived.AwsCodebuildProject{},
+		&archived.AwsCodebuildBuild{},
+		&archived.AwsCodebuildBuildPhase{},
 	)
 }
 

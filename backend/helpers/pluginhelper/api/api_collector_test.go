@@ -25,9 +25,11 @@ import (
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/unithelper"
 	mockdal "github.com/apache/incubator-devlake/mocks/core/dal"
+	mockplugin "github.com/apache/incubator-devlake/mocks/core/plugin"
 	mockapi "github.com/apache/incubator-devlake/mocks/helpers/pluginhelper/api"
 
 	"github.com/stretchr/testify/assert"
@@ -106,4 +108,69 @@ func TestFetchPageUndetermined(t *testing.T) {
 	assert.Nil(t, collector.Execute())
 
 	mockDal.AssertExpectations(t)
+}
+
+func TestExecuteFlushesRawDataUnlessPreserved(t *testing.T) {
+	cases := []struct {
+		name        string
+		incremental bool
+		fullSync    bool
+		preserve    bool
+		wantDelete  bool
+	}{
+		{name: "full collection flushes", wantDelete: true},
+		{name: "incremental keeps", incremental: true},
+		{name: "full sync overrides incremental", incremental: true, fullSync: true, wantDelete: true},
+		{name: "preserved on full collection", preserve: true},
+		{name: "preserved on full sync", incremental: true, fullSync: true, preserve: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDal := new(mockdal.Dal)
+			mockDal.On("AutoMigrate", mock.Anything, mock.Anything).Return(nil).Once()
+			if tc.wantDelete {
+				mockDal.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			}
+
+			mockCtx := new(mockplugin.SubTaskContext)
+			mockCtx.On("GetDal").Return(mockDal)
+			mockCtx.On("GetLogger").Return(unithelper.DummyLogger())
+			mockCtx.On("SetProgress", mock.Anything, mock.Anything)
+			mockCtx.On("GetName").Return("test")
+			policy := &models.SyncPolicy{}
+			policy.FullSync = tc.fullSync
+			mockTaskCtx := new(mockplugin.TaskContext)
+			mockTaskCtx.On("SyncPolicy").Return(policy)
+			mockCtx.On("TaskContext").Return(mockTaskCtx)
+
+			mockInput := new(mockapi.Iterator)
+			mockInput.On("HasNext").Return(false)
+			mockInput.On("Close").Return(nil)
+
+			mockApi := new(mockapi.RateLimitedApiClient)
+			mockApi.On("HasError").Return(false)
+			mockApi.On("WaitAsync").Return(nil)
+			mockApi.On("SetAfterFunction", mock.Anything).Return()
+
+			collector, err := NewApiCollector(ApiCollectorArgs{
+				RawDataSubTaskArgs: RawDataSubTaskArgs{
+					Ctx:     mockCtx,
+					Table:   "whatever rawtable",
+					Options: &TestOpts{},
+				},
+				ApiClient:       mockApi,
+				Input:           mockInput,
+				UrlTemplate:     "whatever url",
+				Incremental:     tc.incremental,
+				PreserveRawData: tc.preserve,
+				ResponseParser:  GetRawMessageArrayFromResponse,
+			})
+			assert.Nil(t, err)
+			assert.Nil(t, collector.Execute())
+			mockDal.AssertExpectations(t)
+			if !tc.wantDelete {
+				mockDal.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything)
+			}
+		})
+	}
 }

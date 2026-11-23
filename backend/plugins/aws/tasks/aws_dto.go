@@ -43,10 +43,41 @@ type AwsGetPipelineInput struct {
 	Name string `json:"name"`
 }
 
+type AwsActionTypeId struct {
+	Category string `json:"category"`
+	Provider string `json:"provider"`
+}
+
+// AwsActionConfiguration is the settings of an action; only the keys the connector reads are modelled.
+type AwsActionConfiguration struct {
+	ProjectName      string `json:"ProjectName,omitempty"`
+	BranchName       string `json:"BranchName,omitempty"`
+	FullRepositoryId string `json:"FullRepositoryId,omitempty"`
+}
+
+type AwsPipelineActionDeclaration struct {
+	Name          string                 `json:"name"`
+	ActionTypeId  AwsActionTypeId        `json:"actionTypeId"`
+	Configuration AwsActionConfiguration `json:"configuration"`
+}
+
+type AwsPipelineStageDeclaration struct {
+	Name    string                         `json:"name"`
+	Actions []AwsPipelineActionDeclaration `json:"actions"`
+}
+
+type AwsPipelineDeclaration struct {
+	PipelineType  string                        `json:"pipelineType"`
+	ExecutionMode string                        `json:"executionMode"`
+	Version       int                           `json:"version"`
+	Stages        []AwsPipelineStageDeclaration `json:"stages"`
+}
+
 type AwsGetPipelineOutput struct {
 	Metadata struct {
 		PipelineArn string `json:"pipelineArn"`
 	} `json:"metadata"`
+	Pipeline AwsPipelineDeclaration `json:"pipeline"`
 }
 
 type AwsListTagsInput struct {
@@ -56,12 +87,35 @@ type AwsListTagsInput struct {
 type AwsListPipelineExecutionsInput struct {
 	PipelineName string `json:"pipelineName"`
 	MaxResults   int    `json:"maxResults"`
+	NextToken    string `json:"nextToken,omitempty"`
+}
+
+type AwsSourceRevision struct {
+	ActionName      string `json:"actionName"`
+	RevisionId      string `json:"revisionId"`
+	RevisionSummary string `json:"revisionSummary"`
+	RevisionUrl     string `json:"revisionUrl"`
+}
+
+type AwsExecutionTrigger struct {
+	TriggerType   string `json:"triggerType"`
+	TriggerDetail string `json:"triggerDetail"`
+}
+
+type AwsPipelineExecutionSummary struct {
+	PipelineExecutionId string              `json:"pipelineExecutionId"`
+	Status              string              `json:"status"`
+	ExecutionMode       string              `json:"executionMode"`
+	ExecutionType       string              `json:"executionType"`
+	StartTime           *float64            `json:"startTime"`
+	LastUpdateTime      *float64            `json:"lastUpdateTime"`
+	SourceRevisions     []AwsSourceRevision `json:"sourceRevisions"`
+	Trigger             AwsExecutionTrigger `json:"trigger"`
 }
 
 type AwsListPipelineExecutionsOutput struct {
-	PipelineExecutionSummaries []struct {
-		PipelineExecutionId string `json:"pipelineExecutionId"`
-	} `json:"pipelineExecutionSummaries"`
+	PipelineExecutionSummaries []AwsPipelineExecutionSummary `json:"pipelineExecutionSummaries"`
+	NextToken                  string                        `json:"nextToken"`
 }
 
 type AwsActionExecutionFilter struct {
@@ -71,27 +125,63 @@ type AwsActionExecutionFilter struct {
 type AwsListActionExecutionsInput struct {
 	PipelineName string                   `json:"pipelineName"`
 	Filter       AwsActionExecutionFilter `json:"filter"`
+	MaxResults   int                      `json:"maxResults,omitempty"`
+	NextToken    string                   `json:"nextToken,omitempty"`
+}
+
+type AwsActionExecutionInput struct {
+	ActionTypeId  AwsActionTypeId        `json:"actionTypeId"`
+	Configuration AwsActionConfiguration `json:"configuration"`
+}
+
+type AwsActionExecutionResult struct {
+	ExternalExecutionId      string `json:"externalExecutionId"`
+	ExternalExecutionSummary string `json:"externalExecutionSummary"`
+	ErrorDetails             struct {
+		Code string `json:"code"`
+	} `json:"errorDetails"`
 }
 
 type AwsActionExecutionDetail struct {
-	Input struct {
-		Configuration struct {
-			ProjectName string `json:"ProjectName"`
-		} `json:"configuration"`
-	} `json:"input"`
-	Output struct {
-		ExecutionResult struct {
-			ExternalExecutionId string `json:"externalExecutionId"`
-		} `json:"executionResult"`
+	ActionExecutionId   string                  `json:"actionExecutionId"`
+	PipelineExecutionId string                  `json:"pipelineExecutionId"`
+	PipelineVersion     int                     `json:"pipelineVersion"`
+	StageName           string                  `json:"stageName"`
+	ActionName          string                  `json:"actionName"`
+	Status              string                  `json:"status"`
+	StartTime           *float64                `json:"startTime"`
+	LastUpdateTime      *float64                `json:"lastUpdateTime"`
+	Input               AwsActionExecutionInput `json:"input"`
+	Output              struct {
+		ExecutionResult AwsActionExecutionResult `json:"executionResult"`
 	} `json:"output"`
 }
 
 type AwsListActionExecutionsOutput struct {
 	ActionExecutionDetails []AwsActionExecutionDetail `json:"actionExecutionDetails"`
+	NextToken              string                     `json:"nextToken"`
+}
+
+type AwsEnvironment struct {
+	Type        string `json:"type"`
+	ComputeType string `json:"computeType"`
+	Image       string `json:"image"`
 }
 
 type AwsBatchGetProjectsInput struct {
 	Names []string `json:"names"`
+}
+
+type AwsCodebuildProjectDetail struct {
+	Name                   string         `json:"name"`
+	Arn                    string         `json:"arn"`
+	Environment            AwsEnvironment `json:"environment"`
+	TimeoutInMinutes       int            `json:"timeoutInMinutes"`
+	QueuedTimeoutInMinutes int            `json:"queuedTimeoutInMinutes"`
+}
+
+type AwsBatchGetProjectsOutput struct {
+	Projects []AwsCodebuildProjectDetail `json:"projects"`
 }
 
 type AwsListBuildsForProjectInput struct {
@@ -102,13 +192,41 @@ type AwsBatchGetBuildsInput struct {
 	Ids []string `json:"ids"`
 }
 
+type AwsBuildPhaseContext struct {
+	Message string `json:"message"`
+}
+
+type AwsBuildPhase struct {
+	PhaseType         string                 `json:"phaseType"`
+	PhaseStatus       string                 `json:"phaseStatus"`
+	StartTime         *float64               `json:"startTime"`
+	EndTime           *float64               `json:"endTime"`
+	DurationInSeconds int                    `json:"durationInSeconds"`
+	Contexts          []AwsBuildPhaseContext `json:"contexts"`
+}
+
+type AwsBuildDetail struct {
+	Id                    string         `json:"id"`
+	ProjectName           string         `json:"projectName"`
+	BuildNumber           int            `json:"buildNumber"`
+	BuildStatus           string         `json:"buildStatus"`
+	BuildComplete         bool           `json:"buildComplete"`
+	CurrentPhase          string         `json:"currentPhase"`
+	StartTime             *float64       `json:"startTime"`
+	EndTime               *float64       `json:"endTime"`
+	Initiator             string         `json:"initiator"`
+	ResolvedSourceVersion string         `json:"resolvedSourceVersion"`
+	TimeoutInMinutes      int            `json:"timeoutInMinutes"`
+	Environment           AwsEnvironment `json:"environment"`
+	Logs                  struct {
+		GroupName  string `json:"groupName"`
+		StreamName string `json:"streamName"`
+	} `json:"logs"`
+	Phases []AwsBuildPhase `json:"phases"`
+}
+
 type AwsBatchGetBuildsOutput struct {
-	Builds []struct {
-		Logs struct {
-			GroupName  string `json:"groupName"`
-			StreamName string `json:"streamName"`
-		} `json:"logs"`
-	} `json:"builds"`
+	Builds []AwsBuildDetail `json:"builds"`
 }
 
 type AwsGetLogEventsInput struct {
