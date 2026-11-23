@@ -77,6 +77,10 @@ const PLUGIN_INITIAL_VALUE_FIELDS = [
   'tenantId',
   'tenantType',
   'usesApiToken',
+  'sessionToken',
+  'roleArn',
+  'regions',
+  'useCostExplorer',
 ];
 
 const SAVE_CONNECTION_FIELDS = [...CONNECTION_FORM_FIELDS, ...PLUGIN_INITIAL_VALUE_FIELDS];
@@ -115,6 +119,13 @@ const CHANGED_TEST_FIELDS = [
   'enableWebhook',
   'webhookSharedKey',
   'customHeaders',
+  'authType',
+  'accessKeyId',
+  'secretAccessKey',
+  'sessionToken',
+  'roleArn',
+  'regions',
+  'useCostExplorer',
 ];
 
 const NEW_TEST_FIELDS = [
@@ -155,6 +166,11 @@ const NEW_TEST_FIELDS = [
   'enableWebhook',
   'webhookSharedKey',
   'customHeaders',
+  'authType',
+  'sessionToken',
+  'roleArn',
+  'regions',
+  'useCostExplorer',
 ];
 
 export const sanitizeCustomHeaders = (

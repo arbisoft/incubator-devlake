@@ -268,12 +268,18 @@ func (c *awsChecker) checkCredentials(ctx context.Context, conn *models.AwsConn,
 
 func firstFailure(checks []AwsPermissionCheck) string {
 	for _, check := range checks {
-		if check.blocksSuccess() {
-			if check.Region == "" {
-				return fmt.Sprintf("Check failed: %s", check.Action)
-			}
-			return fmt.Sprintf("Check failed: %s in %s", check.Action, check.Region)
+		if !check.blocksSuccess() {
+			continue
 		}
+		// The reason leads the message, so the user sees it without reading the table.
+		message := "Check failed: " + check.Action
+		if check.Region != "" {
+			message += " in " + check.Region
+		}
+		if check.Detail != "" {
+			message += ": " + check.Detail
+		}
+		return message
 	}
 	return ""
 }
@@ -292,13 +298,29 @@ func (check AwsPermissionCheck) blocksSuccess() bool {
 
 func (c *awsChecker) warnings(credentialsFailed bool) []string {
 	var warnings []string
+	type unverifiedKey struct{ region, detail string }
+	unverified := map[unverifiedKey][]string{}
+	var unverifiedOrder []unverifiedKey
 	for _, check := range c.checks {
 		switch {
 		case check.Requirement == models.AwsRequirementOptional && check.Status == AwsCheckDenied:
 			warnings = append(warnings, fmt.Sprintf("%s: %s is denied in %s.", models.AwsOptionalFeatures[check.Action], check.Action, check.Region))
 		case !credentialsFailed && check.Requirement == models.AwsRequirementRequired && check.Status == AwsCheckNotChecked && check.Detail != "":
-			warnings = append(warnings, fmt.Sprintf("Couldn't verify %s in %s: %s.", check.Action, check.Region, check.Detail))
+			key := unverifiedKey{check.Region, check.Detail}
+			if _, seen := unverified[key]; !seen {
+				unverifiedOrder = append(unverifiedOrder, key)
+			}
+			unverified[key] = append(unverified[key], check.Action)
 		}
+	}
+	// One line per region and cause, since a failed first call leaves every later check of that region unverified.
+	for _, key := range unverifiedOrder {
+		actions := unverified[key]
+		if len(actions) == 1 {
+			warnings = append(warnings, fmt.Sprintf("Couldn't verify %s in %s: %s.", actions[0], key.region, key.detail))
+			continue
+		}
+		warnings = append(warnings, fmt.Sprintf("Couldn't verify %d permissions in %s: %s.", len(actions), key.region, key.detail))
 	}
 	return warnings
 }

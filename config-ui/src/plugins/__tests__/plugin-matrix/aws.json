@@ -1,0 +1,108 @@
+{
+  "plugin": "aws",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "secretAccessKey": "",
+      "rateLimitPerHour": 10000
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "AKIAIOSFODNN7EXAMPLE"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your secret access key"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "arn:aws:iam::123456789012:role/devlake"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      },
+      {
+        "tag": "input",
+        "role": "spinbutton"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Authentication*Two connections to the same AWS account in one project double-count deployments, so connect each account once.Assume roleRecommended. DevLake borrows a read-only role in your account with an External ID.Access keyDevLake signs requests with the access key of one IAM user.Broker access key ID*Access key ID of the IAM user DevLake signs in with before assuming the role.Broker secret access key*Secret access key paired with the broker access key ID.Role ARNARN of the role DevLake assumes. Save first to get the External ID, then create the role and enter its ARN.Regions*AWS regions to read pipelines from. Pick from the list or type a region code such as us-east-2.us-east-2Use Cost ExplorerReal spend by service from Cost Explorer. AWS bills each request (about $0.01); DevLake makes about 2 per night.Save the connection to see the External ID and the policies to create.Custom Rate LimitSet a fixed hourly rate limit if you need to throttle collection speed (default 10,000). requests/hour",
+    "typed": {
+      "name": "v0",
+      "secretAccessKey": "v2",
+      "rateLimitPerHour": 10000,
+      "accessKeyId": "v1",
+      "roleArn": "v3"
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "deploymentPattern": "(?i)(deploy|release)",
+      "productionPattern": "(?i)(^|[^a-z])prod(uction)?([^a-z]|$)",
+      "trivyTotalsPattern": "Total: (\\d+) \\((.*)\\)",
+      "smokeTestPattern": "(?i)smoke test (passed|failed)",
+      "rollbackPattern": "(?i)(rolling .* back|rolled back|rollback)"
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text"
+      },
+      {
+        "tag": "input",
+        "type": "text"
+      },
+      {
+        "tag": "input",
+        "type": "text"
+      },
+      {
+        "tag": "input",
+        "type": "text"
+      },
+      {
+        "tag": "input",
+        "type": "text"
+      }
+    ],
+    "text": "DeploymentsWhich runs count as deployments and which pipelines are production, for DORA.DeploymentMatched against stage and action names. A pipeline with a matching stage or action is a deployment pipeline: every run counts as a deployment for DORA.ProductionMatched against the pipeline name. Leave empty to treat every pipeline as production.Build log signalsMatched against build log lines. Echoed script lines are ignored, and smoke-test and rollback patterns apply only to deployment builds. Logs expire (about 14 days), so a changed pattern applies to new builds, and to older ones still in retention after a full re-sync.Trivy totalsTrivy's summary line. Group 1 is the total and group 2 the counts by severity.Smoke testGroup 1 captures whether the smoke test passed or failed.RollbackEach matching line counts as one rollback.",
+    "typed": {
+      "deploymentPattern": "v0",
+      "productionPattern": "v1",
+      "trivyTotalsPattern": "v2",
+      "smokeTestPattern": "v3",
+      "rollbackPattern": "v4"
+    }
+  },
+  "consoleErrors": [],
+  "requests": []
+}

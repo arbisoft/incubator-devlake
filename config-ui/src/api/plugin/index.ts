@@ -18,6 +18,7 @@
 
 import { request } from '@/utils';
 
+import * as aws from './aws';
 import * as jira from './jira';
 import * as tapd from './tapd';
 import * as webhook from './webhook';
@@ -27,6 +28,7 @@ const list = (): Promise<[{ plugin: string }]> => request('/plugins');
 
 const plugin = {
   list,
+  aws,
   jira,
   tapd,
   webhook,

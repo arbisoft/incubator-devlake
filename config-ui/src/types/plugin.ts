@@ -18,6 +18,8 @@
 
 import type { ReactNode } from 'react';
 
+import type { IConnectionTestResult } from './connection';
+
 export type ScopeConfigTransformation = Record<string, unknown>;
 
 export type ConnectionFieldValues = Record<string, unknown>;
@@ -69,6 +71,8 @@ export interface IPluginConfig {
     // the plugin's test API (e.g. the authenticated login, soft warnings)
     // instead of the generic toast
     showTestResultMessage?: boolean;
+    // rendered between the fields and the actions after a Test, while the form values are unchanged
+    renderTestResult?: (result: IConnectionTestResult) => ReactNode;
   };
   dataScope: {
     localSearch?: boolean;

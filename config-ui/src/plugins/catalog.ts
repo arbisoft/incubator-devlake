@@ -44,6 +44,7 @@ export const PLUGIN_CATALOG: Record<string, CatalogEntry> = {
   bamboo: { category: CI_CD, weight: 130 },
   argocd: { category: CI_CD, weight: 140 },
   testmo: { category: CI_CD, weight: 150 },
+  aws: { category: CI_CD, weight: 160 },
   jira: { category: ISSUES, weight: 210 },
   linear: { category: ISSUES, weight: 220 },
   asana: { category: ISSUES, weight: 230 },

@@ -145,7 +145,7 @@ func TestRunAwsChecks(t *testing.T) {
 		stub.failures[stubKey{"us-east-2", listPipelines}] = awsDenied()
 		res := runAwsChecks(context.Background(), newConn("us-east-1", "us-east-2"), okProvider(), stub.call)
 		require.False(t, res.Success)
-		require.Equal(t, "Check failed: codepipeline:ListPipelines in us-east-2", res.Message)
+		require.Equal(t, "Check failed: codepipeline:ListPipelines in us-east-2: not allowed", res.Message)
 		require.Equal(t, AwsCheckAllowed, checkOf(res, "us-east-1", models.AwsActionGetPipeline).Status)
 		require.Equal(t, AwsCheckDenied, checkOf(res, "us-east-2", listPipelines).Status)
 		require.Equal(t, "not allowed", checkOf(res, "us-east-2", listPipelines).Detail)
@@ -158,7 +158,7 @@ func TestRunAwsChecks(t *testing.T) {
 		stub.pipelines = nil
 		res := runAwsChecks(context.Background(), newConn("us-east-1"), okProvider(), stub.call)
 		require.True(t, res.Success)
-		require.Contains(t, res.Warnings, "Couldn't verify codepipeline:GetPipeline in us-east-1: no pipeline in this region.")
+		require.Equal(t, []string{"Couldn't verify 5 permissions in us-east-1: no pipeline in this region."}, res.Warnings)
 		require.Equal(t, AwsCheckAllowed, checkOf(res, "us-east-1", listPipelines).Status)
 		require.Equal(t, AwsCheckAllowed, checkOf(res, "us-east-1", models.AwsActionListProjects).Status)
 		require.Equal(t, AwsCheckNotChecked, checkOf(res, "us-east-1", models.AwsActionGetPipeline).Status)
@@ -170,7 +170,7 @@ func TestRunAwsChecks(t *testing.T) {
 		stub.runs = 0
 		res := runAwsChecks(context.Background(), newConn("us-east-1"), okProvider(), stub.call)
 		require.True(t, res.Success)
-		require.Contains(t, res.Warnings, "Couldn't verify codepipeline:ListActionExecutions in us-east-1: no run yet.")
+		require.Equal(t, []string{"Couldn't verify 3 permissions in us-east-1: no run yet."}, res.Warnings)
 		require.Equal(t, "no run yet", checkOf(res, "us-east-1", models.AwsActionListActionExecutions).Detail)
 		require.Equal(t, "no run yet", checkOf(res, "us-east-1", models.AwsActionBatchGetProjects).Detail)
 	})
@@ -180,7 +180,7 @@ func TestRunAwsChecks(t *testing.T) {
 		stub.hasBuild = false
 		res := runAwsChecks(context.Background(), newConn("us-east-1"), okProvider(), stub.call)
 		require.True(t, res.Success)
-		require.Contains(t, res.Warnings, "Couldn't verify codebuild:BatchGetBuilds in us-east-1: no CodeBuild action in the latest run.")
+		require.Equal(t, []string{"Couldn't verify 2 permissions in us-east-1: no CodeBuild action in the latest run."}, res.Warnings)
 		require.Equal(t, "no CodeBuild action in the latest run", checkOf(res, "us-east-1", models.AwsActionBatchGetBuilds).Detail)
 	})
 
@@ -219,7 +219,7 @@ func TestRunAwsChecks(t *testing.T) {
 		stub.failures[stubKey{"us-east-1", models.AwsActionListPipelineExecutions}] = lakeErrors.Default.New("connection reset by peer")
 		res := runAwsChecks(context.Background(), newConn("us-east-1"), okProvider(), stub.call)
 		require.False(t, res.Success)
-		require.Equal(t, "Check failed: codepipeline:ListPipelineExecutions in us-east-1", res.Message)
+		require.Equal(t, "Check failed: codepipeline:ListPipelineExecutions in us-east-1: "+detailRequestFailed, res.Message)
 		require.Equal(t, AwsCheckError, checkOf(res, "us-east-1", models.AwsActionListPipelineExecutions).Status)
 	})
 
@@ -245,7 +245,7 @@ func TestRunAwsChecks(t *testing.T) {
 		conn.UseCostExplorer = true
 		res := runAwsChecks(context.Background(), conn, okProvider(), stub.call)
 		require.False(t, res.Success)
-		require.Equal(t, "Check failed: ce:GetCostAndUsage in us-east-1", res.Message)
+		require.Equal(t, "Check failed: ce:GetCostAndUsage in us-east-1: not allowed", res.Message)
 	})
 
 	t.Run("cost explorer off has no ce rows", func(t *testing.T) {
@@ -282,7 +282,7 @@ func TestRunAwsChecksCredentials(t *testing.T) {
 			stub := newAwsStub()
 			res := runAwsChecks(context.Background(), assumeRole, failingProvider(tt.code), stub.call)
 			require.False(t, res.Success)
-			require.Equal(t, "Check failed: sts:AssumeRole", res.Message)
+			require.Equal(t, "Check failed: sts:AssumeRole: "+tt.wantDetail, res.Message)
 			require.Equal(t, tt.wantStatus, res.Checks[0].Status)
 			require.Equal(t, tt.wantDetail, res.Checks[0].Detail)
 			require.Empty(t, stub.calls, "nothing is called after the role can't be assumed")
@@ -308,4 +308,20 @@ func TestRunAwsChecksCredentials(t *testing.T) {
 			require.Equal(t, detailCredentialsFailed, checkOf(res, "us-east-1", models.AwsActionListPipelines).Detail)
 		})
 	}
+}
+
+func TestAwsCheckerWarningsGroupUnverifiedChecksByRegionAndCause(t *testing.T) {
+	unverified := func(region, action, detail string) AwsPermissionCheck {
+		return AwsPermissionCheck{Action: action, Region: region, Requirement: models.AwsRequirementRequired, Status: AwsCheckNotChecked, Detail: detail}
+	}
+	c := &awsChecker{checks: []AwsPermissionCheck{
+		unverified("us-east-1", models.AwsActionGetPipeline, "ListPipelines did not succeed in this region"),
+		unverified("us-east-1", models.AwsActionListPipelineExecutions, "ListPipelines did not succeed in this region"),
+		unverified("us-east-2", models.AwsActionBatchGetBuilds, "no CodeBuild action in the latest run"),
+	}}
+	require.Equal(t, []string{
+		"Couldn't verify 2 permissions in us-east-1: ListPipelines did not succeed in this region.",
+		"Couldn't verify codebuild:BatchGetBuilds in us-east-2: no CodeBuild action in the latest run.",
+	}, c.warnings(false))
+	require.Empty(t, c.warnings(true))
 }

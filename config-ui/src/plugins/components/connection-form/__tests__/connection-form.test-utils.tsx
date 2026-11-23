@@ -16,10 +16,11 @@
  *
  */
 
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { vi } from 'vitest';
 
 import API from '@/api';
+import type { IConnectionTestResult } from '@/types';
 import { withMockedMessage } from '@/ui/__tests__/mock-message';
 
 import type { ConnectionFormType, ConnectionFormValues } from '../types';
@@ -43,6 +44,7 @@ const mocks = vi.hoisted(() => {
         fields: string[];
         initialValues: Record<string, unknown>;
         showTestResultMessage?: boolean;
+        renderTestResult?: (result: IConnectionTestResult) => ReactNode;
       };
     },
     dispatch: vi.fn(),
@@ -116,7 +118,10 @@ export const test = vi.mocked(API.connection.test);
 export const get = vi.mocked(API.connection.get);
 export { mocks };
 
-export const setPluginConfig = (showTestResultMessage = false) => {
+export const setPluginConfig = (
+  showTestResultMessage = false,
+  renderTestResult?: (result: IConnectionTestResult) => ReactNode,
+) => {
   mocks.pluginConfig = {
     name: 'GitLab',
     connection: {
@@ -124,6 +129,7 @@ export const setPluginConfig = (showTestResultMessage = false) => {
       fields: ['endpoint'],
       initialValues: { endpoint: mocks.defaultEndpoint },
       showTestResultMessage,
+      renderTestResult,
     },
   };
 };

@@ -30,6 +30,7 @@ type ScopeIdInput = {
   projectId?: unknown;
   teamId?: unknown;
   folderId?: unknown;
+  arn?: unknown;
 };
 
 export const getPluginScopeId = (plugin: string, scope: ScopeIdInput): string => {
@@ -74,6 +75,9 @@ export const getPluginScopeId = (plugin: string, scope: ScopeIdInput): string =>
       break;
     case 'plane':
       id = scope.projectId;
+      break;
+    case 'aws':
+      id = scope.arn;
       break;
     default:
       ({ id } = scope);
