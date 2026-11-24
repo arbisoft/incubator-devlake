@@ -222,7 +222,7 @@ func (w *Worker) process(ctx context.Context, row *models.EmailHistory) errors.E
 	sendCtx, cancel := context.WithTimeout(ctx, w.sendTimeout)
 	messageID, sendErr := w.mailer.Send(sendCtx, w.message(row))
 	cancel()
-	if sendErr != nil && ctx.Err() != nil {
+	if sendErr != nil && !IsPartial(sendErr) && ctx.Err() != nil {
 		// shutting down: leave the row QUEUED for the next start, without spending an attempt
 		row.Attempts--
 	}
@@ -285,6 +285,10 @@ func (w *Worker) message(row *models.EmailHistory) *Message {
 func (w *Worker) logOutcome(row *models.EmailHistory, sendErr error) {
 	switch row.Status {
 	case models.EmailStatusSent:
+		if sendErr != nil {
+			w.logger.Warn(sendErr, "mail sent to some recipients only id=%d template=%s attempts=%d", row.ID, row.Template, row.Attempts)
+			return
+		}
 		w.logger.Info("mail sent id=%d template=%s attempts=%d", row.ID, row.Template, row.Attempts)
 	case models.EmailStatusFailed:
 		w.logger.Error(sendErr, "mail failed id=%d template=%s attempts=%d", row.ID, row.Template, row.Attempts)
@@ -305,6 +309,7 @@ type outcome struct {
 
 // decide turns one attempt's result into the row's next state. It does no I/O.
 //   - success: SENT now;
+//   - delivered to some recipients only: SENT now, with the error naming the others;
 //   - shutting down: stays QUEUED, due again at once;
 //   - permanent error, or attempts used up: FAILED with the error;
 //   - otherwise: stays QUEUED until now + backoff(attempts), with the error kept for the screen.
@@ -313,6 +318,10 @@ func decide(attempts, maxAttempts int, sendErr error, shuttingDown bool, now tim
 		return outcome{status: models.EmailStatusSent, sentOn: &now}
 	}
 	msg := errorText(sendErr)
+	if IsPartial(sendErr) {
+		// some recipients got it: sending again would duplicate theirs, so keep the reason for the rest
+		return outcome{status: models.EmailStatusSent, sentOn: &now, errorMessage: msg}
+	}
 	if shuttingDown {
 		return outcome{status: models.EmailStatusQueued, errorMessage: msg}
 	}

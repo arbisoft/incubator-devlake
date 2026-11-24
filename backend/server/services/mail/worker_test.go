@@ -199,6 +199,21 @@ func TestWorkerFailsPermanentErrorsAtOnce(t *testing.T) {
 	assert.Contains(t, *row.ErrorMessage, "550 no such user")
 }
 
+func TestWorkerRecordsAPartialSendAsSent(t *testing.T) {
+	row := queuedRow(12)
+	q := &fakeQueue{rows: []*models.EmailHistory{row}}
+	m := &fakeMailer{results: []error{Partial(goerrors.New("550 no such user b@arbisoft.com"))}}
+	w, logger := newTestWorker(t, q, m, 3)
+
+	w.drain(context.Background())
+
+	assert.Equal(t, models.EmailStatusSent, row.Status, "sending again would duplicate the delivered copies")
+	assert.Equal(t, fixedNow, *row.SentOn)
+	assert.Contains(t, *row.ErrorMessage, "550 no such user b@arbisoft.com")
+	assert.Nil(t, row.NextAttemptAt)
+	assert.Contains(t, logger.all(), "WARN mail sent to some recipients only id=12")
+}
+
 func TestWorkerPicksUpRowsLeftByARestart(t *testing.T) {
 	// a row that had one attempt before the restart and is now due
 	past := fixedNow.Add(-time.Hour)

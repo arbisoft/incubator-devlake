@@ -47,8 +47,9 @@ const (
 type fakeSMTP struct {
 	t         *testing.T
 	ln        net.Listener
-	tlsConfig *tls.Config // nil: STARTTLS is not offered
-	rcptReply string      // reply to RCPT TO; empty means "250 OK"
+	tlsConfig *tls.Config       // nil: STARTTLS is not offered
+	rcptReply string            // reply to RCPT TO; empty means "250 OK"
+	rejects   map[string]string // reply to RCPT TO for single addresses, checked after rcptReply
 	wg        sync.WaitGroup
 
 	mu       sync.Mutex // guards the fields below
@@ -57,6 +58,7 @@ type fakeSMTP struct {
 	usedTLS  bool
 	rcpts    []string
 	data     string
+	datas    []string // every message body, in order
 }
 
 func startFakeSMTP(t *testing.T, tlsConfig *tls.Config, rcptReply string) *fakeSMTP {
@@ -146,6 +148,10 @@ func (s *fakeSMTP) session(conn net.Conn) {
 				reply(s.rcptReply)
 				continue
 			}
+			if r, ok := s.rejects[strings.Trim(strings.TrimPrefix(strings.SplitN(cmd, " ", 2)[1], "TO:"), "<>")]; ok {
+				reply(r)
+				continue
+			}
 			s.mu.Lock()
 			s.rcpts = append(s.rcpts, cmd)
 			s.mu.Unlock()
@@ -165,6 +171,7 @@ func (s *fakeSMTP) session(conn net.Conn) {
 			}
 			s.mu.Lock()
 			s.data = b.String()
+			s.datas = append(s.datas, s.data)
 			s.mu.Unlock()
 			reply("250 OK queued")
 		case "QUIT":
@@ -276,6 +283,70 @@ func TestSMTPMailerClassifiesFailures(t *testing.T) {
 			require.NotNil(t, sendErr)
 			assert.Equal(t, tc.permanent, IsPermanent(sendErr), sendErr.Error())
 			assert.NotContains(t, sendErr.Error(), fakePassword)
+		})
+	}
+}
+
+func TestSMTPMailerSendsEachRecipientTheirOwnCopy(t *testing.T) {
+	srv := startFakeSMTP(t, nil, "")
+	m, err := NewSMTPMailer(SMTPConfig{Host: "127.0.0.1", Port: srv.port(), Security: SecurityNone, Auth: AuthNone, Timeout: 5 * time.Second})
+	require.Nil(t, err)
+	msg := testMessage()
+	msg.To = []string{"ali@arbisoft.com", "sara@arbisoft.com"}
+
+	id, sendErr := m.Send(context.Background(), msg)
+
+	require.Nil(t, sendErr)
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	assert.Equal(t, []string{"RCPT TO:<ali@arbisoft.com>", "RCPT TO:<sara@arbisoft.com>"}, srv.rcpts)
+	require.Len(t, srv.datas, 2)
+	assert.Contains(t, srv.datas[0], "To: <ali@arbisoft.com>")
+	assert.NotContains(t, srv.datas[0], "sara@arbisoft.com", "a copy names only its own recipient")
+	assert.Contains(t, srv.datas[1], "To: <sara@arbisoft.com>")
+	for _, d := range srv.datas {
+		assert.Contains(t, d, "Message-ID: "+id, "every copy shares the Message-ID")
+	}
+}
+
+func TestSMTPMailerRejectedRecipientDoesNotBlockTheOthers(t *testing.T) {
+	cases := []struct {
+		name      string
+		rejects   map[string]string
+		partial   bool
+		permanent bool
+	}{
+		{"one rejected: the rest are delivered", map[string]string{"gone@arbisoft.com": "550 5.1.1 No such user"}, true, false},
+		{"all rejected with 5xx: permanent", map[string]string{
+			"gone@arbisoft.com": "550 5.1.1 No such user", "ali@arbisoft.com": "550 5.1.1 No such user"}, false, true},
+		{"all rejected, one with 4xx: temporary", map[string]string{
+			"gone@arbisoft.com": "550 5.1.1 No such user", "ali@arbisoft.com": "452 4.2.2 Mailbox full"}, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := startFakeSMTP(t, nil, "")
+			srv.rejects = tc.rejects
+			m, err := NewSMTPMailer(SMTPConfig{Host: "127.0.0.1", Port: srv.port(), Security: SecurityNone, Auth: AuthNone, Timeout: 5 * time.Second})
+			require.Nil(t, err)
+			msg := testMessage()
+			msg.To = []string{"gone@arbisoft.com", "ali@arbisoft.com"}
+
+			id, sendErr := m.Send(context.Background(), msg)
+
+			require.NotNil(t, sendErr)
+			assert.Equal(t, tc.partial, IsPartial(sendErr), sendErr.Error())
+			assert.Equal(t, tc.permanent, IsPermanent(sendErr), sendErr.Error())
+			assert.Contains(t, sendErr.Error(), "gone@arbisoft.com")
+			if tc.partial {
+				assert.NotEmpty(t, id)
+				assert.Contains(t, sendErr.Error(), "not delivered to 1 of 2 recipients")
+				srv.mu.Lock()
+				assert.Equal(t, []string{"RCPT TO:<ali@arbisoft.com>"}, srv.rcpts)
+				assert.Len(t, srv.datas, 1)
+				srv.mu.Unlock()
+			} else {
+				assert.Empty(t, id)
+			}
 		})
 	}
 }

@@ -39,7 +39,8 @@ type Message struct {
 
 // Mailer sends one message through a provider.
 //
-// Send returns the provider's message id (empty when the provider has none) or an error. An error
+// Send returns the provider's message id (empty when the provider has none) or an error. A send that
+// reached some recipients but not all returns the message id and an error marked with Partial. An error
 // that retrying can't fix (a rejected address, failed authentication, a 5xx reply) is marked with
 // Permanent, so IsPermanent reports true for it; every other error is treated as temporary. The
 // error's own message (errors.Error.Messages) states the provider's reason, because that message,
@@ -62,6 +63,28 @@ func Permanent(err error) error {
 		return nil
 	}
 	return &permanentError{cause: err}
+}
+
+// partialError marks a send that reached some recipients but not all. Like permanentError it is a
+// leaf, so errors.As finds it through core/errors wrapping.
+type partialError struct{ cause error }
+
+func (p *partialError) Error() string { return p.cause.Error() }
+
+// Partial marks err as a send that was delivered to some recipients only. Drivers return it with the
+// Message-ID; the worker records the email as SENT and keeps the error for the failed recipients.
+// It returns nil for nil.
+func Partial(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &partialError{cause: err}
+}
+
+// IsPartial reports whether err, or anything it wraps, was marked with Partial.
+func IsPartial(err error) bool {
+	var p *partialError
+	return goerrors.As(err, &p)
 }
 
 // IsPermanent reports whether err, or anything it wraps, was marked with Permanent.
