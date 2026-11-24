@@ -180,8 +180,12 @@ func (w *Worker) drain(ctx context.Context) bool {
 }
 
 // process makes one attempt to send row and saves the outcome. The attempt is counted before
-// sending, so a crash mid-send can't make the worker retry forever.
+// sending, and a row whose attempts are already used up is failed without sending, so a crash
+// mid-send can't make the worker retry forever.
 func (w *Worker) process(ctx context.Context, row *models.EmailHistory) errors.Error {
+	if row.Attempts >= w.maxAttempts {
+		return w.failInterrupted(row)
+	}
 	row.Attempts++
 	row.UpdatedAt = w.now().UTC()
 	if err := w.store.Save(row); err != nil {
@@ -200,6 +204,24 @@ func (w *Worker) process(ctx context.Context, row *models.EmailHistory) errors.E
 		return err
 	}
 	w.logOutcome(row, sendErr)
+	return nil
+}
+
+// interruptedMessage is the reason kept on a row whose last attempt never recorded an outcome.
+const interruptedMessage = "the last attempt was interrupted before its result was saved; not sent again"
+
+// failInterrupted marks a row FAILED without sending. It is only reached when the process stopped
+// during the last allowed attempt, so the email may or may not have been delivered.
+func (w *Worker) failInterrupted(row *models.EmailHistory) errors.Error {
+	msg := interruptedMessage
+	row.Status = models.EmailStatusFailed
+	row.NextAttemptAt = nil
+	row.ErrorMessage = &msg
+	row.UpdatedAt = w.now().UTC()
+	if err := w.store.Save(row); err != nil {
+		return err
+	}
+	w.logger.Error(nil, "mail failed id=%d template=%s attempts=%d: last attempt was interrupted", row.ID, row.Template, row.Attempts)
 	return nil
 }
 

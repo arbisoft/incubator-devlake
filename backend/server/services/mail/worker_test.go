@@ -188,6 +188,23 @@ func TestWorkerPicksUpRowsLeftByARestart(t *testing.T) {
 	assert.Equal(t, 2, row.Attempts)
 }
 
+func TestWorkerFailsARowWhoseLastAttemptWasInterrupted(t *testing.T) {
+	// the process died during the last allowed attempt: the row is still QUEUED with every attempt spent
+	row := queuedRow(6)
+	row.Attempts = 4
+	q, m := &fakeQueue{rows: []*models.EmailHistory{row}}, &fakeMailer{}
+	w, logger := newTestWorker(t, q, m, 3)
+
+	w.drain(context.Background())
+
+	assert.Empty(t, m.sent, "an interrupted last attempt is not sent again")
+	assert.Equal(t, models.EmailStatusFailed, row.Status)
+	assert.Equal(t, 4, row.Attempts)
+	assert.Equal(t, interruptedMessage, *row.ErrorMessage)
+	assert.Equal(t, 1, q.saves)
+	assert.Contains(t, logger.all(), "ERROR mail failed id=6 template=alert attempts=4")
+}
+
 func TestWorkerShutdownKeepsTheRowQueuedWithoutSpendingAnAttempt(t *testing.T) {
 	row := queuedRow(4)
 	ctx, cancel := context.WithCancel(context.Background())
