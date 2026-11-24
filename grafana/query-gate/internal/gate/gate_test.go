@@ -180,7 +180,7 @@ func newCustomHarness(t *testing.T, mode config.Mode, root string, tweak func(g 
 	logs := &bytes.Buffer{}
 	sets := func() *templates.Set { return set }
 	status := func() gatesync.Status { return gatesync.Status{} }
-	g := New(cfg, target, identity.New(target, root), sets, status, slog.New(slog.NewJSONHandler(logs, nil))).(*Gate)
+	g := New(cfg, target, identity.New(target, root), sets, status, 0, slog.New(slog.NewJSONHandler(logs, nil))).(*Gate)
 	if tweak != nil {
 		tweak(g, &g.sets)
 	}
@@ -531,7 +531,7 @@ func TestOrgAdminBypassOnlyForCurrentOrg(t *testing.T) {
 func TestHealthEndpoints(t *testing.T) {
 	h := newHarness(t, config.ModeReport, "")
 	status, body := h.do(t, http.MethodGet, "/gate/healthz", "", "", "")
-	if status != 200 || body != `{"mode":"report","status":"ok","sync":{"enabled":false,"consecutive_failures":0},"templates":2}` {
+	if status != 200 || body != `{"mode":"report","shipped_errors":0,"status":"ok","sync":{"enabled":false,"consecutive_failures":0},"templates":2}` {
 		t.Fatalf("healthz %d %s", status, body)
 	}
 	status, body = h.do(t, http.MethodGet, "/gate/readyz", "", "", "")
@@ -547,6 +547,14 @@ func TestHealthEndpoints(t *testing.T) {
 	status, _ = h.do(t, http.MethodGet, "/gate/readyz", "", "", "")
 	if status != 503 {
 		t.Fatalf("readyz unreachable %d", status)
+	}
+}
+
+func TestHealthzReportsShippedErrors(t *testing.T) {
+	h := newCustomHarness(t, config.ModeReport, "", func(g *Gate, _ *func() *templates.Set) { g.shippedErrors = 2 })
+	status, body := h.do(t, http.MethodGet, "/gate/healthz", "", "", "")
+	if status != 200 || !strings.Contains(body, `"shipped_errors":2`) {
+		t.Fatalf("healthz %d %s", status, body)
 	}
 }
 
