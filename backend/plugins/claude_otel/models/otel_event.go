@@ -38,11 +38,11 @@ type OtelEvent struct {
 	UserAccountId       *string `gorm:"type:varchar(255)"`
 	UserAccountUUID     *string `gorm:"type:varchar(255)"`
 	UserEmail           *string `gorm:"type:varchar(255);index"`
-	SessionId           string  `gorm:"type:varchar(128);index:idx_otel_event_session_time,priority:1"`
+	SessionId           string  `gorm:"type:varchar(128);index:idx_otel_event_session_time,priority:1;index:idx_otel_event_session_name_time,priority:1"`
 	PromptId            string  `gorm:"type:varchar(128);index"`
-	EventName           string  `gorm:"type:varchar(100);index"`
+	EventName           string  `gorm:"type:varchar(100);index;index:idx_otel_event_session_name_time,priority:2"`
 	EventSequence       *int64
-	EventTimestamp      time.Time `gorm:"type:datetime(3);index;index:idx_otel_event_user_time,priority:3;index:idx_otel_event_session_time,priority:2"`
+	EventTimestamp      time.Time `gorm:"type:datetime(3);index;index:idx_otel_event_user_time,priority:3;index:idx_otel_event_session_time,priority:2;index:idx_otel_event_session_name_time,priority:3"`
 	AppVersion          string    `gorm:"type:varchar(64)"`
 	TerminalType        string    `gorm:"type:varchar(100)"`
 	Model               string    `gorm:"type:varchar(255)"`

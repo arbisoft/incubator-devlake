@@ -32,5 +32,6 @@ func All() []plugin.MigrationScript {
 		new(normalizeAiPromptModelsUsed),
 		new(addClaudeCodeOtelHourlyAttribution),
 		new(addClaudeCodeOtelHourlySessionStarts),
+		new(addClaudeCodeOtelEventSessionNameIndex),
 	}
 }
