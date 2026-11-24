@@ -16,13 +16,23 @@
  *
  */
 
+import { useDebounce } from 'ahooks';
 import { DatePicker } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
 
 import API from '@/api';
 import { useRefreshData } from '@/hooks';
-import { DataTable, ListPage, ListToolbar, PageHeader, buildListEmpty, useListState, useRefreshVersion } from '@/ui';
+import {
+  DataTable,
+  ListPage,
+  ListToolbar,
+  PageHeader,
+  SEARCH_DEBOUNCE_MS,
+  buildListEmpty,
+  useListState,
+  useRefreshVersion,
+} from '@/ui';
 import { operator } from '@/utils';
 
 import { getColumns } from './columns';
@@ -31,7 +41,7 @@ import { COPY, DEFAULT_FILTERS, EMAIL_STATUS, FILTER_PARAM, PROJECT_OPTIONS_LIMI
 import { FilterSelect, ProjectSelect } from './styled';
 import type { EmailHistoryItem, HistoryFilters, HistorySortKey } from './types';
 import { useQueuedPoll } from './use-queued-poll';
-import { buildHistoryQuery, getStatusLabel, getTemplateLabel, toDateRange } from './utils';
+import { buildHistoryQuery, buildProjectOptions, getStatusLabel, getTemplateLabel, toDateRange } from './utils';
 
 const statusOptions = Object.values(EMAIL_STATUS).map((value) => ({ value, label: getStatusLabel(value) }));
 const templateOptions = TEMPLATES.map((value) => ({ value, label: getTemplateLabel(value) }));
@@ -48,13 +58,20 @@ export const EmailHistory = () => {
   const { data, ready, error } = useRefreshData((signal) => API.mail.history(query, signal), [version, query]);
   useQueuedPoll(data, query, refresh);
   const { data: status, error: statusError } = useRefreshData((signal) => API.mail.status(signal), []);
+  const [projectKeyword, setProjectKeyword] = useState('');
+  const projectSearch = useDebounce(projectKeyword, { wait: SEARCH_DEBOUNCE_MS });
   const { data: projects } = useRefreshData(
-    (signal) => API.project.list({ page: 1, pageSize: PROJECT_OPTIONS_LIMIT, namesOnly: true }, signal),
-    [],
+    (signal) =>
+      API.project.list({ keyword: projectSearch, page: 1, pageSize: PROJECT_OPTIONS_LIMIT, namesOnly: true }, signal),
+    [projectSearch],
   );
   const projectOptions = useMemo(
-    () => (projects?.projects ?? []).map(({ name }) => ({ value: name, label: name })),
-    [projects],
+    () =>
+      buildProjectOptions(
+        filters.projectName,
+        (projects?.projects ?? []).map(({ name }) => name),
+      ),
+    [filters.projectName, projects],
   );
 
   const openRow = useCallback((row: EmailHistoryItem) => {
@@ -99,12 +116,13 @@ export const EmailHistory = () => {
       />
       <ProjectSelect
         allowClear
-        showSearch
+        showSearch={{ filterOption: false, onSearch: setProjectKeyword }}
         aria-label={COPY.filters.project}
         placeholder={COPY.filters.project}
         options={projectOptions}
         value={filters.projectName || undefined}
         onChange={(value) => list.setFilter(FILTER_PARAM.PROJECT, String(value ?? ''))}
+        onOpenChange={(open) => !open && setProjectKeyword('')}
       />
       <DatePicker.RangePicker
         aria-label={COPY.filters.dateRange.join(' – ')}

@@ -59,8 +59,8 @@ export const DRIVER_LOG = 'log';
 // How often a page or drawer showing a queued email checks for its result.
 export const QUEUED_POLL_MS = 5000;
 
-// Projects offered in the project filter; more than this is unusual for one DevLake.
-export const PROJECT_OPTIONS_LIMIT = 100;
+// Projects offered at once in the project filter; typing searches the server for the rest.
+export const PROJECT_OPTIONS_LIMIT = 50;
 
 export const DATE_FORMAT = 'YYYY-MM-DD HH:mm';
 

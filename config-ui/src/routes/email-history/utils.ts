@@ -96,3 +96,10 @@ export const queuedChanged = (shown: HistoryPage, fresh: HistoryPage) => {
 };
 
 export const hasQueued = (items: EmailHistoryItem[]) => items.some((item) => item.status === EMAIL_STATUS.QUEUED);
+
+// buildProjectOptions lists the projects the server found for the typed text, keeping the selected
+// project first when the search didn't return it, so the select still shows its name.
+export const buildProjectOptions = (selected: string, found: string[]) => {
+  const names = selected && !found.includes(selected) ? [selected, ...found] : found;
+  return names.map((name) => ({ value: name, label: name }));
+};

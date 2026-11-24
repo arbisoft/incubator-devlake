@@ -25,6 +25,7 @@ import { COPY, DEFAULT_FILTERS } from './constants';
 import type { EmailHistoryItem } from './types';
 import {
   buildHistoryQuery,
+  buildProjectOptions,
   getBanner,
   getStatusTone,
   hasQueued,
@@ -147,5 +148,16 @@ describe('queuedChanged', () => {
   it('hasQueued finds a queued row', () => {
     expect(hasQueued([row(1, 'SENT')])).toBe(false);
     expect(hasQueued([row(1, 'SENT'), row(2, 'QUEUED')])).toBe(true);
+  });
+});
+
+describe('buildProjectOptions', () => {
+  it('keeps the selected project when the search did not return it', () => {
+    expect(buildProjectOptions('zeta', ['alpha', 'beta']).map((o) => o.value)).toEqual(['zeta', 'alpha', 'beta']);
+  });
+
+  it('does not repeat a selected project the search found, or add an empty one', () => {
+    expect(buildProjectOptions('beta', ['alpha', 'beta']).map((o) => o.value)).toEqual(['alpha', 'beta']);
+    expect(buildProjectOptions('', ['alpha']).map((o) => o.value)).toEqual(['alpha']);
   });
 });
