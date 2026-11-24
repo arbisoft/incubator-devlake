@@ -38,7 +38,7 @@ func registerMailRoutes(r *gin.Engine, basicRes context.BasicRes, admin gin.Hand
 	logger := basicRes.GetLogger().Nested("mail")
 	cfg, disabledReason := loadMailConfig(basicRes.GetConfigReader(), logger)
 
-	renderer, err := loadMailTemplates(cfg.TemplateDir)
+	renderer, err := loadMailTemplates(mailTemplateDir(cfg))
 	if err != nil {
 		cfg.Enabled, disabledReason = disableMail(logger, err, "load mail templates")
 		renderer = errors.Must1(mailsvc.LoadRenderer(mailsvc.BuiltinTemplates()))
@@ -85,6 +85,15 @@ func loadMailConfig(src mailConfigSource, logger log.Logger) (mailsvc.Config, st
 type mailConfigSource interface {
 	GetBool(key string) bool
 	GetString(key string) string
+}
+
+// mailTemplateDir is the MAIL_TEMPLATE_DIR override to load. It is empty when mail is off, so a stale
+// folder setting can't log an error or show a warning for mail that was never turned on.
+func mailTemplateDir(cfg mailsvc.Config) string {
+	if !cfg.Enabled {
+		return ""
+	}
+	return cfg.TemplateDir
 }
 
 // loadMailTemplates reads the built-in templates, with files in dir replacing them by name when dir is set.

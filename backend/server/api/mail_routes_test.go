@@ -54,6 +54,12 @@ func TestLoadMailTemplates(t *testing.T) {
 	})
 }
 
+func TestMailTemplateDirIsIgnoredWhenMailIsOff(t *testing.T) {
+	assert.Equal(t, "/templates", mailTemplateDir(mailsvc.Config{Enabled: true, TemplateDir: "/templates"}))
+	assert.Empty(t, mailTemplateDir(mailsvc.Config{Enabled: false, TemplateDir: "/missing"}),
+		"a stale MAIL_TEMPLATE_DIR doesn't turn into a warning while mail is off")
+}
+
 func TestDisableMailReason(t *testing.T) {
 	logger := logmocks.NewLogger(t)
 	logger.On("Error", mock.Anything, "mail is off: %s failed", mock.Anything).Return()
