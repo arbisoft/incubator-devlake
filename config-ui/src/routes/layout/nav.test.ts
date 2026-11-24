@@ -46,13 +46,14 @@ const activeKey = (pathname: string, access: AccessCurrent | null = ADMIN) =>
   findActiveKey(visibleItems(getNavItems({ access, copyrightHide: false })), pathname);
 
 describe('getNavItems', () => {
-  it('orders the sidebar as Projects, Connections, Advanced, API Keys, Settings, Resources, divider, Dashboards', () => {
+  it('orders the sidebar as Projects, Connections, Advanced, API Keys, Email History, Settings, Resources, divider, Dashboards', () => {
     const top = visibleItems(getNavItems({ access: ADMIN, copyrightHide: false })).map((item) => item.key);
     expect(top).toEqual([
       NAV_KEY.PROJECTS,
       NAV_KEY.CONNECTIONS,
       NAV_KEY.ADVANCED,
       NAV_KEY.API_KEYS,
+      NAV_KEY.EMAIL_HISTORY,
       NAV_KEY.SETTINGS,
       NAV_KEY.RESOURCES,
       NAV_KEY.DIVIDER,
@@ -83,6 +84,11 @@ describe('getNavItems', () => {
   it('shows API Keys to an administrator and when access is disabled, but not to a member or a failed lookup', () => {
     [ADMIN, { enabled: false }].forEach((access) => expect(visibleKeys(access)).toContain(NAV_KEY.API_KEYS));
     [MEMBER, null].forEach((access) => expect(visibleKeys(access)).not.toContain(NAV_KEY.API_KEYS));
+  });
+
+  it('shows Email History to an administrator and when access is disabled, but not to a member or a failed lookup', () => {
+    [ADMIN, { enabled: false }].forEach((access) => expect(visibleKeys(access)).toContain(NAV_KEY.EMAIL_HISTORY));
+    [MEMBER, null].forEach((access) => expect(visibleKeys(access)).not.toContain(NAV_KEY.EMAIL_HISTORY));
   });
 
   it('lists Users, Authentication and Recent Activities under Settings, in that order', () => {

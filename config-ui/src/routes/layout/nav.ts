@@ -26,6 +26,7 @@ import {
   HistoryOutlined,
   KeyOutlined,
   LockOutlined,
+  MailOutlined,
   PartitionOutlined,
   ProjectOutlined,
   SettingOutlined,
@@ -98,6 +99,14 @@ export const getNavItems = (visibility: NavVisibility): NavItem[] => {
       icon: createElement(KeyOutlined),
       path: PATHS.APIKEYS(),
       visible: visible(NAV_KEY.API_KEYS),
+    },
+    {
+      kind: NAV_ITEM_KIND.ROUTE,
+      key: NAV_KEY.EMAIL_HISTORY,
+      label: COPY.nav.emailHistory,
+      icon: createElement(MailOutlined),
+      path: PATHS.EMAIL_HISTORY(),
+      visible: visible(NAV_KEY.EMAIL_HISTORY),
     },
     {
       kind: NAV_ITEM_KIND.ROUTE,

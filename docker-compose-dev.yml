@@ -190,7 +190,7 @@ services:
       - "host.docker.internal:host-gateway"
     env_file:
       - ./.env
-      # Backend-only OIDC, Grafana-management, and local-password bootstrap
+      # Backend-only OIDC, Grafana-management, SMTP password and local-password bootstrap
       # secrets. This file is ignored and must never be mounted into Config UI.
       - path: ./auth-secrets.env
         required: false

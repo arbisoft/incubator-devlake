@@ -40,6 +40,7 @@ import {
   Pipelines,
   Pipeline,
   ApiKeys,
+  EmailHistory,
   SettingsActivity,
   SettingsAuthentication,
   SettingsUserManagement,
@@ -173,6 +174,11 @@ export const routes: RouteObject[] = [
         path: ROUTE_SEGMENTS.KEYS,
         loader: adminFeaturesLoader,
         element: <ApiKeys />,
+      },
+      {
+        path: ROUTE_SEGMENTS.EMAIL_HISTORY,
+        loader: adminFeaturesLoader,
+        element: <EmailHistory />,
       },
       {
         path: ROUTE_SEGMENTS.ACCESS,

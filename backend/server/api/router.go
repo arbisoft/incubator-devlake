@@ -99,6 +99,9 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.PUT("/api-keys/:apiKeyId", admin, apikeys.PutApiKey)
 	r.DELETE("/api-keys/:apiKeyId", admin, apikeys.DeleteApiKey)
 
+	// mail status, test email and email history (admin-only)
+	registerMailRoutes(r, basicRes, admin)
+
 	// auth (OIDC and local user login)
 	auth.RegisterRoutes(r)
 

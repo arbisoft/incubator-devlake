@@ -25,6 +25,7 @@ import * as blueprint from './blueprint';
 import * as complianceScorecard from './compliance-scorecard';
 import * as connection from './connection';
 import * as grafanaUsers from './grafana-users';
+import * as mail from './mail';
 import * as otel from './otel';
 import * as pipeline from './pipeline';
 import plugin from './plugin';
@@ -46,6 +47,7 @@ const API = {
   complianceScorecard,
   connection,
   grafanaUsers,
+  mail,
   otel,
   pipeline,
   plugin,
