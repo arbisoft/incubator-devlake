@@ -33,14 +33,15 @@ import (
 
 // fakeQueue is an in-memory history table for the worker.
 type fakeQueue struct {
-	mu       sync.Mutex // guards the fields below
-	rows     []*models.EmailHistory
-	saves    int
-	claims   int
-	saveErr  errors.Error
-	listErr  errors.Error
-	claimErr errors.Error
-	stolen   bool // another worker claims every row first
+	mu        sync.Mutex // guards the fields below
+	rows      []*models.EmailHistory
+	saves     int
+	claims    int
+	saveErr   errors.Error
+	failSaves int // the first failSaves saves fail with saveErr; 0 means every save fails when saveErr is set
+	listErr   errors.Error
+	claimErr  errors.Error
+	stolen    bool // another worker claims every row first
 }
 
 func (q *fakeQueue) DueQueued(now time.Time, limit int) ([]*models.EmailHistory, errors.Error) {
@@ -78,6 +79,9 @@ func (q *fakeQueue) Save(*models.EmailHistory) errors.Error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.saves++
+	if q.failSaves > 0 && q.saves > q.failSaves {
+		return nil
+	}
 	return q.saveErr
 }
 
@@ -120,7 +124,8 @@ func newTestWorker(t *testing.T, q queueStore, m Mailer, maxRetries int, opts ..
 	t.Helper()
 	logger := &recordingLogger{}
 	cfg := Config{FromName: "DevLake", ReplyTo: "team@arbisoft.com", MaxRetries: maxRetries, SMTP: SMTPConfig{Timeout: time.Second}}
-	opts = append([]WorkerOption{WithWorkerClock(func() time.Time { return fixedNow }), WithBackoff(constantBackoff)}, opts...)
+	opts = append([]WorkerOption{WithWorkerClock(func() time.Time { return fixedNow }), WithBackoff(constantBackoff),
+		WithSleep(func(time.Duration) {})}, opts...)
 	w, err := NewWorker(q, m, cfg, logger, opts...)
 	require.Nil(t, err)
 	return w, logger
@@ -267,6 +272,34 @@ func TestWorkerLogsStoreErrors(t *testing.T) {
 		assert.False(t, w.drain(context.Background()))
 		assert.Empty(t, m.sent, "nothing is sent when the attempt can't be recorded")
 		assert.Contains(t, logger.all(), "ERROR mail worker: record email outcome id=5")
+	})
+}
+
+func TestWorkerRetriesSavingTheOutcome(t *testing.T) {
+	t.Run("a short outage", func(t *testing.T) {
+		row := queuedRow(10)
+		q := &fakeQueue{rows: []*models.EmailHistory{row}, saveErr: errors.Default.New("db blip"), failSaves: 2}
+		m := &fakeMailer{}
+		w, logger := newTestWorker(t, q, m, 3)
+
+		assert.False(t, w.drain(context.Background()))
+
+		assert.Len(t, m.sent, 1)
+		assert.Equal(t, 3, q.saves, "the third try records the outcome")
+		assert.Equal(t, models.EmailStatusSent, row.Status)
+		assert.Contains(t, logger.all(), "WARN mail worker: save email outcome id=10 try=2; trying again")
+	})
+	t.Run("every try fails", func(t *testing.T) {
+		row := queuedRow(11)
+		q := &fakeQueue{rows: []*models.EmailHistory{row}, saveErr: errors.Default.New("db down")}
+		m := &fakeMailer{}
+		w, logger := newTestWorker(t, q, m, 3)
+
+		w.drain(context.Background())
+
+		assert.Equal(t, outcomeSaveTries, q.saves)
+		assert.Len(t, m.sent, 1)
+		assert.Contains(t, logger.all(), "ERROR mail worker: record email outcome id=11")
 	})
 }
 

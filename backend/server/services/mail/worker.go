@@ -41,6 +41,8 @@ const (
 	maxErrorMessageLen  = 2000             // keeps a provider's long reply from bloating the row
 	claimLeaseMargin    = time.Minute      // a claim outlives the send timeout by this much
 	claimTokenBytes     = 16
+	outcomeSaveTries    = 3               // tries to record a send's outcome before giving up
+	outcomeSaveWait     = 2 * time.Second // wait between those tries
 )
 
 // queueStore is what the worker needs from the history table.
@@ -96,6 +98,7 @@ type Worker struct {
 	pollInterval time.Duration
 	batchSize    int
 	wake         chan struct{}
+	sleep        func(time.Duration)
 }
 
 var _ notifier = (*Worker)(nil)
@@ -111,6 +114,9 @@ func WithBackoff(b Backoff) WorkerOption { return func(w *Worker) { w.backoff = 
 
 // WithReadiness makes the worker wait until ready returns true, for example until migrations ran.
 func WithReadiness(ready func() bool) WorkerOption { return func(w *Worker) { w.ready = ready } }
+
+// WithSleep replaces the wait between tries to save a send's outcome; tests pass a no-op.
+func WithSleep(sleep func(time.Duration)) WorkerOption { return func(w *Worker) { w.sleep = sleep } }
 
 // WithPollInterval changes how often the worker looks for due rows without being woken.
 func WithPollInterval(d time.Duration) WorkerOption { return func(w *Worker) { w.pollInterval = d } }
@@ -135,6 +141,7 @@ func NewWorker(store queueStore, mailer Mailer, cfg Config, logger log.Logger, o
 		pollInterval: defaultPollInterval,
 		batchSize:    defaultBatchSize,
 		wake:         make(chan struct{}, 1),
+		sleep:        time.Sleep,
 	}
 	for _, opt := range opts {
 		opt(w)
@@ -221,11 +228,28 @@ func (w *Worker) process(ctx context.Context, row *models.EmailHistory) errors.E
 	}
 	o := decide(row.Attempts, w.maxAttempts, sendErr, ctx.Err() != nil, w.now().UTC(), w.backoff)
 	apply(row, o, messageID)
-	if err := w.store.Save(row); err != nil {
+	if err := w.saveOutcome(row); err != nil {
 		return err
 	}
 	w.logOutcome(row, sendErr)
 	return nil
+}
+
+// saveOutcome records a send's result, trying a few times so a short database outage doesn't lose it.
+// The claim's lease keeps the row from being sent again while these tries run. If every try fails,
+// the row is sent again once the lease ends, within the attempt limit.
+func (w *Worker) saveOutcome(row *models.EmailHistory) errors.Error {
+	var err errors.Error
+	for try := 1; try <= outcomeSaveTries; try++ {
+		if err = w.store.Save(row); err == nil {
+			return nil
+		}
+		if try < outcomeSaveTries {
+			w.logger.Warn(err, "mail worker: save email outcome id=%d try=%d; trying again", row.ID, try)
+			w.sleep(outcomeSaveWait)
+		}
+	}
+	return err
 }
 
 // interruptedMessage is the reason kept on a row whose last attempt never recorded an outcome.
