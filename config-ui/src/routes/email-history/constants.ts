@@ -103,7 +103,7 @@ export const COPY = {
     offReason: (reason: string) => `Mail is off: ${reason}`,
     failed: 'The mail status could not be loaded.',
     sendTest: 'Send test email',
-    testQueued: 'Test email queued. It will appear in the list once it is sent.',
+    testQueued: 'Test email queued. Its status changes to Sent or Failed once it is tried.',
   },
   drawer: {
     title: 'Email detail',
