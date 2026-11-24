@@ -19,7 +19,7 @@
 import { STATUS_TONE } from '@/ui';
 import type { StatusTone } from '@/ui/types';
 
-import type { EmailStatus, HistoryFilters, HistorySortKey } from './types';
+import type { EmailStatus, HistoryFilters } from './types';
 
 export const HISTORY_COLUMN = {
   SENT_ON: 'sentOn',
@@ -29,8 +29,6 @@ export const HISTORY_COLUMN = {
   STATUS: 'status',
   SENT_BY: 'sentBy',
 } as const;
-
-export const SORTABLE_COLUMNS: readonly HistorySortKey[] = ['sentOn', 'template', 'subject', 'status'];
 
 export const FILTER_PARAM = {
   STATUS: 'status',
