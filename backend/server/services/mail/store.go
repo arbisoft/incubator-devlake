@@ -61,6 +61,33 @@ func (s *Store) Save(row *models.EmailHistory) errors.Error {
 	return nil
 }
 
+// Claim takes row for one send attempt. In a single UPDATE it raises attempts by one, stores token and
+// pushes next_attempt_at to leaseUntil, but only while the row is still QUEUED, due at now and at the
+// attempts value this worker read. It then reads the row back: the claim is won when the stored token
+// is this one. Another worker that read the same row finds its UPDATE matched nothing and a different
+// token, so it skips the row. On a win, row holds the claimed values.
+func (s *Store) Claim(row *models.EmailHistory, token string, now, leaseUntil time.Time) (bool, errors.Error) {
+	err := s.db.UpdateColumns(&models.EmailHistory{}, []dal.DalSet{
+		{ColumnName: "attempts", Value: row.Attempts + 1},
+		{ColumnName: "next_attempt_at", Value: leaseUntil},
+		{ColumnName: "claim_token", Value: token},
+		{ColumnName: "updated_at", Value: now},
+	}, dal.Where("id = ? AND status = ? AND attempts = ? AND (next_attempt_at IS NULL OR next_attempt_at <= ?)",
+		row.ID, models.EmailStatusQueued, row.Attempts, now))
+	if err != nil {
+		return false, errors.Default.Wrap(err, fmt.Sprintf("claim email history row id=%d", row.ID))
+	}
+	var stored models.EmailHistory
+	if err := s.db.First(&stored, dal.Where("id = ?", row.ID)); err != nil {
+		return false, errors.Default.Wrap(err, fmt.Sprintf("read claimed email history row id=%d", row.ID))
+	}
+	if stored.ClaimToken == nil || *stored.ClaimToken != token {
+		return false, nil
+	}
+	row.Attempts, row.NextAttemptAt, row.ClaimToken, row.UpdatedAt = stored.Attempts, stored.NextAttemptAt, stored.ClaimToken, stored.UpdatedAt
+	return true, nil
+}
+
 // DueQueued returns up to limit QUEUED rows whose next attempt is due at now, oldest first.
 func (s *Store) DueQueued(now time.Time, limit int) ([]*models.EmailHistory, errors.Error) {
 	rows := make([]*models.EmailHistory, 0, limit)

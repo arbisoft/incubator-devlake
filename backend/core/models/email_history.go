@@ -48,6 +48,7 @@ type EmailHistory struct {
 	SourceId          *string    `gorm:"type:varchar(255)"`
 	Provider          string     `gorm:"type:varchar(255)"`
 	ProviderMessageId *string    `gorm:"type:varchar(255)"`
+	ClaimToken        *string    `gorm:"type:varchar(64)"` // set by the worker that claimed the current attempt, so two workers never send one row
 	ErrorMessage      *string    `gorm:"type:text"`
 	Attempts          int
 	NextAttemptAt     *time.Time

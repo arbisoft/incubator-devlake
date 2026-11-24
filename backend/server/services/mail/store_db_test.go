@@ -133,6 +133,43 @@ func TestStoreQueueLifecycle(t *testing.T) {
 	}
 }
 
+func TestStoreClaimLetsOnlyOneWorkerWin(t *testing.T) {
+	_, tx := testStoreTx(t)
+	store, err := NewStore(tx)
+	require.Nil(t, err)
+	now := time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
+	lease := now.Add(5 * time.Minute)
+	row := &models.EmailHistory{Sender: "a@arbisoft.com", Recipients: "b@arbisoft.com", Subject: "claim", Status: models.EmailStatusQueued,
+		SentBy: models.EmailSentBySystem, Template: TemplateAlert, Provider: "log", CreatedAt: now, UpdatedAt: now}
+	require.Nil(t, store.Create(row))
+
+	// two workers read the same row
+	first, second := *row, *row
+	won, err := store.Claim(&first, "token-a", now, lease)
+	require.Nil(t, err)
+	assert.True(t, won)
+	assert.Equal(t, 1, first.Attempts)
+	assert.Equal(t, lease, first.NextAttemptAt.UTC())
+
+	won, err = store.Claim(&second, "token-b", now, lease)
+	require.Nil(t, err)
+	assert.False(t, won, "the second worker read a stale row and loses")
+	assert.Zero(t, second.Attempts, "a lost claim leaves the caller's row alone")
+
+	rows, err := store.DueQueued(now, 10)
+	require.Nil(t, err)
+	for _, r := range rows {
+		assert.NotEqual(t, row.ID, r.ID, "a claimed row is not due until its lease ends")
+	}
+	rows, err = store.DueQueued(lease, 10)
+	require.Nil(t, err)
+	var ids []uint64
+	for _, r := range rows {
+		ids = append(ids, r.ID)
+	}
+	assert.Contains(t, ids, row.ID, "a row whose claim ran out is due again")
+}
+
 func TestStoreProjectLogins(t *testing.T) {
 	_, tx := testStoreTx(t)
 	store, err := NewStore(tx)

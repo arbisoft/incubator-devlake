@@ -19,6 +19,9 @@ package mail
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -36,12 +39,25 @@ const (
 	backoffCap          = 30 * time.Minute // longest wait between retries
 	backoffJitter       = 0.2              // ±20% so retries don't line up with the poll ticks
 	maxErrorMessageLen  = 2000             // keeps a provider's long reply from bloating the row
+	claimLeaseMargin    = time.Minute      // a claim outlives the send timeout by this much
+	claimTokenBytes     = 16
 )
 
 // queueStore is what the worker needs from the history table.
 type queueStore interface {
 	DueQueued(now time.Time, limit int) ([]*models.EmailHistory, errors.Error)
+	Claim(row *models.EmailHistory, token string, now, leaseUntil time.Time) (bool, errors.Error)
 	Save(row *models.EmailHistory) errors.Error
+}
+
+// newClaimToken returns a random token that marks one worker's claim on a row.
+func newClaimToken() string {
+	b := make([]byte, claimTokenBytes)
+	if _, err := cryptorand.Read(b); err != nil {
+		// crypto/rand doesn't fail on supported platforms; a time-based token still differs per claim
+		return fmt.Sprintf("t%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)
 }
 
 // Backoff returns how long to wait after the given failed attempt (1 for the first).
@@ -65,7 +81,7 @@ func ExponentialBackoff(rnd func() float64) Backoff {
 
 // Worker sends QUEUED rows one at a time and records the outcome. The row is the retry state:
 // attempts, next_attempt_at and status live in the database, so a restart resumes where it stopped.
-// Only one Worker may run per database.
+// Several workers may share a database: each claims a row before sending it, so only one sends it.
 type Worker struct {
 	store        queueStore
 	mailer       Mailer
@@ -179,17 +195,22 @@ func (w *Worker) drain(ctx context.Context) bool {
 	return len(rows) == w.batchSize && recorded == len(rows)
 }
 
-// process makes one attempt to send row and saves the outcome. The attempt is counted before
-// sending, and a row whose attempts are already used up is failed without sending, so a crash
-// mid-send can't make the worker retry forever.
+// process makes one attempt to send row and saves the outcome. It first claims the row, which counts
+// the attempt and holds the row until the send has timed out, so no other worker sends it meanwhile.
+// A row whose attempts are already used up is failed without sending, so a crash mid-send can't make
+// the worker retry forever.
 func (w *Worker) process(ctx context.Context, row *models.EmailHistory) errors.Error {
 	if row.Attempts >= w.maxAttempts {
 		return w.failInterrupted(row)
 	}
-	row.Attempts++
-	row.UpdatedAt = w.now().UTC()
-	if err := w.store.Save(row); err != nil {
+	now := w.now().UTC()
+	claimed, err := w.store.Claim(row, newClaimToken(), now, now.Add(w.sendTimeout+claimLeaseMargin))
+	if err != nil {
 		return err
+	}
+	if !claimed {
+		w.logger.Debug("mail worker: another worker claimed email id=%d", row.ID)
+		return nil
 	}
 	sendCtx, cancel := context.WithTimeout(ctx, w.sendTimeout)
 	messageID, sendErr := w.mailer.Send(sendCtx, w.message(row))

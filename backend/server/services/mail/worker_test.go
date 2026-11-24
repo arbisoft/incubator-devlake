@@ -33,11 +33,14 @@ import (
 
 // fakeQueue is an in-memory history table for the worker.
 type fakeQueue struct {
-	mu      sync.Mutex // guards the fields below
-	rows    []*models.EmailHistory
-	saves   int
-	saveErr errors.Error
-	listErr errors.Error
+	mu       sync.Mutex // guards the fields below
+	rows     []*models.EmailHistory
+	saves    int
+	claims   int
+	saveErr  errors.Error
+	listErr  errors.Error
+	claimErr errors.Error
+	stolen   bool // another worker claims every row first
 }
 
 func (q *fakeQueue) DueQueued(now time.Time, limit int) ([]*models.EmailHistory, errors.Error) {
@@ -53,6 +56,22 @@ func (q *fakeQueue) DueQueued(now time.Time, limit int) ([]*models.EmailHistory,
 		}
 	}
 	return out, nil
+}
+
+// Claim mirrors Store.Claim: the row must still be QUEUED and due, with the attempts value read.
+func (q *fakeQueue) Claim(row *models.EmailHistory, token string, now, leaseUntil time.Time) (bool, errors.Error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.claims++
+	if q.claimErr != nil {
+		return false, q.claimErr
+	}
+	if q.stolen || row.Status != models.EmailStatusQueued || (row.NextAttemptAt != nil && row.NextAttemptAt.After(now)) {
+		return false, nil
+	}
+	row.Attempts++
+	row.NextAttemptAt, row.ClaimToken, row.UpdatedAt = &leaseUntil, &token, now
+	return true, nil
 }
 
 func (q *fakeQueue) Save(*models.EmailHistory) errors.Error {
@@ -120,7 +139,8 @@ func TestWorkerSendsAQueuedRow(t *testing.T) {
 	assert.Equal(t, 1, row.Attempts)
 	assert.Nil(t, row.ErrorMessage)
 	assert.Nil(t, row.NextAttemptAt)
-	assert.Equal(t, 2, q.saves, "the attempt is saved before sending, and the outcome after")
+	assert.Equal(t, 1, q.claims, "the attempt is claimed before sending")
+	assert.Equal(t, 1, q.saves, "and the outcome is saved after")
 	require.Len(t, m.sent, 1)
 	assert.Equal(t, &Message{
 		FromAddress: "devlake-alerts@arbisoft.com", FromName: "DevLake", ReplyTo: "team@arbisoft.com",
@@ -188,6 +208,18 @@ func TestWorkerPicksUpRowsLeftByARestart(t *testing.T) {
 	assert.Equal(t, 2, row.Attempts)
 }
 
+func TestWorkerSkipsARowAnotherWorkerClaimed(t *testing.T) {
+	row := queuedRow(8)
+	q, m := &fakeQueue{rows: []*models.EmailHistory{row}, stolen: true}, &fakeMailer{}
+	w, _ := newTestWorker(t, q, m, 3)
+
+	assert.False(t, w.drain(context.Background()))
+
+	assert.Empty(t, m.sent, "only the worker that won the claim sends")
+	assert.Zero(t, q.saves)
+	assert.Equal(t, models.EmailStatusQueued, row.Status)
+}
+
 func TestWorkerFailsARowWhoseLastAttemptWasInterrupted(t *testing.T) {
 	// the process died during the last allowed attempt: the row is still QUEUED with every attempt spent
 	row := queuedRow(6)
@@ -227,8 +259,8 @@ func TestWorkerLogsStoreErrors(t *testing.T) {
 		assert.False(t, w.drain(context.Background()))
 		assert.Contains(t, logger.all(), "WARN mail worker: list queued emails")
 	})
-	t.Run("save", func(t *testing.T) {
-		q := &fakeQueue{rows: []*models.EmailHistory{queuedRow(5)}, saveErr: errors.Default.New("db down")}
+	t.Run("claim", func(t *testing.T) {
+		q := &fakeQueue{rows: []*models.EmailHistory{queuedRow(5)}, claimErr: errors.Default.New("db down")}
 		m := &fakeMailer{}
 		w, logger := newTestWorker(t, q, m, 3)
 
