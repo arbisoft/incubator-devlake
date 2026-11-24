@@ -22,8 +22,8 @@ import type { HistoryParams } from '@/api/mail';
 import { STATUS_TONE, type ListQuery } from '@/ui';
 import type { StatusTone } from '@/ui/types';
 
-import { COPY, DRIVER_LOG, RECIPIENTS_SHOWN, STATUS_TONES } from './constants';
-import type { EmailStatus, HistoryFilters, HistorySortKey, MailStatus } from './types';
+import { COPY, DRIVER_LOG, EMAIL_STATUS, RECIPIENTS_SHOWN, STATUS_TONES } from './constants';
+import type { EmailHistoryItem, EmailStatus, HistoryFilters, HistorySortKey, MailStatus } from './types';
 
 const orUndefined = (value: string) => (value === '' ? undefined : value);
 
@@ -80,3 +80,19 @@ export const getBanner = (status: MailStatus | undefined, failed: boolean): { to
   const host = status.port ? `${status.host}:${status.port}` : (status.host ?? status.driver);
   return { tone: STATUS_TONE.SUCCESS, message: COPY.banner.on(host) };
 };
+
+type HistoryPage = { items: EmailHistoryItem[]; count: number };
+
+// queuedChanged says whether a fresh copy of the page differs for any row that was queued: it moved,
+// left the page, or was updated. A change in the total also counts. Rows that weren't queued are ignored.
+export const queuedChanged = (shown: HistoryPage, fresh: HistoryPage) => {
+  if (fresh.count !== shown.count) return true;
+  const freshById = new Map(fresh.items.map((item) => [item.id, item]));
+  return shown.items.some((item) => {
+    if (item.status !== EMAIL_STATUS.QUEUED) return false;
+    const now = freshById.get(item.id);
+    return !now || now.status !== item.status || now.updatedAt !== item.updatedAt;
+  });
+};
+
+export const hasQueued = (items: EmailHistoryItem[]) => items.some((item) => item.status === EMAIL_STATUS.QUEUED);

@@ -17,13 +17,13 @@
  */
 
 import { Alert, Button } from 'antd';
+import { useEffect, useState } from 'react';
 
 import API from '@/api';
-import { useRefreshData } from '@/hooks';
 import { DetailDrawer, KeyValueList, StatusBadge } from '@/ui';
 import { formatTime } from '@/utils';
 
-import { COPY, DATE_FORMAT, PREVIEW_SANDBOX } from '../constants';
+import { COPY, DATE_FORMAT, EMAIL_STATUS, PREVIEW_SANDBOX, QUEUED_POLL_MS } from '../constants';
 import { Content, PlainText, PreviewFrame, SectionLabel } from '../styled';
 import type { EmailDrawerProps, EmailHistoryDetail } from '../types';
 import { getStatusLabel, getStatusTone, getTemplateLabel } from '../utils';
@@ -50,10 +50,38 @@ const fields = (email: EmailHistoryDetail) => {
 };
 
 export const EmailDrawer = ({ open, emailId, onClose }: EmailDrawerProps) => {
-  const { data: email, error } = useRefreshData(
-    async (signal) => (emailId ? API.mail.historyEmail(emailId, signal) : undefined),
-    [emailId],
-  );
+  const [loaded, setLoaded] = useState<EmailHistoryDetail>();
+  const [failure, setFailure] = useState<{ id: number; error: unknown }>();
+
+  // Load the email each time the drawer opens, and check again while it is queued, so the drawer
+  // never shows a stale status. The last copy stays on screen while a newer one loads.
+  useEffect(() => {
+    if (!open || !emailId) return;
+    const controller = new AbortController();
+    let timer: number | undefined;
+    const load = () => {
+      API.mail
+        .historyEmail(emailId, controller.signal)
+        .then((detail) => {
+          if (controller.signal.aborted) return;
+          setLoaded(detail);
+          setFailure(undefined);
+          if (detail.status === EMAIL_STATUS.QUEUED) timer = window.setTimeout(load, QUEUED_POLL_MS);
+        })
+        .catch((err: unknown) => {
+          if (!controller.signal.aborted) setFailure({ id: emailId, error: err });
+        });
+    };
+    load();
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [open, emailId]);
+
+  // a copy of another email, or an error from one, is never shown for this one
+  const email = loaded?.id === emailId ? loaded : undefined;
+  const error = failure && failure.id === emailId ? failure.error : undefined;
 
   return (
     <DetailDrawer

@@ -56,6 +56,9 @@ export const TEMPLATES = ['alert', 'report'] as const;
 // The mail driver that logs emails instead of sending them.
 export const DRIVER_LOG = 'log';
 
+// How often a page or drawer showing a queued email checks for its result.
+export const QUEUED_POLL_MS = 5000;
+
 // Projects offered in the project filter; more than this is unusual for one DevLake.
 export const PROJECT_OPTIONS_LIMIT = 100;
 

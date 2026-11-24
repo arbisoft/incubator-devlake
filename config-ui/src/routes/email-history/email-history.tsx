@@ -30,6 +30,7 @@ import { EmailDrawer, MailStatusBanner } from './components';
 import { COPY, DEFAULT_FILTERS, EMAIL_STATUS, FILTER_PARAM, PROJECT_OPTIONS_LIMIT, TEMPLATES } from './constants';
 import { FilterSelect, ProjectSelect } from './styled';
 import type { EmailHistoryItem, HistoryFilters, HistorySortKey } from './types';
+import { useQueuedPoll } from './use-queued-poll';
 import { buildHistoryQuery, getStatusLabel, getTemplateLabel, toDateRange } from './utils';
 
 const statusOptions = Object.values(EMAIL_STATUS).map((value) => ({ value, label: getStatusLabel(value) }));
@@ -45,6 +46,7 @@ export const EmailHistory = () => {
 
   const query = useMemo(() => buildHistoryQuery(list.query, filters), [list.query, filters]);
   const { data, ready, error } = useRefreshData((signal) => API.mail.history(query, signal), [version, query]);
+  useQueuedPoll(data, query, refresh);
   const { data: status, error: statusError } = useRefreshData((signal) => API.mail.status(signal), []);
   const { data: projects } = useRefreshData(
     (signal) => API.project.list({ page: 1, pageSize: PROJECT_OPTIONS_LIMIT, namesOnly: true }, signal),

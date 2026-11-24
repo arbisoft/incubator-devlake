@@ -22,7 +22,16 @@ import { describe, expect, it } from 'vitest';
 import { STATUS_TONE } from '@/ui';
 
 import { COPY, DEFAULT_FILTERS } from './constants';
-import { buildHistoryQuery, getBanner, getStatusTone, summarizeRecipients, toDateRange } from './utils';
+import type { EmailHistoryItem } from './types';
+import {
+  buildHistoryQuery,
+  getBanner,
+  getStatusTone,
+  hasQueued,
+  queuedChanged,
+  summarizeRecipients,
+  toDateRange,
+} from './utils';
 
 describe('buildHistoryQuery', () => {
   it('sends the search box as search and leaves empty filters out', () => {
@@ -114,5 +123,29 @@ describe('getBanner', () => {
   it('reports a failed status load and stays empty while loading', () => {
     expect(getBanner(undefined, true).message).toBe(COPY.banner.failed);
     expect(getBanner(undefined, false).message).toBe('');
+  });
+});
+
+describe('queuedChanged', () => {
+  const row = (id: number, status: string, updatedAt = '2026-11-24T10:00:00Z') =>
+    ({ id, status, updatedAt }) as EmailHistoryItem;
+  const page = (...items: EmailHistoryItem[]) => ({ items, count: items.length });
+
+  it('is false while queued rows are unchanged, whatever happens to the others', () => {
+    const shown = page(row(1, 'QUEUED'), row(2, 'SENT'));
+    expect(queuedChanged(shown, page(row(1, 'QUEUED'), row(2, 'SENT', '2026-11-24T11:00:00Z')))).toBe(false);
+  });
+
+  it('is true when a queued row was sent, retried or left the page, or the total changed', () => {
+    const shown = page(row(1, 'QUEUED'), row(2, 'SENT'));
+    expect(queuedChanged(shown, page(row(1, 'SENT'), row(2, 'SENT')))).toBe(true);
+    expect(queuedChanged(shown, page(row(1, 'QUEUED', '2026-11-24T10:01:00Z'), row(2, 'SENT')))).toBe(true);
+    expect(queuedChanged(shown, page(row(3, 'SENT'), row(2, 'SENT')))).toBe(true);
+    expect(queuedChanged(shown, page(row(4, 'QUEUED'), row(1, 'QUEUED'), row(2, 'SENT')))).toBe(true);
+  });
+
+  it('hasQueued finds a queued row', () => {
+    expect(hasQueued([row(1, 'SENT')])).toBe(false);
+    expect(hasQueued([row(1, 'SENT'), row(2, 'QUEUED')])).toBe(true);
   });
 });
