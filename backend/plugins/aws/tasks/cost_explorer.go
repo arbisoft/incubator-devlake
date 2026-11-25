@@ -49,16 +49,21 @@ const (
 	awsCostDeniedMessage    = "Cost Explorer is on but access was denied; spend by service is off"
 	awsArnAccountIndex      = 4
 	awsArnParts             = 6
+	awsCostBackfillMonths   = 12
 )
 
 // awsCostCaller sends one Cost Explorer request.
 type awsCostCaller func(action string, input, output interface{}) errors.Error
 
-// awsCostPeriods returns the periods of the actual spend and of the forecast, both ending exclusive.
-func awsCostPeriods(now time.Time) (actual, forecast AwsCostTimePeriod) {
+// awsCostPeriods returns the periods of the actual spend and of the forecast, both ending exclusive; a backfill starts the actual spend 12 months back.
+func awsCostPeriods(now time.Time, backfill bool) (actual, forecast AwsCostTimePeriod) {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	thisMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	return AwsCostTimePeriod{Start: thisMonth.AddDate(0, -1, 0).Format(awsCostDateLayout), End: today.Format(awsCostDateLayout)},
+	actualStart := thisMonth.AddDate(0, -1, 0)
+	if backfill {
+		actualStart = thisMonth.AddDate(0, -awsCostBackfillMonths, 0)
+	}
+	return AwsCostTimePeriod{Start: actualStart.Format(awsCostDateLayout), End: today.Format(awsCostDateLayout)},
 		AwsCostTimePeriod{Start: today.Format(awsCostDateLayout), End: thisMonth.AddDate(0, 1, 0).Format(awsCostDateLayout)}
 }
 
@@ -160,8 +165,8 @@ func fetchAwsForecast(call awsCostCaller, period AwsCostTimePeriod) (*AwsGetCost
 }
 
 // collectAwsActualRows reads the daily spend by service and turns it into rows.
-func collectAwsActualRows(call awsCostCaller, base models.AwsCostDaily, now time.Time) ([]*models.AwsCostDaily, errors.Error) {
-	period, _ := awsCostPeriods(now)
+func collectAwsActualRows(call awsCostCaller, base models.AwsCostDaily, now time.Time, backfill bool) ([]*models.AwsCostDaily, errors.Error) {
+	period, _ := awsCostPeriods(now, backfill)
 	results, err := fetchAwsActualCosts(call, period)
 	if err != nil {
 		return nil, err
@@ -171,7 +176,7 @@ func collectAwsActualRows(call awsCostCaller, base models.AwsCostDaily, now time
 
 // collectAwsForecastRows reads the forecast of the account spend and turns it into rows.
 func collectAwsForecastRows(call awsCostCaller, base models.AwsCostDaily, now time.Time) ([]*models.AwsCostDaily, errors.Error) {
-	_, period := awsCostPeriods(now)
+	_, period := awsCostPeriods(now, false)
 	forecast, err := fetchAwsForecast(call, period)
 	if err != nil {
 		return nil, err
@@ -241,7 +246,7 @@ func CollectCostExplorer(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 	base := models.AwsCostDaily{ConnectionId: data.Options.ConnectionId, AccountId: accountId, FetchedAt: now}
 	logger := taskCtx.GetLogger()
-	rows, err := collectAwsActualRows(call, base, now)
+	rows, err := collectAwsActualRows(call, base, now, newest == nil)
 	if err != nil {
 		warnAwsCostFailure(logger, err, "Cost Explorer could not be read; spend by service is not updated")
 		return nil

@@ -200,7 +200,7 @@ export const COPY = {
   },
   costExplorer: {
     label: 'Use Cost Explorer',
-    help: 'Real spend by service from Cost Explorer. AWS bills each request (about $0.01); DevLake makes about 2 per night.',
+    help: 'Real spend by service from Cost Explorer. AWS bills each request (about $0.01); DevLake makes about 2 per night, plus a few once to load the last 13 months.',
   },
   setup: {
     heading: {

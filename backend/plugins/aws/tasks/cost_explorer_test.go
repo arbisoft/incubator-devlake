@@ -31,29 +31,42 @@ func TestAwsCostPeriods(t *testing.T) {
 	tests := []struct {
 		name     string
 		now      time.Time
+		backfill bool
 		actual   AwsCostTimePeriod
 		forecast AwsCostTimePeriod
 	}{
 		{
-			"mid month", time.Date(2026, 11, 24, 2, 30, 0, 0, time.UTC),
+			"mid month", time.Date(2026, 11, 24, 2, 30, 0, 0, time.UTC), false,
 			AwsCostTimePeriod{Start: "2026-10-01", End: "2026-11-24"}, AwsCostTimePeriod{Start: "2026-11-24", End: "2026-12-01"},
 		},
 		{
-			"first of the month", time.Date(2026, 11, 1, 0, 5, 0, 0, time.UTC),
+			"first of the month", time.Date(2026, 11, 1, 0, 5, 0, 0, time.UTC), false,
 			AwsCostTimePeriod{Start: "2026-10-01", End: "2026-11-01"}, AwsCostTimePeriod{Start: "2026-11-01", End: "2026-12-01"},
 		},
 		{
-			"last day of the year", time.Date(2026, 12, 31, 23, 59, 0, 0, time.UTC),
+			"last day of the year", time.Date(2026, 12, 31, 23, 59, 0, 0, time.UTC), false,
 			AwsCostTimePeriod{Start: "2026-11-01", End: "2026-12-31"}, AwsCostTimePeriod{Start: "2026-12-31", End: "2027-01-01"},
 		},
 		{
-			"january", time.Date(2027, 1, 15, 0, 0, 0, 0, time.UTC),
+			"january", time.Date(2027, 1, 15, 0, 0, 0, 0, time.UTC), false,
 			AwsCostTimePeriod{Start: "2026-12-01", End: "2027-01-15"}, AwsCostTimePeriod{Start: "2027-01-15", End: "2027-02-01"},
+		},
+		{
+			"backfill mid month", time.Date(2026, 11, 24, 2, 30, 0, 0, time.UTC), true,
+			AwsCostTimePeriod{Start: "2025-11-01", End: "2026-11-24"}, AwsCostTimePeriod{Start: "2026-11-24", End: "2026-12-01"},
+		},
+		{
+			"backfill first of the month", time.Date(2026, 11, 1, 0, 5, 0, 0, time.UTC), true,
+			AwsCostTimePeriod{Start: "2025-11-01", End: "2026-11-01"}, AwsCostTimePeriod{Start: "2026-11-01", End: "2026-12-01"},
+		},
+		{
+			"backfill january", time.Date(2027, 1, 15, 0, 0, 0, 0, time.UTC), true,
+			AwsCostTimePeriod{Start: "2026-01-01", End: "2027-01-15"}, AwsCostTimePeriod{Start: "2027-01-15", End: "2027-02-01"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, forecast := awsCostPeriods(tt.now)
+			actual, forecast := awsCostPeriods(tt.now, tt.backfill)
 			require.Equal(t, tt.actual, actual)
 			require.Equal(t, tt.forecast, forecast)
 		})
@@ -155,6 +168,7 @@ type stubCostExplorer struct {
 	forecastErr errors.Error
 	actions     []string
 	tokens      []string
+	periods     []AwsCostTimePeriod
 }
 
 func (s *stubCostExplorer) call(action string, input, output interface{}) errors.Error {
@@ -162,6 +176,7 @@ func (s *stubCostExplorer) call(action string, input, output interface{}) errors
 	switch in := input.(type) {
 	case AwsGetCostAndUsageInput:
 		s.tokens = append(s.tokens, in.NextPageToken)
+		s.periods = append(s.periods, in.TimePeriod)
 		if s.usageErr != nil {
 			return s.usageErr
 		}
@@ -194,10 +209,21 @@ func TestCollectAwsCostRows(t *testing.T) {
 
 	t.Run("actual spend follows the page token", func(t *testing.T) {
 		stub := newStubCostExplorer()
-		rows, err := collectAwsActualRows(stub.call, base, now)
+		rows, err := collectAwsActualRows(stub.call, base, now, false)
 		require.Nil(t, err)
 		require.Equal(t, []string{"GetCostAndUsage", "GetCostAndUsage"}, stub.actions)
 		require.Equal(t, []string{"", "page-2"}, stub.tokens)
+		require.Equal(t, "2026-10-01", stub.periods[0].Start)
+		require.Len(t, rows, 2)
+	})
+
+	t.Run("the first run reads 13 months and follows the page token", func(t *testing.T) {
+		stub := newStubCostExplorer()
+		rows, err := collectAwsActualRows(stub.call, base, now, true)
+		require.Nil(t, err)
+		require.Equal(t, []string{"GetCostAndUsage", "GetCostAndUsage"}, stub.actions)
+		require.Equal(t, []string{"", "page-2"}, stub.tokens)
+		require.Equal(t, AwsCostTimePeriod{Start: "2025-11-01", End: "2026-11-24"}, stub.periods[0])
 		require.Len(t, rows, 2)
 	})
 
@@ -213,7 +239,7 @@ func TestCollectAwsCostRows(t *testing.T) {
 	t.Run("a failed usage call is returned and not retried", func(t *testing.T) {
 		stub := newStubCostExplorer()
 		stub.usageErr = errors.HttpStatus(http.StatusInternalServerError).New("boom")
-		rows, err := collectAwsActualRows(stub.call, base, now)
+		rows, err := collectAwsActualRows(stub.call, base, now, false)
 		require.NotNil(t, err)
 		require.Empty(t, rows)
 		require.Equal(t, []string{"GetCostAndUsage"}, stub.actions)
@@ -222,7 +248,7 @@ func TestCollectAwsCostRows(t *testing.T) {
 	t.Run("a malformed response is returned with no rows", func(t *testing.T) {
 		stub := newStubCostExplorer()
 		stub.pages[1].ResultsByTime = []AwsCostResultByTime{costResult("2026-11-23", false, costGroup("AWS CodeBuild", "n/a"))}
-		rows, err := collectAwsActualRows(stub.call, base, now)
+		rows, err := collectAwsActualRows(stub.call, base, now, false)
 		require.NotNil(t, err)
 		require.Empty(t, rows)
 		stub = newStubCostExplorer()

@@ -80,7 +80,7 @@ CodeBuild builds and V2 pipeline actions get an estimated cost from the public A
 
 ## Cost Explorer
 
-With Cost Explorer on, the connector stores daily spend by service for the previous and the current month and the forecast to the end of the month, once a day per connection. Cost Explorer bills every request, so a night costs about two calls per connection (more only when the spend by service spans several pages) and nothing is retried. If access is denied the connector logs one warning and carries on without spend data.
+With Cost Explorer on, the connector stores daily spend by service and the forecast to the end of the month, once a day per connection. The first fetch for a connection loads daily spend for the last 13 months (the current month and the 12 before it), a one-off of a few requests; later nights read the previous and current month. Cost Explorer bills every request, so a night costs about two calls per connection (more only when the spend by service spans several pages) and nothing is retried. If access is denied the connector logs one warning and carries on without spend data.
 
 ## Good to know
 
