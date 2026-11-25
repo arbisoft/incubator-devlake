@@ -1644,7 +1644,7 @@
         "spec": {
           "id": 26,
           "title": "Spend by repository",
-          "description": "Claude Code cost per repository over the selected range (last 7 days by default); Mapping says whether the repository belongs to the selected projects. Cost is the exporter's estimate.",
+          "description": "Claude Code cost per repository over the selected range (last 7 days by default): the ten most expensive, then Other, then spend where no repository was identified. Mapped means the repository belongs to one of the selected projects; unmapped means it doesn't. Cost is the exporter's estimate.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1664,7 +1664,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nrepo_spend AS (\n  SELECT p.repository_url,\n    COUNT(DISTINCT p.session_id) AS sessions,\n    COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS people,\n    SUM(p.estimated_cost_usd) AS cost,\n    EXISTS (SELECT 1 FROM repos r JOIN scoped_repos sr ON sr.repo_id = r.id WHERE LOWER(r.url) = p.repository_url) AS is_mapped\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND p.started_at >= $__timeFrom() AND p.started_at < $__timeTo()\n  GROUP BY p.repository_url\n)\nSELECT COALESCE(REGEXP_REPLACE(repository_url, '^https?://', ''), 'No repository identified') AS Repository,\n  CASE WHEN repository_url IS NULL THEN '–' WHEN is_mapped THEN 'Yes' ELSE 'No' END AS Mapping,\n  sessions AS Sessions,\n  people AS People,\n  cost AS Cost,\n  100 * cost / NULLIF(SUM(cost) OVER (), 0) AS Share\nFROM repo_spend\nORDER BY cost DESC"
+                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nrepo_spend AS (\n  SELECT p.repository_url,\n    SUM(p.estimated_cost_usd) AS cost,\n    EXISTS (SELECT 1 FROM repos r JOIN scoped_repos sr ON sr.repo_id = r.id WHERE LOWER(r.url) = p.repository_url) AS is_mapped\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND p.started_at >= $__timeFrom() AND p.started_at < $__timeTo()\n  GROUP BY p.repository_url\n),\nranked AS (\n  SELECT repository_url, cost, is_mapped, ROW_NUMBER() OVER (ORDER BY cost DESC, repository_url) AS rn\n  FROM repo_spend\n  WHERE repository_url IS NOT NULL\n),\n-- the ten most expensive repositories, then everything else as one row, then spend with no repository\ngrouped AS (\n  SELECT REGEXP_REPLACE(repository_url, '^(https?://)?(github\\\\.com/)?', '') AS name, cost, is_mapped, rn AS ord\n  FROM ranked\n  WHERE rn <= 10\n  UNION ALL\n  SELECT CONCAT('Other (', COUNT(*), IF(COUNT(*) = 1, ' repo)', ' repos)')), SUM(cost), NULL, 11\n  FROM ranked\n  WHERE rn > 10\n  HAVING COUNT(*) > 0\n  UNION ALL\n  SELECT 'No repository identified', cost, NULL, 12\n  FROM repo_spend\n  WHERE repository_url IS NULL\n)\nSELECT CONCAT(name, CASE WHEN is_mapped = 1 THEN ' · mapped' WHEN is_mapped = 0 THEN ' · unmapped' ELSE '' END) AS Repository,\n  cost AS Cost\nFROM grouped\nORDER BY ord"
                       }
                     },
                     "refId": "A",
@@ -1678,30 +1678,34 @@
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "table",
+            "group": "bargauge",
             "version": "13.2.2",
             "spec": {
               "options": {
-                "cellHeight": "sm",
-                "footer": {
-                  "countRows": false,
-                  "fields": "",
-                  "reducer": [
-                    "sum"
-                  ],
-                  "show": false
+                "displayMode": "gradient",
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": false
                 },
-                "frameIndex": 0,
-                "showHeader": true,
-                "sortBy": [
-                  {
-                    "desc": true,
-                    "displayName": "Cost"
-                  }
-                ]
+                "maxVizHeight": 300,
+                "minVizHeight": 16,
+                "minVizWidth": 8,
+                "namePlacement": "auto",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                  "calcs": [],
+                  "fields": "",
+                  "values": true
+                },
+                "showUnfilled": true,
+                "sizing": "auto",
+                "valueMode": "color"
               },
               "fieldConfig": {
                 "defaults": {
+                  "unit": "currencyUSD",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1712,124 +1716,12 @@
                     ]
                   },
                   "color": {
-                    "mode": "thresholds"
+                    "mode": "fixed",
+                    "fixedColor": "green"
                   },
-                  "noValue": "–",
-                  "custom": {
-                    "align": "auto",
-                    "cellOptions": {
-                      "type": "auto"
-                    },
-                    "footer": {
-                      "reducers": []
-                    },
-                    "inspect": false
-                  }
+                  "noValue": "–"
                 },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Cost"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "currencyUSD"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 2
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Share"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "percent"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 1
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Sessions"
-                    },
-                    "properties": [
-                      {
-                        "id": "decimals",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "People"
-                    },
-                    "properties": [
-                      {
-                        "id": "decimals",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Repository"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.minWidth",
-                        "value": 300
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Mapping"
-                    },
-                    "properties": [
-                      {
-                        "id": "mappings",
-                        "value": [
-                          {
-                            "options": {
-                              "No": {
-                                "color": "orange",
-                                "index": 1,
-                                "text": "No"
-                              },
-                              "Yes": {
-                                "color": "green",
-                                "index": 0,
-                                "text": "Yes"
-                              }
-                            },
-                            "type": "value"
-                          }
-                        ]
-                      },
-                      {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "color-text"
-                        }
-                      }
-                    ]
-                  }
-                ]
+                "overrides": []
               }
             }
           }
@@ -6849,20 +6741,7 @@
                                 "spec": {
                                   "x": 0,
                                   "y": 16,
-                                  "width": 8,
-                                  "height": 7,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-26"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 8,
-                                  "y": 16,
-                                  "width": 8,
+                                  "width": 12,
                                   "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
@@ -6873,13 +6752,26 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 16,
+                                  "x": 12,
                                   "y": 16,
-                                  "width": 8,
+                                  "width": 12,
                                   "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-29"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 23,
+                                  "width": 24,
+                                  "height": 10,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-26"
                                   }
                                 }
                               }
