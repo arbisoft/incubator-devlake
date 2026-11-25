@@ -58,15 +58,9 @@ func serve() int {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		return 1
 	}
-	shipped, errs, err := templates.LoadDir(cfg.DashboardsDir)
+	shipped, shippedErrors, err := loadShipped(cfg.DashboardsDir, logger)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
-		return 1
-	}
-	if len(errs) > 0 {
-		for _, e := range errs {
-			fmt.Fprintf(os.Stderr, "ERROR %s: %s\n", e.Location, e.Message)
-		}
 		return 1
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -75,11 +69,11 @@ func serve() int {
 	go syncer.Run(ctx)
 	srv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           gate.New(cfg, cfg.Upstream, identity.New(cfg.Upstream, cfg.RootPath), syncer.Current, syncer.Status, logger),
+		Handler:           gate.New(cfg, cfg.Upstream, identity.New(cfg.Upstream, cfg.RootPath), syncer.Current, syncer.Status, shippedErrors, logger),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	logger.Info("query gate starting", "mode", string(cfg.Mode), "listen", cfg.Listen, "templates", shipped.Len(), "sync_enabled", cfg.GrafanaUser != "")
+	logger.Info("query gate starting", "mode", string(cfg.Mode), "listen", cfg.Listen, "templates", shipped.Len(), "shipped_errors", shippedErrors, "sync_enabled", cfg.GrafanaUser != "")
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()
 	select {
@@ -95,6 +89,18 @@ func serve() int {
 		return 1
 	}
 	return 0
+}
+
+// loadShipped compiles the shipped dashboards; a query that fails to compile is logged and left out.
+func loadShipped(dir string, logger *slog.Logger) (*templates.Set, int, error) {
+	set, errs, err := templates.LoadDir(dir)
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, e := range errs {
+		logger.Error("shipped dashboard query skipped", "location", e.Location, "error", e.Message)
+	}
+	return set, len(errs), nil
 }
 
 func lint(dir string) int {
