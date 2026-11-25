@@ -1644,7 +1644,7 @@
         "spec": {
           "id": 26,
           "title": "Spend by repository",
-          "description": "Claude Code cost per repository over the selected range (last 7 days by default): the ten most expensive, then Other, then spend where no repository was identified. Mapped means the repository belongs to one of the selected projects; unmapped means it doesn't. Cost is the exporter's estimate.",
+          "description": "Claude Code cost per repository over the selected range (last 7 days by default): the ten most expensive, then Other, then No repo: spend from sessions with no git repository detected. Green bars are repositories mapped to one of the selected projects, orange ones aren't; hover a bar to see which. Cost is the exporter's estimate.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1664,44 +1664,87 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nrepo_spend AS (\n  SELECT p.repository_url,\n    SUM(p.estimated_cost_usd) AS cost,\n    EXISTS (SELECT 1 FROM repos r JOIN scoped_repos sr ON sr.repo_id = r.id WHERE LOWER(r.url) = p.repository_url) AS is_mapped\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND p.started_at >= $__timeFrom() AND p.started_at < $__timeTo()\n  GROUP BY p.repository_url\n),\nranked AS (\n  SELECT repository_url, cost, is_mapped, ROW_NUMBER() OVER (ORDER BY cost DESC, repository_url) AS rn\n  FROM repo_spend\n  WHERE repository_url IS NOT NULL\n),\n-- the ten most expensive repositories, then everything else as one row, then spend with no repository\ngrouped AS (\n  SELECT REGEXP_REPLACE(repository_url, '^(https?://)?(github\\\\.com/)?', '') AS name, cost, is_mapped, rn AS ord\n  FROM ranked\n  WHERE rn <= 10\n  UNION ALL\n  SELECT CONCAT('Other (', COUNT(*), IF(COUNT(*) = 1, ' repo)', ' repos)')), SUM(cost), NULL, 11\n  FROM ranked\n  WHERE rn > 10\n  HAVING COUNT(*) > 0\n  UNION ALL\n  SELECT 'No repository identified', cost, NULL, 12\n  FROM repo_spend\n  WHERE repository_url IS NULL\n)\nSELECT CONCAT(name, CASE WHEN is_mapped = 1 THEN ' · mapped' WHEN is_mapped = 0 THEN ' · unmapped' ELSE '' END) AS Repository,\n  cost AS Cost\nFROM grouped\nORDER BY ord"
+                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nrepo_spend AS (\n  SELECT p.repository_url,\n    SUM(p.estimated_cost_usd) AS cost,\n    EXISTS (SELECT 1 FROM repos r JOIN scoped_repos sr ON sr.repo_id = r.id WHERE LOWER(r.url) = p.repository_url) AS is_mapped\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND p.started_at >= $__timeFrom() AND p.started_at < $__timeTo()\n  GROUP BY p.repository_url\n),\nranked AS (\n  SELECT repository_url, cost, is_mapped, ROW_NUMBER() OVER (ORDER BY cost DESC, repository_url) AS rn,\n    REGEXP_REPLACE(repository_url, '^(https?://)?(github\\\\.com/)?', '') AS full_name\n  FROM repo_spend\n  WHERE repository_url IS NOT NULL\n),\n-- the owner is shown only when two of the top ten share a repository name\ntop AS (\n  SELECT ranked.*, COUNT(*) OVER (PARTITION BY SUBSTRING_INDEX(full_name, '/', -1)) AS same_name\n  FROM ranked\n  WHERE rn <= 10\n),\n-- the ten most expensive repositories, then everything else as one row, then spend with no repository\ngrouped AS (\n  SELECT IF(same_name > 1, full_name, SUBSTRING_INDEX(full_name, '/', -1)) AS name, cost, is_mapped, rn AS ord\n  FROM top\n  UNION ALL\n  SELECT CONCAT('Other (', COUNT(*), IF(COUNT(*) = 1, ' repo)', ' repos)')), SUM(cost), NULL, 11\n  FROM ranked\n  WHERE rn > 10\n  HAVING COUNT(*) > 0\n  UNION ALL\n  SELECT 'No repo', cost, NULL, 12\n  FROM repo_spend\n  WHERE repository_url IS NULL\n)\nSELECT name AS Repository, cost AS Cost, is_mapped AS Mapping\nFROM grouped\nORDER BY ord"
                       }
                     },
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nrepo_spend AS (\n  SELECT p.repository_url,\n    SUM(p.estimated_cost_usd) AS cost,\n    EXISTS (SELECT 1 FROM repos r JOIN scoped_repos sr ON sr.repo_id = r.id WHERE LOWER(r.url) = p.repository_url) AS is_mapped\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND p.started_at >= $__timeFrom() AND p.started_at < $__timeTo()\n  GROUP BY p.repository_url\n),\nranked AS (\n  SELECT repository_url, cost, is_mapped, ROW_NUMBER() OVER (ORDER BY cost DESC, repository_url) AS rn,\n    REGEXP_REPLACE(repository_url, '^(https?://)?(github\\\\.com/)?', '') AS full_name\n  FROM repo_spend\n  WHERE repository_url IS NOT NULL\n),\n-- the owner is shown only when two of the top ten share a repository name\ntop AS (\n  SELECT ranked.*, COUNT(*) OVER (PARTITION BY SUBSTRING_INDEX(full_name, '/', -1)) AS same_name\n  FROM ranked\n  WHERE rn <= 10\n),\n-- the ten most expensive repositories, then everything else as one row, then spend with no repository\ngrouped AS (\n  SELECT IF(same_name > 1, full_name, SUBSTRING_INDEX(full_name, '/', -1)) AS name, cost, is_mapped, rn AS ord\n  FROM top\n  UNION ALL\n  SELECT CONCAT('Other (', COUNT(*), IF(COUNT(*) = 1, ' repo)', ' repos)')), SUM(cost), NULL, 11\n  FROM ranked\n  WHERE rn > 10\n  HAVING COUNT(*) > 0\n  UNION ALL\n  SELECT 'No repository identified', cost, NULL, 12\n  FROM repo_spend\n  WHERE repository_url IS NULL\n)\n-- scale headroom so the longest bar's value label fits\nSELECT MAX(cost) * 1.3 AS Max\nFROM grouped"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "mappings": [
+                        {
+                          "fieldName": "Max",
+                          "handlerKey": "max"
+                        }
+                      ],
+                      "applyTo": {
+                        "id": "byName",
+                        "options": "Cost"
+                      }
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "bargauge",
+            "group": "barchart",
             "version": "13.2.2",
             "spec": {
               "options": {
-                "displayMode": "gradient",
+                "barRadius": 0,
+                "barWidth": 0.8,
+                "colorByField": "Mapping",
+                "fullHighlight": false,
+                "groupWidth": 0.7,
                 "legend": {
                   "calcs": [],
                   "displayMode": "list",
                   "placement": "bottom",
                   "showLegend": false
                 },
-                "maxVizHeight": 300,
-                "minVizHeight": 16,
-                "minVizWidth": 8,
-                "namePlacement": "auto",
                 "orientation": "horizontal",
-                "reduceOptions": {
-                  "calcs": [],
-                  "fields": "",
-                  "values": true
+                "showValue": "always",
+                "stacking": "none",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
                 },
-                "showUnfilled": true,
-                "sizing": "auto",
-                "valueMode": "color"
+                "xField": "Repository",
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 0
               },
               "fieldConfig": {
                 "defaults": {
@@ -1719,9 +1762,100 @@
                     "mode": "fixed",
                     "fixedColor": "green"
                   },
-                  "noValue": "–"
+                  "noValue": "–",
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "axisSoftMin": 0,
+                    "fillOpacity": 80,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "lineWidth": 1,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "decimals": 2
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Cost"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.axisPlacement",
+                        "value": "hidden"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Mapping"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "none"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "1": {
+                                "text": "Mapped to the project",
+                                "color": "green",
+                                "index": 0
+                              },
+                              "0": {
+                                "text": "Not mapped to the project",
+                                "color": "orange",
+                                "index": 1
+                              }
+                            }
+                          },
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null",
+                              "result": {
+                                "text": "–",
+                                "color": "gray",
+                                "index": 2
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "custom.hideFrom",
+                        "value": {
+                          "legend": true,
+                          "tooltip": false,
+                          "viz": true
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -6741,7 +6875,7 @@
                                 "spec": {
                                   "x": 0,
                                   "y": 16,
-                                  "width": 12,
+                                  "width": 8,
                                   "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
@@ -6752,9 +6886,9 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 12,
+                                  "x": 8,
                                   "y": 16,
-                                  "width": 12,
+                                  "width": 8,
                                   "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
@@ -6765,10 +6899,10 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 0,
-                                  "y": 23,
-                                  "width": 24,
-                                  "height": 10,
+                                  "x": 16,
+                                  "y": 16,
+                                  "width": 8,
+                                  "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-26"
