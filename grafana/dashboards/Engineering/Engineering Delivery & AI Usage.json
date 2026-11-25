@@ -1695,9 +1695,9 @@
               ],
               "transformations": [
                 {
-                  "kind": "configFromData",
+                  "kind": "Transformation",
+                  "group": "configFromData",
                   "spec": {
-                    "id": "configFromData",
                     "options": {
                       "configRefId": "B",
                       "mappings": [
