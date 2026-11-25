@@ -6592,7 +6592,7 @@
                     {
                       "kind": "TabsLayoutTab",
                       "spec": {
-                        "title": "Capacity",
+                        "title": "Team Contribution",
                         "layout": {
                           "kind": "GridLayout",
                           "spec": {
