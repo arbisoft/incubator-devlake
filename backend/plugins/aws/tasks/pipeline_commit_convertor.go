@@ -123,12 +123,14 @@ func ConvertPipelineCommits(taskCtx plugin.SubTaskContext) errors.Error {
 				repoIds[repoUrl] = repoId
 			}
 			return []interface{}{&devops.CiCDPipelineCommit{
-				PipelineId: executionIdGen.Generate(data.Options.ConnectionId, revision.ExecutionId),
-				CommitSha:  revision.RevisionId,
-				CommitMsg:  revision.CommitMessage,
-				Branch:     firstNonEmpty(revision.TriggerTagName, revision.TriggerBranchName, revision.ActionBranchName),
-				RepoId:     repoId,
-				RepoUrl:    repoUrl,
+				PipelineId:   executionIdGen.Generate(data.Options.ConnectionId, revision.ExecutionId),
+				CommitSha:    revision.RevisionId,
+				CommitMsg:    revision.CommitMessage,
+				Branch:       firstNonEmpty(revision.TriggerTagName, revision.TriggerBranchName, revision.ActionBranchName),
+				RepoId:       repoId,
+				RepoUrl:      repoUrl,
+				DisplayTitle: firstNonEmpty(revision.TriggerTagName, revision.CommitMessage),
+				Url:          models.AwsExecutionConsoleUrl(data.Scope.Region, data.Scope.Name, revision.ExecutionId),
 			}}, nil
 		},
 	})
