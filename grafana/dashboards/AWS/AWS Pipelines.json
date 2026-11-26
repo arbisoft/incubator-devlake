@@ -988,7 +988,7 @@
         "spec": {
           "id": 11,
           "title": "Pipelines",
-          "description": "One row per pipeline with runs in the range, busiest first (up to 50). Environment is Not set when the pipeline's scope config has no production pattern. Triggers splits runs started by a push (webhook), by hand, or otherwise. The pipeline name opens it in the AWS console.",
+          "description": "One row per pipeline with runs in the range, busiest first (up to 50). Environment is Not set when the pipeline's scope config has no production pattern. Triggers splits runs started by a push (webhook), by hand, or otherwise. Re-runs counts runs of a commit, or set of commits, the pipeline had already run in the range. The pipeline name opens it in the AWS console.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1008,7 +1008,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nd AS (\n  SELECT pipeline, TIMESTAMPDIFF(SECOND, start_time, last_update_time) AS sec,\n    ROW_NUMBER() OVER (PARTITION BY pipeline ORDER BY TIMESTAMPDIFF(SECOND, start_time, last_update_time)) AS rn,\n    COUNT(*) OVER (PARTITION BY pipeline) AS n\n  FROM runs WHERE status IN ('Succeeded', 'Failed')\n),\npct AS (\n  SELECT pipeline, MIN(CASE WHEN rn >= CEIL(0.5 * n) THEN sec END) AS p50, MIN(CASE WHEN rn >= CEIL(0.9 * n) THEN sec END) AS p90 FROM d GROUP BY pipeline\n),\nlast AS (\n  SELECT pipeline, status, start_time, ROW_NUMBER() OVER (PARTITION BY pipeline ORDER BY start_time DESC, execution_id DESC) AS rn FROM runs\n)\nSELECT r.pipeline AS Pipeline, MAX(r.pipeline_url) AS url, GROUP_CONCAT(DISTINCT r.env ORDER BY r.env SEPARATOR ', ') AS Environment,\n  COUNT(*) AS Runs,\n  ROUND(100 * SUM(r.status = 'Succeeded') / NULLIF(SUM(r.status IN ('Succeeded', 'Failed')), 0), 1) AS \"Success %\",\n  MAX(pct.p50) AS \"Median\", MAX(pct.p90) AS \"p90\",\n  CONCAT(SUM(r.trigger_type IN ('WebhookV2', 'Webhook')), ' push · ', SUM(r.trigger_type = 'StartPipelineExecution'), ' manual · ',\n    SUM(r.trigger_type NOT IN ('WebhookV2', 'Webhook', 'StartPipelineExecution')), ' other') AS Triggers,\n  MAX(l.start_time) AS \"Last run\", MAX(l.status) AS \"Last status\"\nFROM runs r\nLEFT JOIN pct ON pct.pipeline = r.pipeline\nLEFT JOIN last l ON l.pipeline = r.pipeline AND l.rn = 1\nGROUP BY r.pipeline\nORDER BY Runs DESC, r.pipeline\nLIMIT 50"
+                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nd AS (\n  SELECT pipeline, TIMESTAMPDIFF(SECOND, start_time, last_update_time) AS sec,\n    ROW_NUMBER() OVER (PARTITION BY pipeline ORDER BY TIMESTAMPDIFF(SECOND, start_time, last_update_time)) AS rn,\n    COUNT(*) OVER (PARTITION BY pipeline) AS n\n  FROM runs WHERE status IN ('Succeeded', 'Failed')\n),\npct AS (\n  SELECT pipeline, MIN(CASE WHEN rn >= CEIL(0.5 * n) THEN sec END) AS p50, MIN(CASE WHEN rn >= CEIL(0.9 * n) THEN sec END) AS p90 FROM d GROUP BY pipeline\n),\nlast AS (\n  SELECT pipeline, status, start_time, ROW_NUMBER() OVER (PARTITION BY pipeline ORDER BY start_time DESC, execution_id DESC) AS rn FROM runs\n),\nsig AS (\n  SELECT r.pipeline, r.execution_id, GROUP_CONCAT(s.revision_id ORDER BY s.action_name SEPARATOR ',') AS revs\n  FROM runs r JOIN _tool_aws_execution_source_revisions s ON s.connection_id = r.connection_id AND s.execution_id = r.execution_id\n  GROUP BY r.pipeline, r.execution_id\n),\nrr AS (\n  SELECT pipeline, COUNT(*) - COUNT(DISTINCT revs) AS reruns FROM sig GROUP BY pipeline\n)\nSELECT r.pipeline AS Pipeline, MAX(r.pipeline_url) AS url, GROUP_CONCAT(DISTINCT r.env ORDER BY r.env SEPARATOR ', ') AS Environment,\n  COUNT(*) AS Runs,\n  ROUND(100 * SUM(r.status = 'Succeeded') / NULLIF(SUM(r.status IN ('Succeeded', 'Failed')), 0), 1) AS \"Success %\",\n  MAX(pct.p50) AS \"Median\", MAX(pct.p90) AS \"p90\",\n  CONCAT(SUM(r.trigger_type IN ('WebhookV2', 'Webhook')), ' push · ', SUM(r.trigger_type = 'StartPipelineExecution'), ' manual · ',\n    SUM(r.trigger_type NOT IN ('WebhookV2', 'Webhook', 'StartPipelineExecution')), ' other') AS Triggers,\n  COALESCE(MAX(rr.reruns), 0) AS \"Re-runs\",\n  MAX(l.start_time) AS \"Last run\", MAX(l.status) AS \"Last status\"\nFROM runs r\nLEFT JOIN pct ON pct.pipeline = r.pipeline\nLEFT JOIN last l ON l.pipeline = r.pipeline AND l.rn = 1\nLEFT JOIN rr ON rr.pipeline = r.pipeline\nGROUP BY r.pipeline\nORDER BY Runs DESC, r.pipeline\nLIMIT 50"
                       }
                     },
                     "refId": "A",
@@ -1108,7 +1108,7 @@
                     "properties": [
                       {
                         "id": "custom.width",
-                        "value": 130
+                        "value": 120
                       }
                     ]
                   },
@@ -1498,7 +1498,7 @@
         "spec": {
           "id": 14,
           "title": "Slowest stages",
-          "description": "Each pipeline › stage › action with runs in the range, slowest p90 first (up to 50). Median Δ compares with the previous period of the same length. Retries are extra attempts of the action within one run.",
+          "description": "Each pipeline › stage › action with runs in the range, slowest p90 first (up to 50). Median Δ compares with the previous period of the same length. Retries are extra attempts of the action within one run. Failed % is failed attempts out of all attempts.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1518,7 +1518,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nactions AS (\n  SELECT r.pipeline, r.env, r.execution_id, r.start_time AS run_start, a.connection_id, a.action_execution_id, a.stage_name, a.action_name,\n    a.provider, a.status, a.error_code, a.summary, a.start_time, a.last_update_time, a.external_execution_id\n  FROM runs r\n  JOIN _tool_aws_action_executions a ON a.connection_id = r.connection_id AND a.execution_id = r.execution_id\n),\nstage_keys AS (\n  SELECT pipeline, stage_name, action_name, MAX(provider) AS provider, ROW_NUMBER() OVER (ORDER BY pipeline, stage_name, action_name) AS k\n  FROM actions GROUP BY pipeline, stage_name, action_name\n),\nsd AS (\n  SELECT k.k, a.run_start >= $__timeFrom() AS cur, a.execution_id, TIMESTAMPDIFF(SECOND, a.start_time, a.last_update_time) AS sec\n  FROM actions a JOIN stage_keys k ON k.pipeline = a.pipeline AND k.stage_name = a.stage_name AND k.action_name = a.action_name\n  WHERE a.status IN ('Succeeded', 'Failed') AND a.last_update_time IS NOT NULL\n),\nr AS (\n  SELECT k, cur, execution_id, sec, ROW_NUMBER() OVER (PARTITION BY k, cur ORDER BY sec) AS rn, COUNT(*) OVER (PARTITION BY k, cur) AS n FROM sd\n),\nagg AS (\n  SELECT k, SUM(cur = 1) AS runs, COUNT(DISTINCT CASE WHEN cur = 1 THEN execution_id END) AS executions,\n    MIN(CASE WHEN cur = 1 AND rn >= CEIL(0.5 * n) THEN sec END) AS p50,\n    MIN(CASE WHEN cur = 1 AND rn >= CEIL(0.9 * n) THEN sec END) AS p90,\n    MAX(CASE WHEN cur = 1 THEN sec END) AS mx,\n    MIN(CASE WHEN cur = 0 AND rn >= CEIL(0.5 * n) THEN sec END) AS prev_p50\n  FROM r GROUP BY k\n)\nSELECT k.pipeline AS Pipeline, k.stage_name AS Stage, k.action_name AS Action, k.provider AS Provider, a.runs AS Runs,\n  a.p50 AS Median, a.p90 AS p90, a.mx AS \"Max\",\n  ROUND(100 * (a.p50 - a.prev_p50) / NULLIF(a.prev_p50, 0), 0) AS \"Median Δ\",\n  a.runs - a.executions AS Retries\nFROM agg a JOIN stage_keys k ON k.k = a.k\nWHERE a.runs > 0\nORDER BY a.p90 DESC, k.pipeline, k.stage_name, k.action_name\nLIMIT 50"
+                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nactions AS (\n  SELECT r.pipeline, r.env, r.execution_id, r.start_time AS run_start, a.connection_id, a.action_execution_id, a.stage_name, a.action_name,\n    a.provider, a.status, a.error_code, a.summary, a.start_time, a.last_update_time, a.external_execution_id\n  FROM runs r\n  JOIN _tool_aws_action_executions a ON a.connection_id = r.connection_id AND a.execution_id = r.execution_id\n),\nstage_keys AS (\n  SELECT pipeline, stage_name, action_name, MAX(provider) AS provider, ROW_NUMBER() OVER (ORDER BY pipeline, stage_name, action_name) AS k\n  FROM actions GROUP BY pipeline, stage_name, action_name\n),\nsd AS (\n  SELECT k.k, a.run_start >= $__timeFrom() AS cur, a.execution_id, a.status = 'Failed' AS failed, TIMESTAMPDIFF(SECOND, a.start_time, a.last_update_time) AS sec\n  FROM actions a JOIN stage_keys k ON k.pipeline = a.pipeline AND k.stage_name = a.stage_name AND k.action_name = a.action_name\n  WHERE a.status IN ('Succeeded', 'Failed') AND a.last_update_time IS NOT NULL\n),\nr AS (\n  SELECT k, cur, execution_id, failed, sec, ROW_NUMBER() OVER (PARTITION BY k, cur ORDER BY sec) AS rn, COUNT(*) OVER (PARTITION BY k, cur) AS n FROM sd\n),\nagg AS (\n  SELECT k, SUM(cur = 1) AS runs, SUM(cur = 1 AND failed) AS failed, COUNT(DISTINCT CASE WHEN cur = 1 THEN execution_id END) AS executions,\n    MIN(CASE WHEN cur = 1 AND rn >= CEIL(0.5 * n) THEN sec END) AS p50,\n    MIN(CASE WHEN cur = 1 AND rn >= CEIL(0.9 * n) THEN sec END) AS p90,\n    MAX(CASE WHEN cur = 1 THEN sec END) AS mx,\n    MIN(CASE WHEN cur = 0 AND rn >= CEIL(0.5 * n) THEN sec END) AS prev_p50\n  FROM r GROUP BY k\n)\nSELECT k.pipeline AS Pipeline, k.stage_name AS Stage, k.action_name AS Action, k.provider AS Provider, a.runs AS Runs,\n  a.p50 AS Median, a.p90 AS p90, a.mx AS \"Max\",\n  ROUND(100 * (a.p50 - a.prev_p50) / NULLIF(a.prev_p50, 0), 0) AS \"Median Δ\",\n  a.runs - a.executions AS Retries, ROUND(100 * a.failed / a.runs, 1) AS \"Failed %\"\nFROM agg a JOIN stage_keys k ON k.k = a.k\nWHERE a.runs > 0\nORDER BY a.p90 DESC, k.pipeline, k.stage_name, k.action_name\nLIMIT 50"
                       }
                     },
                     "refId": "A",
@@ -1689,6 +1689,22 @@
                       {
                         "id": "unit",
                         "value": "s"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Failed %"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
                       }
                     ]
                   }
@@ -2325,7 +2341,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nactions AS (\n  SELECT r.pipeline, r.env, r.execution_id, r.start_time AS run_start, a.connection_id, a.action_execution_id, a.stage_name, a.action_name,\n    a.provider, a.status, a.error_code, a.summary, a.start_time, a.last_update_time, a.external_execution_id\n  FROM runs r\n  JOIN _tool_aws_action_executions a ON a.connection_id = r.connection_id AND a.execution_id = r.execution_id\n),\nbuilds AS (\n  SELECT a.pipeline, a.env, a.run_start, b.connection_id, b.build_id, b.project_name, b.build_status, b.start_time, b.end_time,\n    b.compute_type, b.environment_type, b.image, b.timeout_in_minutes, b.initiator, b.failure_message\n  FROM actions a\n  JOIN _tool_aws_codebuild_builds b ON b.connection_id = a.connection_id AND b.build_id = a.external_execution_id\n  WHERE a.provider = 'CodeBuild'\n)\nSELECT project_name AS Project, compute_type AS Compute, environment_type AS OS, image AS Image, COUNT(*) AS Builds,\n  MIN(start_time) AS \"First seen\", MAX(start_time) AS \"Last seen\"\nFROM builds\nGROUP BY project_name, compute_type, environment_type, image\nORDER BY project_name, MAX(start_time) DESC\nLIMIT 50"
+                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nactions AS (\n  SELECT r.pipeline, r.env, r.execution_id, r.start_time AS run_start, a.connection_id, a.action_execution_id, a.stage_name, a.action_name,\n    a.provider, a.status, a.error_code, a.summary, a.start_time, a.last_update_time, a.external_execution_id\n  FROM runs r\n  JOIN _tool_aws_action_executions a ON a.connection_id = r.connection_id AND a.execution_id = r.execution_id\n),\nbuilds AS (\n  SELECT a.pipeline, a.env, a.run_start, b.connection_id, b.build_id, b.project_name, b.build_status, b.start_time, b.end_time,\n    b.compute_type, b.environment_type, b.image, b.timeout_in_minutes, b.initiator, b.failure_message\n  FROM actions a\n  JOIN _tool_aws_codebuild_builds b ON b.connection_id = a.connection_id AND b.build_id = a.external_execution_id\n  WHERE a.provider = 'CodeBuild'\n)\nSELECT project_name AS Project, REPLACE(compute_type, 'BUILD_GENERAL1_', '') AS Compute, environment_type AS OS, image AS Image, COUNT(*) AS Builds,\n  MIN(start_time) AS \"First seen\", MAX(start_time) AS \"Last seen\"\nFROM builds\nGROUP BY project_name, compute_type, environment_type, image\nORDER BY project_name, MAX(start_time) DESC\nLIMIT 50"
                       }
                     },
                     "refId": "A",
@@ -2415,7 +2431,7 @@
                     "properties": [
                       {
                         "id": "custom.width",
-                        "value": 210
+                        "value": 110
                       }
                     ]
                   },
@@ -2473,6 +2489,187 @@
         "kind": "Panel",
         "spec": {
           "id": 20,
+          "title": "Projects",
+          "description": "One row per CodeBuild project run by the selected pipelines, most builds first. Branch is what the project's pipelines build from; Size is the compute type. Failed counts failed, faulted and timed-out builds; Success % leaves out stopped and running builds. Durations run from submission to end.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nactions AS (\n  SELECT r.pipeline, r.env, r.execution_id, r.start_time AS run_start, a.connection_id, a.action_execution_id, a.stage_name, a.action_name,\n    a.provider, a.status, a.error_code, a.summary, a.start_time, a.last_update_time, a.external_execution_id\n  FROM runs r\n  JOIN _tool_aws_action_executions a ON a.connection_id = r.connection_id AND a.execution_id = r.execution_id\n),\nbuilds AS (\n  SELECT a.pipeline, a.env, a.run_start, b.connection_id, b.build_id, b.project_name, b.build_status, b.start_time, b.end_time,\n    b.compute_type, b.environment_type, b.image, b.timeout_in_minutes, b.initiator, b.failure_message\n  FROM actions a\n  JOIN _tool_aws_codebuild_builds b ON b.connection_id = a.connection_id AND b.build_id = a.external_execution_id\n  WHERE a.provider = 'CodeBuild'\n),\nd AS (\n  SELECT project_name, TIMESTAMPDIFF(SECOND, start_time, end_time) AS sec,\n    ROW_NUMBER() OVER (PARTITION BY project_name ORDER BY TIMESTAMPDIFF(SECOND, start_time, end_time)) AS rn,\n    COUNT(*) OVER (PARTITION BY project_name) AS n\n  FROM builds WHERE build_status IN ('SUCCEEDED', 'FAILED', 'FAULT', 'TIMED_OUT') AND end_time IS NOT NULL\n),\npct AS (\n  SELECT project_name, MIN(CASE WHEN rn >= CEIL(0.5 * n) THEN sec END) AS p50, MIN(CASE WHEN rn >= CEIL(0.9 * n) THEN sec END) AS p90, MAX(sec) AS mx\n  FROM d GROUP BY project_name\n),\nsrc AS (\n  SELECT DISTINCT b.connection_id, pa.project_name, s.branch_name AS source\n  FROM (SELECT DISTINCT connection_id, project_name FROM builds) b\n  JOIN _tool_aws_pipeline_actions pa ON pa.connection_id = b.connection_id AND pa.project_name = b.project_name\n  JOIN _tool_aws_pipeline_actions s ON s.connection_id = pa.connection_id AND s.pipeline_arn = pa.pipeline_arn\n  WHERE COALESCE(s.branch_name, '') <> ''\n)\nSELECT b.project_name AS Project,\n  COALESCE((SELECT GROUP_CONCAT(src.source ORDER BY src.source SEPARATOR ', ') FROM src WHERE src.project_name = b.project_name), '–') AS Branch,\n  GROUP_CONCAT(DISTINCT REPLACE(b.compute_type, 'BUILD_GENERAL1_', '') ORDER BY b.compute_type SEPARATOR ', ') AS Size,\n  COUNT(*) AS Builds, SUM(b.build_status IN ('FAILED', 'FAULT', 'TIMED_OUT')) AS Failed,\n  ROUND(100 * SUM(b.build_status = 'SUCCEEDED') / NULLIF(SUM(b.build_status IN ('SUCCEEDED', 'FAILED', 'FAULT', 'TIMED_OUT')), 0), 1) AS \"Success %\",\n  MAX(pct.p50) AS Median, MAX(pct.p90) AS p90, MAX(pct.mx) AS \"Max\",\n  MAX(b.start_time) AS \"Last build\"\nFROM builds b LEFT JOIN pct ON pct.project_name = b.project_name\nGROUP BY b.project_name\nORDER BY Builds DESC, b.project_name\nLIMIT 50"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "footer": {
+                  "countRows": false,
+                  "fields": "",
+                  "reducer": [
+                    "sum"
+                  ],
+                  "show": false
+                },
+                "frameIndex": 0,
+                "showHeader": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "text"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "–",
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false,
+                    "width": 100
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Project"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 260
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Branch"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 160
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Last build"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 130
+                      },
+                      {
+                        "id": "unit",
+                        "value": "dateTimeFromNow"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Success %"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Median"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "s"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "p90"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "s"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Max"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "s"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-21": {
+        "kind": "Panel",
+        "spec": {
+          "id": 21,
           "title": "Failures by stage",
           "description": "Failed actions per bucket, stacked by the stage they failed in (the 8 stages with most failures, the rest as Other).",
           "links": [],
@@ -2610,10 +2807,10 @@
           }
         }
       },
-      "panel-21": {
+      "panel-22": {
         "kind": "Panel",
         "spec": {
-          "id": 21,
+          "id": 22,
           "title": "Time to green",
           "description": "For runs that failed in each bucket: median time from the failure to the next successful run of the same pipeline. Failures not yet followed by a success are left out.",
           "links": [],
@@ -2737,10 +2934,10 @@
           }
         }
       },
-      "panel-22": {
+      "panel-23": {
         "kind": "Panel",
         "spec": {
-          "id": 22,
+          "id": 23,
           "title": "Failure log",
           "description": "The 100 newest failed actions in the range. Message is the CodeBuild failure or the action's summary; Failed phase is the CodeBuild phase that failed. The pipeline name opens the run in the AWS console.",
           "links": [],
@@ -2947,10 +3144,805 @@
           }
         }
       },
-      "panel-23": {
+      "panel-24": {
         "kind": "Panel",
         "spec": {
-          "id": 23,
+          "id": 24,
+          "title": "Deployments",
+          "description": "Successful deployment runs per day, week or month by when they ended, stacked by pipeline (8 busiest, the rest as Other), counted as on the DORA dashboard. A run is a deployment when the scope config's deployment pattern matches one of its stages or actions.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH RECURSIVE\nperiods AS (\n  SELECT CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE($__timeFrom()) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) ELSE DATE_FORMAT($__timeFrom(), '%Y-%m-01') END AS DATE) AS period_start\n  UNION ALL\n  SELECT CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN period_start + INTERVAL 1 DAY WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN period_start + INTERVAL 7 DAY ELSE period_start + INTERVAL 1 MONTH END FROM periods WHERE CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN period_start + INTERVAL 1 DAY WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN period_start + INTERVAL 7 DAY ELSE period_start + INTERVAL 1 MONTH END < $__timeTo()\n),\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\ndeploy_runs AS (\n  SELECT r.* FROM runs r\n  JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', r.connection_id, ':', r.execution_id)\n  WHERE cp.type = 'DEPLOYMENT'\n),\nok AS (\n  SELECT pipeline, last_update_time AS end_time FROM deploy_runs WHERE status = 'Succeeded' AND last_update_time >= $__timeFrom() AND last_update_time < $__timeTo()\n),\nlabels AS (\n  SELECT k, IF(rk <= 8, k, 'Other') AS label FROM (\n    SELECT pipeline AS k, ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC, pipeline) AS rk FROM ok GROUP BY pipeline\n  ) ranked\n),\nagg AS (\n  SELECT CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE(o.end_time) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE(o.end_time), INTERVAL WEEKDAY(o.end_time) DAY) ELSE DATE_FORMAT(o.end_time, '%Y-%m-01') END AS DATE) AS period_start, l.label, COUNT(*) AS value FROM ok o JOIN labels l ON l.k = o.pipeline GROUP BY 1, 2\n)\nSELECT CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_FORMAT(GREATEST(p.period_start, $__timeFrom()), '%m/%d') ELSE DATE_FORMAT(p.period_start, '%b %Y') END AS Period, l.label AS metric, COALESCE(v.value, 0) AS value\nFROM periods p\nCROSS JOIN (SELECT DISTINCT label FROM labels) l\nLEFT JOIN agg v ON v.period_start = p.period_start AND v.label = l.label\nORDER BY p.period_start, l.label"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "groupingToMatrix",
+                  "spec": {
+                    "options": {
+                      "rowField": "Period",
+                      "columnField": "metric",
+                      "valueField": "value",
+                      "emptyValue": "zero"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "barchart",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "barRadius": 0,
+                "barWidth": 0.8,
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "orientation": "vertical",
+                "showValue": "never",
+                "stacking": "normal",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "multi",
+                  "sort": "none"
+                },
+                "xField": "Period\\metric",
+                "xTickLabelRotation": -45,
+                "xTickLabelSpacing": 30,
+                "xTickLabelMaxLength": 32
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "decimals": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "text"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "noValue": "–",
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "axisSoftMin": 0,
+                    "fillOpacity": 80,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "lineWidth": 1,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Other"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "gray"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-25": {
+        "kind": "Panel",
+        "spec": {
+          "id": 25,
+          "title": "Failed deployment rate",
+          "description": "Deployment runs that failed, were rollbacks, or logged a failed smoke test, out of finished deployment runs per bucket. A proxy for change failure rate: it catches deploys that broke, not bugs found after a green deploy. A gap means no finished deployments.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH RECURSIVE\nperiods AS (\n  SELECT CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE($__timeFrom()) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) ELSE DATE_FORMAT($__timeFrom(), '%Y-%m-01') END AS DATE) AS period_start\n  UNION ALL\n  SELECT CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN period_start + INTERVAL 1 DAY WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN period_start + INTERVAL 7 DAY ELSE period_start + INTERVAL 1 MONTH END FROM periods WHERE CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN period_start + INTERVAL 1 DAY WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN period_start + INTERVAL 7 DAY ELSE period_start + INTERVAL 1 MONTH END < $__timeTo()\n),\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\ndeploy_runs AS (\n  SELECT r.* FROM runs r\n  JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', r.connection_id, ':', r.execution_id)\n  WHERE cp.type = 'DEPLOYMENT'\n),\ndeploy_outcome AS (\n  SELECT d.*, (d.status = 'Failed' OR d.execution_type = 'ROLLBACK' OR EXISTS (\n      SELECT 1 FROM _tool_aws_action_executions a\n      JOIN _tool_aws_build_log_signals s ON s.connection_id = a.connection_id AND s.build_id = a.external_execution_id\n      WHERE a.connection_id = d.connection_id AND a.execution_id = d.execution_id AND a.provider = 'CodeBuild'\n        AND s.signal_type = 'SMOKE_TEST' AND LOWER(s.result) = 'failed')) AS bad\n  FROM deploy_runs d WHERE d.status IN ('Succeeded', 'Failed')\n),\nagg AS (\n  SELECT CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE(start_time) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE(start_time), INTERVAL WEEKDAY(start_time) DAY) ELSE DATE_FORMAT(start_time, '%Y-%m-01') END AS DATE) AS period_start, ROUND(100 * SUM(bad) / COUNT(*), 1) AS rate FROM deploy_outcome GROUP BY 1\n)\nSELECT CAST(GREATEST(p.period_start, $__timeFrom()) AS DATETIME) AS time, a.rate AS \"Failed deployments %\"\nFROM periods p LEFT JOIN agg a ON a.period_start = p.period_start\nORDER BY p.period_start"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "decimals": 1,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "text"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "noValue": "–",
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "axisSoftMin": 0,
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 2,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "min": 0
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Failed deployments %"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "red"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Other"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "gray"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-26": {
+        "kind": "Panel",
+        "spec": {
+          "id": 26,
+          "title": "Lead time for changes",
+          "description": "DORA's lead time for changes for pull requests shipped by these pipelines: from the pull request's first commit to the end of the production deployment that included it, median and p90 per bucket of deployment end. The same numbers as the DORA dashboard. Needs the project's repositories in DevLake and DORA turned on.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH RECURSIVE\nperiods AS (\n  SELECT CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE($__timeFrom()) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) ELSE DATE_FORMAT($__timeFrom(), '%Y-%m-01') END AS DATE) AS period_start\n  UNION ALL\n  SELECT CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN period_start + INTERVAL 1 DAY WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN period_start + INTERVAL 7 DAY ELSE period_start + INTERVAL 1 MONTH END FROM periods WHERE CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN period_start + INTERVAL 1 DAY WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN period_start + INTERVAL 7 DAY ELSE period_start + INTERVAL 1 MONTH END < $__timeTo()\n),\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\ndeploy_runs AS (\n  SELECT r.* FROM runs r\n  JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', r.connection_id, ':', r.execution_id)\n  WHERE cp.type = 'DEPLOYMENT'\n),\nlead_t AS (\n  SELECT DISTINCT ppm.id, sp.name AS pipeline, cdc.finished_date AS start_time, ppm.pr_cycle_time * 60 AS sec\n  FROM scoped_pipelines sp\n  JOIN cicd_deployment_commits cdc ON cdc.cicd_scope_id = CONCAT('aws:AwsPipeline:', sp.connection_id, ':', sp.arn)\n  JOIN project_pr_metrics ppm ON ppm.deployment_commit_id = cdc.id\n  WHERE ppm.project_name IN (SELECT upm_l.project_name FROM user_project_mapping upm_l WHERE upm_l.user_login = ${__user.login:sqlstring} AND upm_l.project_name IN ($project))\n    AND ppm.pr_cycle_time IS NOT NULL AND cdc.finished_date >= $__timeFrom() AND cdc.finished_date < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nr AS (\n  SELECT CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE(start_time) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE(start_time), INTERVAL WEEKDAY(start_time) DAY) ELSE DATE_FORMAT(start_time, '%Y-%m-01') END AS DATE) AS period_start, sec, ROW_NUMBER() OVER (PARTITION BY CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE(start_time) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE(start_time), INTERVAL WEEKDAY(start_time) DAY) ELSE DATE_FORMAT(start_time, '%Y-%m-01') END AS DATE) ORDER BY sec) AS rn,\n    COUNT(*) OVER (PARTITION BY CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE(start_time) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE(start_time), INTERVAL WEEKDAY(start_time) DAY) ELSE DATE_FORMAT(start_time, '%Y-%m-01') END AS DATE)) AS n FROM lead_t\n),\nagg AS (\n  SELECT period_start, MIN(CASE WHEN rn >= CEIL(0.5 * n) THEN sec END) AS p50, MIN(CASE WHEN rn >= CEIL(0.9 * n) THEN sec END) AS p90 FROM r GROUP BY period_start\n)\nSELECT CAST(GREATEST(p.period_start, $__timeFrom()) AS DATETIME) AS time, a.p50 AS \"Median\", a.p90 AS \"p90\"\nFROM periods p LEFT JOIN agg a ON a.period_start = p.period_start\nORDER BY p.period_start"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "s",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "text"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "noValue": "–",
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "axisSoftMin": 0,
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 2,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "min": 0
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Other"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "gray"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-27": {
+        "kind": "Panel",
+        "spec": {
+          "id": 27,
+          "title": "Time to recover",
+          "description": "For failed deployments in each bucket: median time from the end of the failed run to the end of the next successful deployment run of the same pipeline. Failures not yet followed by a success are left out.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH RECURSIVE\nperiods AS (\n  SELECT CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE($__timeFrom()) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) ELSE DATE_FORMAT($__timeFrom(), '%Y-%m-01') END AS DATE) AS period_start\n  UNION ALL\n  SELECT CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN period_start + INTERVAL 1 DAY WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN period_start + INTERVAL 7 DAY ELSE period_start + INTERVAL 1 MONTH END FROM periods WHERE CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN period_start + INTERVAL 1 DAY WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN period_start + INTERVAL 7 DAY ELSE period_start + INTERVAL 1 MONTH END < $__timeTo()\n),\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\ndeploy_runs AS (\n  SELECT r.* FROM runs r\n  JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', r.connection_id, ':', r.execution_id)\n  WHERE cp.type = 'DEPLOYMENT'\n),\ndeploy_outcome AS (\n  SELECT d.*, (d.status = 'Failed' OR d.execution_type = 'ROLLBACK' OR EXISTS (\n      SELECT 1 FROM _tool_aws_action_executions a\n      JOIN _tool_aws_build_log_signals s ON s.connection_id = a.connection_id AND s.build_id = a.external_execution_id\n      WHERE a.connection_id = d.connection_id AND a.execution_id = d.execution_id AND a.provider = 'CodeBuild'\n        AND s.signal_type = 'SMOKE_TEST' AND LOWER(s.result) = 'failed')) AS bad\n  FROM deploy_runs d WHERE d.status IN ('Succeeded', 'Failed')\n),\ndgrp AS (\n  SELECT pipeline, bad, start_time, last_update_time,\n    SUM(NOT bad) OVER (PARTITION BY pipeline ORDER BY start_time DESC, execution_id DESC ROWS UNBOUNDED PRECEDING) AS grp\n  FROM deploy_outcome\n),\nrecover AS (\n  SELECT pipeline, start_time, TIMESTAMPDIFF(SECOND, last_update_time, next_ok) AS sec FROM (\n    SELECT pipeline, bad, start_time, last_update_time,\n      MAX(CASE WHEN NOT bad THEN last_update_time END) OVER (PARTITION BY pipeline, grp) AS next_ok\n    FROM dgrp\n  ) x WHERE bad AND next_ok IS NOT NULL\n),\nr AS (\n  SELECT CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE(start_time) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE(start_time), INTERVAL WEEKDAY(start_time) DAY) ELSE DATE_FORMAT(start_time, '%Y-%m-01') END AS DATE) AS period_start, sec, ROW_NUMBER() OVER (PARTITION BY CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE(start_time) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE(start_time), INTERVAL WEEKDAY(start_time) DAY) ELSE DATE_FORMAT(start_time, '%Y-%m-01') END AS DATE) ORDER BY sec) AS rn,\n    COUNT(*) OVER (PARTITION BY CAST(CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31 THEN DATE(start_time) WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_SUB(DATE(start_time), INTERVAL WEEKDAY(start_time) DAY) ELSE DATE_FORMAT(start_time, '%Y-%m-01') END AS DATE)) AS n FROM recover\n),\nagg AS (\n  SELECT period_start, MIN(CASE WHEN rn >= CEIL(0.5 * n) THEN sec END) AS value FROM r GROUP BY period_start\n)\nSELECT CASE WHEN TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 182 THEN DATE_FORMAT(GREATEST(p.period_start, $__timeFrom()), '%m/%d') ELSE DATE_FORMAT(p.period_start, '%b %Y') END AS Period, a.value AS \"Median time to recover\"\nFROM periods p LEFT JOIN agg a ON a.period_start = p.period_start\nORDER BY p.period_start"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "barchart",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "barRadius": 0,
+                "barWidth": 0.8,
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "orientation": "vertical",
+                "showValue": "never",
+                "stacking": "none",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "multi",
+                  "sort": "none"
+                },
+                "xField": "Period",
+                "xTickLabelRotation": -45,
+                "xTickLabelSpacing": 30,
+                "xTickLabelMaxLength": 32
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "s",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "text"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "noValue": "–",
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "axisSoftMin": 0,
+                    "fillOpacity": 80,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "lineWidth": 1,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Other"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "gray"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-28": {
+        "kind": "Panel",
+        "spec": {
+          "id": 28,
+          "title": "Deployments by pipeline",
+          "description": "One row per pipeline with deployment runs started in the range. Deploys counts successful ones. Gap is the time between the starts of consecutive successful deployments. Lead time and Time to recover are medians, as in the panels above. The pipeline name opens it in the AWS console.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\ndeploy_runs AS (\n  SELECT r.* FROM runs r\n  JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', r.connection_id, ':', r.execution_id)\n  WHERE cp.type = 'DEPLOYMENT'\n),\ndeploy_outcome AS (\n  SELECT d.*, (d.status = 'Failed' OR d.execution_type = 'ROLLBACK' OR EXISTS (\n      SELECT 1 FROM _tool_aws_action_executions a\n      JOIN _tool_aws_build_log_signals s ON s.connection_id = a.connection_id AND s.build_id = a.external_execution_id\n      WHERE a.connection_id = d.connection_id AND a.execution_id = d.execution_id AND a.provider = 'CodeBuild'\n        AND s.signal_type = 'SMOKE_TEST' AND LOWER(s.result) = 'failed')) AS bad\n  FROM deploy_runs d WHERE d.status IN ('Succeeded', 'Failed')\n),\nlead_t AS (\n  SELECT DISTINCT ppm.id, sp.name AS pipeline, cdc.finished_date AS start_time, ppm.pr_cycle_time * 60 AS sec\n  FROM scoped_pipelines sp\n  JOIN cicd_deployment_commits cdc ON cdc.cicd_scope_id = CONCAT('aws:AwsPipeline:', sp.connection_id, ':', sp.arn)\n  JOIN project_pr_metrics ppm ON ppm.deployment_commit_id = cdc.id\n  WHERE ppm.project_name IN (SELECT upm_l.project_name FROM user_project_mapping upm_l WHERE upm_l.user_login = ${__user.login:sqlstring} AND upm_l.project_name IN ($project))\n    AND ppm.pr_cycle_time IS NOT NULL AND cdc.finished_date >= $__timeFrom() AND cdc.finished_date < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\ndgrp AS (\n  SELECT pipeline, bad, start_time, last_update_time,\n    SUM(NOT bad) OVER (PARTITION BY pipeline ORDER BY start_time DESC, execution_id DESC ROWS UNBOUNDED PRECEDING) AS grp\n  FROM deploy_outcome\n),\nrecover AS (\n  SELECT pipeline, start_time, TIMESTAMPDIFF(SECOND, last_update_time, next_ok) AS sec FROM (\n    SELECT pipeline, bad, start_time, last_update_time,\n      MAX(CASE WHEN NOT bad THEN last_update_time END) OVER (PARTITION BY pipeline, grp) AS next_ok\n    FROM dgrp\n  ) x WHERE bad AND next_ok IS NOT NULL\n),\nok AS (\n  SELECT pipeline, start_time, TIMESTAMPDIFF(SECOND, start_time, last_update_time) AS dur,\n    TIMESTAMPDIFF(SECOND, LAG(start_time) OVER (PARTITION BY pipeline ORDER BY start_time, execution_id), start_time) AS gap\n  FROM deploy_runs WHERE status = 'Succeeded'\n),\nm_gap AS (\n  SELECT pipeline, MIN(CASE WHEN rn >= CEIL(0.5 * n) THEN gap END) AS p50 FROM (\n    SELECT pipeline, gap, ROW_NUMBER() OVER (PARTITION BY pipeline ORDER BY gap) AS rn, COUNT(*) OVER (PARTITION BY pipeline) AS n FROM ok WHERE gap IS NOT NULL\n  ) x GROUP BY pipeline\n),\nm_dur AS (\n  SELECT pipeline, MIN(CASE WHEN rn >= CEIL(0.5 * n) THEN dur END) AS p50 FROM (\n    SELECT pipeline, dur, ROW_NUMBER() OVER (PARTITION BY pipeline ORDER BY dur) AS rn, COUNT(*) OVER (PARTITION BY pipeline) AS n FROM ok WHERE dur IS NOT NULL\n  ) x GROUP BY pipeline\n),\nm_lead AS (\n  SELECT pipeline, MIN(CASE WHEN rn >= CEIL(0.5 * n) THEN sec END) AS p50 FROM (\n    SELECT pipeline, sec, ROW_NUMBER() OVER (PARTITION BY pipeline ORDER BY sec) AS rn, COUNT(*) OVER (PARTITION BY pipeline) AS n FROM lead_t WHERE sec IS NOT NULL\n  ) x GROUP BY pipeline\n),\nm_rec AS (\n  SELECT pipeline, MIN(CASE WHEN rn >= CEIL(0.5 * n) THEN sec END) AS p50 FROM (\n    SELECT pipeline, sec, ROW_NUMBER() OVER (PARTITION BY pipeline ORDER BY sec) AS rn, COUNT(*) OVER (PARTITION BY pipeline) AS n FROM recover WHERE sec IS NOT NULL\n  ) x GROUP BY pipeline\n),\no AS (\n  SELECT pipeline, COUNT(*) AS finished, SUM(bad) AS bad FROM deploy_outcome GROUP BY pipeline\n)\nSELECT d.pipeline AS Pipeline, MAX(d.pipeline_url) AS url, MAX(d.env) AS Environment,\n  SUM(d.status = 'Succeeded') AS Deploys,\n  ROUND(SUM(d.status = 'Succeeded') / GREATEST(TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) / 604800, 1 / 7), 1) AS \"Per week\",\n  MAX(ROUND(100 * o.bad / NULLIF(o.finished, 0), 1)) AS \"Failed %\",\n  MAX(m_dur.p50) AS \"Median duration\", MAX(m_gap.p50) AS \"Median gap\", (SELECT MAX(gap) FROM ok WHERE ok.pipeline = d.pipeline) AS \"Longest gap\",\n  MAX(m_lead.p50) AS \"Lead time\", MAX(m_rec.p50) AS \"Time to recover\",\n  MAX(CASE WHEN d.status = 'Succeeded' THEN d.start_time END) AS \"Last deploy\"\nFROM deploy_runs d\nLEFT JOIN o ON o.pipeline = d.pipeline\nLEFT JOIN m_dur ON m_dur.pipeline = d.pipeline\nLEFT JOIN m_gap ON m_gap.pipeline = d.pipeline\nLEFT JOIN m_lead ON m_lead.pipeline = d.pipeline\nLEFT JOIN m_rec ON m_rec.pipeline = d.pipeline\nGROUP BY d.pipeline\nORDER BY Deploys DESC, d.pipeline\nLIMIT 50"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "footer": {
+                  "countRows": false,
+                  "fields": "",
+                  "reducer": [
+                    "sum"
+                  ],
+                  "show": false
+                },
+                "frameIndex": 0,
+                "showHeader": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "text"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "–",
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false,
+                    "width": 100
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Pipeline"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 300
+                      },
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "Open in AWS",
+                            "url": "${__data.fields.url}",
+                            "targetBlank": true
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Environment"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 120
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Median duration"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 125
+                      },
+                      {
+                        "id": "unit",
+                        "value": "s"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Time to recover"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 125
+                      },
+                      {
+                        "id": "unit",
+                        "value": "s"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Longest gap"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 100
+                      },
+                      {
+                        "id": "unit",
+                        "value": "s"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Last deploy"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 110
+                      },
+                      {
+                        "id": "unit",
+                        "value": "dateTimeFromNow"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Per week"
+                    },
+                    "properties": [
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Failed %"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Median gap"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "s"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Lead time"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "s"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "url"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.hideFrom.viz",
+                        "value": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-29": {
+        "kind": "Panel",
+        "spec": {
+          "id": 29,
           "title": "Release cadence",
           "description": "Runs triggered by a git tag per bucket, stacked by pipeline (8 busiest, the rest as Other).",
           "links": [],
@@ -3088,10 +4080,10 @@
           }
         }
       },
-      "panel-24": {
+      "panel-30": {
         "kind": "Panel",
         "spec": {
-          "id": 24,
+          "id": 30,
           "title": "Repositories shipped",
           "description": "Distinct commits that went through a successful run, per source repository (top 15).",
           "links": [],
@@ -3216,10 +4208,10 @@
           }
         }
       },
-      "panel-25": {
+      "panel-31": {
         "kind": "Panel",
         "spec": {
-          "id": 25,
+          "id": 31,
           "title": "Releases",
           "description": "The 100 newest tag-triggered runs and rollback runs in the range. The pipeline name opens the run in the AWS console.",
           "links": [],
@@ -3353,7 +4345,7 @@
                     "properties": [
                       {
                         "id": "custom.width",
-                        "value": 130
+                        "value": 120
                       }
                     ]
                   },
@@ -3486,10 +4478,10 @@
           }
         }
       },
-      "panel-26": {
+      "panel-32": {
         "kind": "Panel",
         "spec": {
-          "id": 26,
+          "id": 32,
           "title": "Critical and high over time",
           "description": "Critical plus high Trivy findings in the latest scan per bucket, for the 8 images or package sets with the most findings. Image tags are dropped so every version of an image shares a line. Build logs are kept about 14 days, so older buckets have no scans.",
           "links": [],
@@ -3616,10 +4608,10 @@
           }
         }
       },
-      "panel-27": {
+      "panel-33": {
         "kind": "Panel",
         "spec": {
-          "id": 27,
+          "id": 33,
           "title": "Latest scan per target",
           "description": "The newest scan of each image and package set in the range, with the change in critical plus high since its previous scan. Medium, low and unknown appear only when a scan in range reports them.",
           "links": [],
@@ -3799,10 +4791,10 @@
           }
         }
       },
-      "panel-28": {
+      "panel-34": {
         "kind": "Panel",
         "spec": {
-          "id": 28,
+          "id": 34,
           "title": "Smoke tests and rollbacks",
           "description": "Smoke test results and rollback lines found in deployment build logs per bucket. Only builds whose logs were still available are counted.",
           "links": [],
@@ -3972,10 +4964,10 @@
           }
         }
       },
-      "panel-29": {
+      "panel-35": {
         "kind": "Panel",
         "spec": {
-          "id": 29,
+          "id": 35,
           "title": "Log coverage",
           "description": "For each log pattern, builds in the range whose log was read and matched, read without a match, or already expired (AWS keeps build logs about 14 days). Expired logs are why older buckets above are empty.",
           "links": [],
@@ -4144,6 +5136,44 @@
             }
           }
         }
+      },
+      "panel-36": {
+        "kind": "Panel",
+        "spec": {
+          "id": 36,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                },
+                "content": "",
+                "mode": "markdown"
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
       }
     },
     "layout": {
@@ -4223,6 +5253,34 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-7"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Spacer",
+              "collapse": false,
+              "hideHeader": true,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 1,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-36"
                         }
                       }
                     }
@@ -4430,6 +5488,19 @@
                                     "name": "panel-19"
                                   }
                                 }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 16,
+                                  "width": 24,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-20"
+                                  }
+                                }
                               }
                             ]
                           }
@@ -4453,7 +5524,7 @@
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-20"
+                                    "name": "panel-21"
                                   }
                                 }
                               },
@@ -4466,7 +5537,7 @@
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-21"
+                                    "name": "panel-22"
                                   }
                                 }
                               },
@@ -4479,7 +5550,85 @@
                                   "height": 10,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-22"
+                                    "name": "panel-23"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "TabsLayoutTab",
+                      "spec": {
+                        "title": "Deployments",
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-24"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-25"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 8,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-26"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 8,
+                                  "width": 12,
+                                  "height": 8,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-27"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 16,
+                                  "width": 24,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-28"
                                   }
                                 }
                               }
@@ -4505,7 +5654,7 @@
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-23"
+                                    "name": "panel-29"
                                   }
                                 }
                               },
@@ -4518,7 +5667,7 @@
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-24"
+                                    "name": "panel-30"
                                   }
                                 }
                               },
@@ -4531,7 +5680,7 @@
                                   "height": 10,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-25"
+                                    "name": "panel-31"
                                   }
                                 }
                               }
@@ -4557,7 +5706,7 @@
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-26"
+                                    "name": "panel-32"
                                   }
                                 }
                               },
@@ -4570,7 +5719,7 @@
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-27"
+                                    "name": "panel-33"
                                   }
                                 }
                               },
@@ -4583,7 +5732,7 @@
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-28"
+                                    "name": "panel-34"
                                   }
                                 }
                               },
@@ -4596,7 +5745,7 @@
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-29"
+                                    "name": "panel-35"
                                   }
                                 }
                               }

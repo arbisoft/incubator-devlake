@@ -1234,6 +1234,231 @@
         "kind": "Panel",
         "spec": {
           "id": 11,
+          "title": "By stage",
+          "description": "Cost per pipeline stage in the range, most expensive first (up to 50). A CodeBuild action costs its build minutes plus its CodePipeline action minutes. Unpriced counts builds or actions with no list price.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nactions AS (\n  SELECT r.pipeline, r.env, r.execution_id, r.start_time AS run_start, a.connection_id, a.action_execution_id, a.stage_name, a.action_name,\n    a.provider, a.status, a.error_code, a.summary, a.start_time, a.last_update_time, a.external_execution_id\n  FROM runs r\n  JOIN _tool_aws_action_executions a ON a.connection_id = r.connection_id AND a.execution_id = r.execution_id\n),\ncostrows AS (\n  SELECT r.pipeline, r.execution_id, r.status AS run_status, r.start_time AS run_start, 'CodePipeline' AS kind, a.billed_minutes AS billed_min,\n    NULL AS actual_sec, a.estimated_cost_usd AS cost, a.stage_name, a.action_name, a.provider, a.status AS action_status\n  FROM runs r JOIN _tool_aws_action_executions a ON a.connection_id = r.connection_id AND a.execution_id = r.execution_id\n  UNION ALL\n  SELECT a.pipeline, a.execution_id, r.status, a.run_start, 'CodeBuild', b.billed_minutes, TIMESTAMPDIFF(SECOND, b.start_time, b.end_time),\n    b.estimated_cost_usd, a.stage_name, a.action_name, b.project_name, a.status\n  FROM actions a\n  JOIN runs r ON r.connection_id = a.connection_id AND r.execution_id = a.execution_id\n  JOIN _tool_aws_codebuild_builds b ON b.connection_id = a.connection_id AND b.build_id = a.external_execution_id\n  WHERE a.provider = 'CodeBuild'\n),\nagg AS (\n  SELECT pipeline, stage_name, COUNT(DISTINCT execution_id) AS runs,\n    SUM(CASE WHEN kind = 'CodeBuild' THEN billed_min END) AS build_min, SUM(CASE WHEN kind = 'CodePipeline' THEN billed_min END) AS action_min,\n    SUM(cost) AS cost, SUM(cost IS NULL) AS unpriced\n  FROM costrows GROUP BY pipeline, stage_name\n)\nSELECT pipeline AS Pipeline, stage_name AS Stage, runs AS Runs, COALESCE(build_min, 0) AS \"Build minutes\", COALESCE(action_min, 0) AS \"Action minutes\",\n  ROUND(COALESCE(cost, 0), 2) AS Cost, ROUND(cost / NULLIF(runs, 0), 3) AS \"Cost per run\",\n  ROUND(100 * cost / NULLIF(SUM(cost) OVER (), 0), 1) AS \"Share %\", unpriced AS Unpriced\nFROM agg\nORDER BY cost DESC, pipeline, stage_name\nLIMIT 50"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "footer": {
+                  "countRows": false,
+                  "fields": "",
+                  "reducer": [
+                    "sum"
+                  ],
+                  "show": false
+                },
+                "frameIndex": 0,
+                "showHeader": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "text"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "noValue": "–",
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false,
+                    "width": 100
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Pipeline"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 280
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Stage"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 170
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Action"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 190
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Build"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 300
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Build minutes"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 120
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Action minutes"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 130
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Cost"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "currencyUSD"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 2
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "range",
+                            "options": {
+                              "from": 1e-06,
+                              "to": 0.004999,
+                              "result": {
+                                "text": "< $0.01",
+                                "index": 0
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Cost per run"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "currencyUSD"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 3
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Share %"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-12": {
+        "kind": "Panel",
+        "spec": {
+          "id": 12,
           "title": "Cost per run",
           "description": "Estimated cost per run per bucket for the 8 most expensive pipelines.",
           "links": [],
@@ -1360,10 +1585,10 @@
           }
         }
       },
-      "panel-12": {
+      "panel-13": {
         "kind": "Panel",
         "spec": {
-          "id": 12,
+          "id": 13,
           "title": "Spent on failures and retries",
           "description": "Cost of runs that failed, and of retried actions inside runs that went on to succeed.",
           "links": [],
@@ -1517,10 +1742,10 @@
           }
         }
       },
-      "panel-13": {
+      "panel-14": {
         "kind": "Panel",
         "spec": {
-          "id": 13,
+          "id": 14,
           "title": "Minutes rounded up",
           "description": "CodeBuild bills whole minutes. Build minutes actually used vs minutes added by rounding each build up, for the 8 projects with the most billed minutes.",
           "links": [],
@@ -1660,10 +1885,10 @@
           }
         }
       },
-      "panel-14": {
+      "panel-15": {
         "kind": "Panel",
         "spec": {
-          "id": 14,
+          "id": 15,
           "title": "Compute size what-if",
           "description": "Each project's billed minutes priced at the next smaller and next larger compute size, at the list price in force on each build's date. An estimate: a different size would also change how long builds take.",
           "links": [],
@@ -1685,7 +1910,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nactions AS (\n  SELECT r.pipeline, r.env, r.execution_id, r.start_time AS run_start, a.connection_id, a.action_execution_id, a.stage_name, a.action_name,\n    a.provider, a.status, a.error_code, a.summary, a.start_time, a.last_update_time, a.external_execution_id\n  FROM runs r\n  JOIN _tool_aws_action_executions a ON a.connection_id = r.connection_id AND a.execution_id = r.execution_id\n),\nb AS (\n  SELECT x.project_name, x.compute_type, x.billed_minutes, x.estimated_cost_usd, x.price_usage_type, x.start_time, r.region\n  FROM actions a\n  JOIN runs r ON r.connection_id = a.connection_id AND r.execution_id = a.execution_id\n  JOIN _tool_aws_codebuild_builds x ON x.connection_id = a.connection_id AND x.build_id = a.external_execution_id\n  WHERE a.provider = 'CodeBuild' AND x.price_usage_type IS NOT NULL AND x.price_usage_type <> ''\n),\nalt AS (\n  SELECT b.*,\n    CASE SUBSTRING_INDEX(price_usage_type, '.', -1) WHEN 'medium' THEN 'small' WHEN 'large' THEN 'medium' WHEN 'xlarge' THEN 'large' WHEN '2xlarge' THEN 'xlarge' END AS smaller,\n    CASE SUBSTRING_INDEX(price_usage_type, '.', -1) WHEN 'small' THEN 'medium' WHEN 'medium' THEN 'large' WHEN 'large' THEN 'xlarge' WHEN 'xlarge' THEN '2xlarge' END AS larger\n  FROM b\n),\npriced AS (\n  SELECT alt.*, (SELECT pr.price_usd FROM _tool_aws_prices pr WHERE pr.region = alt.region AND pr.usage_type = CONCAT(SUBSTRING_INDEX(alt.price_usage_type, '.', 1), '.', alt.smaller) AND pr.publication_date <= alt.start_time ORDER BY pr.publication_date DESC LIMIT 1) AS p_small, (SELECT pr.price_usd FROM _tool_aws_prices pr WHERE pr.region = alt.region AND pr.usage_type = CONCAT(SUBSTRING_INDEX(alt.price_usage_type, '.', 1), '.', alt.larger) AND pr.publication_date <= alt.start_time ORDER BY pr.publication_date DESC LIMIT 1) AS p_large FROM alt\n)\nSELECT project_name AS Project, compute_type AS Compute, SUM(billed_minutes) AS \"Billed minutes\", ROUND(SUM(estimated_cost_usd), 2) AS \"Cost now\",\n  ROUND(SUM(billed_minutes * p_small), 2) AS \"Smaller size\", ROUND(SUM(billed_minutes * p_large), 2) AS \"Larger size\"\nFROM priced\nGROUP BY project_name, compute_type\nORDER BY SUM(estimated_cost_usd) DESC, project_name\nLIMIT 50"
+                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nactions AS (\n  SELECT r.pipeline, r.env, r.execution_id, r.start_time AS run_start, a.connection_id, a.action_execution_id, a.stage_name, a.action_name,\n    a.provider, a.status, a.error_code, a.summary, a.start_time, a.last_update_time, a.external_execution_id\n  FROM runs r\n  JOIN _tool_aws_action_executions a ON a.connection_id = r.connection_id AND a.execution_id = r.execution_id\n),\nb AS (\n  SELECT x.project_name, x.compute_type, x.billed_minutes, x.estimated_cost_usd, x.price_usage_type, x.start_time, r.region\n  FROM actions a\n  JOIN runs r ON r.connection_id = a.connection_id AND r.execution_id = a.execution_id\n  JOIN _tool_aws_codebuild_builds x ON x.connection_id = a.connection_id AND x.build_id = a.external_execution_id\n  WHERE a.provider = 'CodeBuild' AND x.price_usage_type IS NOT NULL AND x.price_usage_type <> ''\n),\nalt AS (\n  SELECT b.*,\n    CASE SUBSTRING_INDEX(price_usage_type, '.', -1) WHEN 'medium' THEN 'small' WHEN 'large' THEN 'medium' WHEN 'xlarge' THEN 'large' WHEN '2xlarge' THEN 'xlarge' END AS smaller,\n    CASE SUBSTRING_INDEX(price_usage_type, '.', -1) WHEN 'small' THEN 'medium' WHEN 'medium' THEN 'large' WHEN 'large' THEN 'xlarge' WHEN 'xlarge' THEN '2xlarge' END AS larger\n  FROM b\n),\npriced AS (\n  SELECT alt.*, (SELECT pr.price_usd FROM _tool_aws_prices pr WHERE pr.region = alt.region AND pr.usage_type = CONCAT(SUBSTRING_INDEX(alt.price_usage_type, '.', 1), '.', alt.smaller) AND pr.publication_date <= alt.start_time ORDER BY pr.publication_date DESC LIMIT 1) AS p_small, (SELECT pr.price_usd FROM _tool_aws_prices pr WHERE pr.region = alt.region AND pr.usage_type = CONCAT(SUBSTRING_INDEX(alt.price_usage_type, '.', 1), '.', alt.larger) AND pr.publication_date <= alt.start_time ORDER BY pr.publication_date DESC LIMIT 1) AS p_large FROM alt\n)\nSELECT project_name AS Project, REPLACE(compute_type, 'BUILD_GENERAL1_', '') AS Compute, SUM(billed_minutes) AS \"Billed minutes\", ROUND(SUM(estimated_cost_usd), 2) AS \"Cost now\",\n  ROUND(SUM(billed_minutes * p_small), 2) AS \"Smaller size\", ROUND(SUM(billed_minutes * p_large), 2) AS \"Larger size\"\nFROM priced\nGROUP BY project_name, compute_type\nORDER BY SUM(estimated_cost_usd) DESC, project_name\nLIMIT 50"
                       }
                     },
                     "refId": "A",
@@ -1763,7 +1988,7 @@
                     "properties": [
                       {
                         "id": "custom.width",
-                        "value": 210
+                        "value": 110
                       }
                     ]
                   },
@@ -1833,12 +2058,12 @@
           }
         }
       },
-      "panel-15": {
+      "panel-16": {
         "kind": "Panel",
         "spec": {
-          "id": 15,
-          "title": "",
-          "description": "",
+          "id": 16,
+          "title": "By compute type",
+          "description": "CodeBuild builds, billed minutes and cost per compute type, in the range. Per minute is the average list price paid.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1858,7 +2083,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nconn_scope AS (\n  SELECT DISTINCT connection_id FROM scoped_pipelines\n)\nSELECT 'Cost Explorer is off for these connections, or has not run yet. Turn on \"Use Cost Explorer\" on the AWS connection: DevLake then reads daily spend once a night (about 2 billed requests at $0.01 each) and loads the last 13 months the first time.' AS hint\nFROM conn_scope s\nWHERE NOT EXISTS (SELECT 1 FROM _tool_aws_cost_daily c WHERE c.connection_id = s.connection_id)\nLIMIT 1"
+                        "rawSql": "WITH\nscoped_pipelines AS (\n  SELECT x.*,\n    CASE WHEN COALESCE(sc.production_pattern, '') = '' THEN 'Not set'\n         WHEN (SELECT cp.environment FROM _tool_aws_pipeline_executions e1\n               JOIN cicd_pipelines cp ON cp.id = CONCAT('aws:AwsPipelineExecution:', e1.connection_id, ':', e1.execution_id)\n               WHERE e1.connection_id = x.connection_id AND e1.pipeline_arn = x.arn LIMIT 1) = 'PRODUCTION' THEN 'Production'\n         ELSE 'Non-production' END AS env\n  FROM (\n    SELECT DISTINCT p.connection_id, p.arn, p.name, p.region, p.url, p.scope_config_id\n    FROM project_mapping pm\n    JOIN _tool_aws_pipelines p ON pm.row_id = CONCAT('aws:AwsPipeline:', p.connection_id, ':', p.arn)\n    WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  ) x\n  LEFT JOIN _tool_aws_scope_configs sc ON sc.id = x.scope_config_id\n),\nruns AS (\n  SELECT e.connection_id, e.execution_id, e.pipeline_arn, sp.name AS pipeline, sp.region, sp.url AS pipeline_url,\n    e.status, e.execution_type, e.trigger_type, e.trigger_tag_name, e.start_time, e.last_update_time, sp.env\n  FROM scoped_pipelines sp\n  JOIN _tool_aws_pipeline_executions e ON e.connection_id = sp.connection_id AND e.pipeline_arn = sp.arn\n  WHERE e.start_time >= $__timeFrom() AND e.start_time < $__timeTo() AND (${environment:sqlstring} = 'All' OR sp.env = ${environment:sqlstring})\n),\nactions AS (\n  SELECT r.pipeline, r.env, r.execution_id, r.start_time AS run_start, a.connection_id, a.action_execution_id, a.stage_name, a.action_name,\n    a.provider, a.status, a.error_code, a.summary, a.start_time, a.last_update_time, a.external_execution_id\n  FROM runs r\n  JOIN _tool_aws_action_executions a ON a.connection_id = r.connection_id AND a.execution_id = r.execution_id\n),\ncb AS (\n  SELECT DISTINCT b.connection_id, b.build_id, b.compute_type, b.environment_type, b.billed_minutes, b.estimated_cost_usd\n  FROM actions a JOIN _tool_aws_codebuild_builds b ON b.connection_id = a.connection_id AND b.build_id = a.external_execution_id\n  WHERE a.provider = 'CodeBuild'\n)\nSELECT CONCAT(REPLACE(compute_type, 'BUILD_GENERAL1_', ''), ' · ', CASE environment_type WHEN 'LINUX_CONTAINER' THEN 'Linux' WHEN 'ARM_CONTAINER' THEN 'Linux ARM'\n    WHEN 'WINDOWS_SERVER_2019_CONTAINER' THEN 'Windows' ELSE environment_type END) AS \"Compute type\",\n  COUNT(*) AS Builds, SUM(billed_minutes) AS \"Billed minutes\", ROUND(COALESCE(SUM(estimated_cost_usd), 0), 2) AS Cost,\n  ROUND(100 * SUM(estimated_cost_usd) / NULLIF(SUM(SUM(estimated_cost_usd)) OVER (), 0), 1) AS \"Share %\",\n  ROUND(SUM(estimated_cost_usd) / NULLIF(SUM(billed_minutes), 0), 4) AS \"Per minute\"\nFROM cb\nGROUP BY compute_type, environment_type\nORDER BY Cost DESC, compute_type"
                       }
                     },
                     "refId": "A",
@@ -1872,28 +2097,21 @@
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "stat",
+            "group": "table",
             "version": "13.2.2",
             "spec": {
               "options": {
-                "colorMode": "none",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
+                "cellHeight": "sm",
+                "footer": {
+                  "countRows": false,
+                  "fields": "",
+                  "reducer": [
+                    "sum"
                   ],
-                  "fields": "/.*/",
-                  "values": false
+                  "show": false
                 },
-                "showPercentChange": false,
-                "text": {
-                  "valueSize": 14
-                },
-                "textMode": "value",
-                "wideLayout": true
+                "frameIndex": 0,
+                "showHeader": true
               },
               "fieldConfig": {
                 "defaults": {
@@ -1907,22 +2125,136 @@
                     ]
                   },
                   "color": {
-                    "mode": "fixed",
-                    "fixedColor": "text"
+                    "mode": "thresholds"
                   },
-                  "noValue": " "
+                  "noValue": "–",
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false,
+                    "width": 100
+                  }
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Compute"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 110
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Billed minutes"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 120
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Compute type"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 140
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Per minute"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 110
+                      },
+                      {
+                        "id": "unit",
+                        "value": "currencyUSD"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 4
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Cost"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "currencyUSD"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 2
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "range",
+                            "options": {
+                              "from": 1e-06,
+                              "to": 0.004999,
+                              "result": {
+                                "text": "< $0.01",
+                                "index": 0
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Share %"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
               }
             }
-          },
-          "transparent": true
+          }
         }
       },
-      "panel-16": {
+      "panel-17": {
         "kind": "Panel",
         "spec": {
-          "id": 16,
+          "id": 17,
           "title": "Monthly spend by service",
           "description": "All AWS spend per calendar month for the last 13 months, stacked by service (the 8 largest, the rest as Other), from Cost Explorer. This panel always shows 13 months.",
           "links": [],
@@ -2016,7 +2348,7 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "noValue": "–",
+                  "noValue": "No Cost Explorer data. Turn on \"Use Cost Explorer\" on the AWS connection; its next run loads the last 13 months.",
                   "custom": {
                     "axisBorderShow": false,
                     "axisCenteredZero": false,
@@ -2062,10 +2394,10 @@
           }
         }
       },
-      "panel-17": {
+      "panel-18": {
         "kind": "Panel",
         "spec": {
-          "id": 17,
+          "id": 18,
           "title": "Spend by service",
           "description": "The same spend over the selected range, per day, week or month by range length.",
           "links": [],
@@ -2156,7 +2488,7 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "noValue": "–",
+                  "noValue": "No Cost Explorer data. Turn on \"Use Cost Explorer\" on the AWS connection; its next run loads the last 13 months.",
                   "custom": {
                     "axisBorderShow": false,
                     "axisCenteredZero": false,
@@ -2202,10 +2534,10 @@
           }
         }
       },
-      "panel-18": {
+      "panel-19": {
         "kind": "Panel",
         "spec": {
-          "id": 18,
+          "id": 19,
           "title": "This month vs last",
           "description": "Last month's total, this month so far, and this month so far plus Cost Explorer's forecast to month end.",
           "links": [],
@@ -2283,7 +2615,7 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "noValue": "–",
+                  "noValue": "No Cost Explorer data. Turn on \"Use Cost Explorer\" on the AWS connection; its next run loads the last 13 months.",
                   "custom": {
                     "axisBorderShow": false,
                     "axisCenteredZero": false,
@@ -2329,10 +2661,10 @@
           }
         }
       },
-      "panel-19": {
+      "panel-20": {
         "kind": "Panel",
         "spec": {
-          "id": 19,
+          "id": 20,
           "title": "Biggest movers",
           "description": "Services whose spend this month to date moved most against the same days of last month.",
           "links": [],
@@ -2398,7 +2730,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "noValue": "–",
+                  "noValue": "No Cost Explorer data. Turn on \"Use Cost Explorer\" on the AWS connection; its next run loads the last 13 months.",
                   "custom": {
                     "align": "auto",
                     "cellOptions": {
@@ -2536,10 +2868,10 @@
           }
         }
       },
-      "panel-20": {
+      "panel-21": {
         "kind": "Panel",
         "spec": {
-          "id": 20,
+          "id": 21,
           "title": "Estimate vs bill",
           "description": "DevLake's estimated CI/CD cost against what Cost Explorer billed for CodeBuild and CodePipeline. The bill covers the whole account, including pipelines not in the selected projects and free-tier credits, so a small gap is expected.",
           "links": [],
@@ -2606,7 +2938,7 @@
                   "color": {
                     "mode": "palette-classic"
                   },
-                  "noValue": "–",
+                  "noValue": "No Cost Explorer data. Turn on \"Use Cost Explorer\" on the AWS connection; its next run loads the last 13 months.",
                   "custom": {
                     "axisBorderShow": false,
                     "axisCenteredZero": false,
@@ -2665,10 +2997,10 @@
           }
         }
       },
-      "panel-21": {
+      "panel-22": {
         "kind": "Panel",
         "spec": {
-          "id": 21,
+          "id": 22,
           "title": "Prices in force",
           "description": "The CodeBuild and CodePipeline list prices DevLake uses for the regions of the selected projects' pipelines, with the previous price when AWS published a change. Prices are refreshed at most once a day.",
           "links": [],
@@ -2849,6 +3181,44 @@
             }
           }
         }
+      },
+      "panel-23": {
+        "kind": "Panel",
+        "spec": {
+          "id": 23,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                },
+                "content": "",
+                "mode": "markdown"
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
       }
     },
     "layout": {
@@ -2939,6 +3309,34 @@
           {
             "kind": "RowsLayoutRow",
             "spec": {
+              "title": "Spacer",
+              "collapse": false,
+              "hideHeader": true,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 1,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-23"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
               "title": "Tabs",
               "collapse": true,
               "hideHeader": true,
@@ -2992,6 +3390,19 @@
                                     "name": "panel-10"
                                   }
                                 }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 17,
+                                  "width": 24,
+                                  "height": 9,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-11"
+                                  }
+                                }
                               }
                             ]
                           }
@@ -3015,7 +3426,7 @@
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-11"
+                                    "name": "panel-12"
                                   }
                                 }
                               },
@@ -3028,7 +3439,7 @@
                                   "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-12"
+                                    "name": "panel-13"
                                   }
                                 }
                               },
@@ -3041,7 +3452,7 @@
                                   "height": 9,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-13"
+                                    "name": "panel-14"
                                   }
                                 }
                               },
@@ -3054,7 +3465,20 @@
                                   "height": 9,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-14"
+                                    "name": "panel-15"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 17,
+                                  "width": 12,
+                                  "height": 7,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-16"
                                   }
                                 }
                               }
@@ -3077,32 +3501,6 @@
                                   "x": 0,
                                   "y": 0,
                                   "width": 24,
-                                  "height": 2,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-15"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 2,
-                                  "width": 24,
-                                  "height": 7,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-16"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 9,
-                                  "width": 12,
                                   "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
@@ -3113,8 +3511,8 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 12,
-                                  "y": 9,
+                                  "x": 0,
+                                  "y": 7,
                                   "width": 12,
                                   "height": 7,
                                   "element": {
@@ -3126,8 +3524,8 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 0,
-                                  "y": 16,
+                                  "x": 12,
+                                  "y": 7,
                                   "width": 12,
                                   "height": 7,
                                   "element": {
@@ -3139,13 +3537,26 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 12,
-                                  "y": 16,
+                                  "x": 0,
+                                  "y": 14,
                                   "width": 12,
                                   "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "panel-20"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 12,
+                                  "y": 14,
+                                  "width": 12,
+                                  "height": 7,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-21"
                                   }
                                 }
                               }
@@ -3171,7 +3582,7 @@
                                   "height": 10,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-21"
+                                    "name": "panel-22"
                                   }
                                 }
                               }
