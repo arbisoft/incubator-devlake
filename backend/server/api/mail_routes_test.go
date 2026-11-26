@@ -35,7 +35,7 @@ func TestLoadMailTemplates(t *testing.T) {
 	t.Run("built-in only", func(t *testing.T) {
 		r, err := loadMailTemplates("")
 		require.Nil(t, err)
-		assert.Equal(t, []string{mailsvc.TemplateAlert, mailsvc.TemplateReport}, r.Names())
+		assert.Equal(t, []string{mailsvc.TemplateAlert, mailsvc.TemplateProjectInvite, mailsvc.TemplateReport}, r.Names())
 	})
 	t.Run("override folder", func(t *testing.T) {
 		dir := t.TempDir()

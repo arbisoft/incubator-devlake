@@ -32,8 +32,9 @@ import (
 
 // Template names. Only these can be rendered, so a name never becomes a file path from input.
 const (
-	TemplateAlert  = "alert"
-	TemplateReport = "report"
+	TemplateAlert         = "alert"
+	TemplateReport        = "report"
+	TemplateProjectInvite = "project_invite"
 )
 
 const (
@@ -44,7 +45,7 @@ const (
 )
 
 // templateNames is every template LoadRenderer parses. Never written after init.
-var templateNames = []string{TemplateAlert, TemplateReport}
+var templateNames = []string{TemplateAlert, TemplateReport, TemplateProjectInvite}
 
 //go:embed templates/*.html templates/*.txt
 var builtinFS embed.FS
@@ -78,6 +79,24 @@ type ReportData struct {
 	Sections    []ReportSection
 }
 
+// InviteCheck is one compliance scorecard check in a project invite.
+type InviteCheck struct {
+	Label   string // for example "Ticketing system"
+	Done    bool
+	Sources string // the connected tools, for example "Jira, GitHub"; empty when not done
+	Hint    string // what to connect when not done
+}
+
+// ProjectInviteData fills the project_invite template, sent when a user is given a new project.
+type ProjectInviteData struct {
+	Title       string // the heading of the shared layout
+	Name        string // the recipient's full name
+	ProjectName string
+	Checks      []InviteCheck
+	Score       string // the compliance score, for example "33%"
+	Link        string // the project's page in config-ui; optional. html/template blocks unsafe schemes
+}
+
 // Rendered is a rendered email.
 type Rendered struct {
 	Subject string
@@ -90,7 +109,7 @@ type parsedTemplate struct {
 	text *texttemplate.Template
 }
 
-// Renderer renders the alert and report templates. It is safe for concurrent use.
+// Renderer renders the alert, report and project invite templates. It is safe for concurrent use.
 type Renderer struct {
 	templates map[string]parsedTemplate
 }

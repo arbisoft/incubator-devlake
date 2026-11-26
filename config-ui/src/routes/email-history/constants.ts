@@ -51,7 +51,7 @@ export const STATUS_TONES: Record<EmailStatus, StatusTone> = {
   FAILED: STATUS_TONE.ERROR,
 };
 
-export const TEMPLATES = ['alert', 'report'] as const;
+export const TEMPLATES = ['alert', 'report', 'project_invite'] as const;
 
 // The mail driver that logs emails instead of sending them.
 export const DRIVER_LOG = 'log';
@@ -84,7 +84,7 @@ export const COPY = {
     sentBy: 'Sent By',
   },
   statusLabels: { QUEUED: 'Queued', SENT: 'Sent', FAILED: 'Failed' } as Record<EmailStatus, string>,
-  templateLabels: { alert: 'Alert', report: 'Report' } as Record<string, string>,
+  templateLabels: { alert: 'Alert', report: 'Report', project_invite: 'Project invite' } as Record<string, string>,
   filters: {
     status: 'Status',
     template: 'Template',

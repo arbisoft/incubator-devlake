@@ -33,8 +33,9 @@ import (
 )
 
 // registerMailRoutes is the composition root for the mail service. A bad mail config never stops
-// the server: it is logged once, mail is turned off, and GET /mail/status reports why.
-func registerMailRoutes(r *gin.Engine, basicRes context.BasicRes, admin gin.HandlerFunc) {
+// the server: it is logged once, mail is turned off, and GET /mail/status reports why. It returns the
+// service, for other emails to be sent through, and MAIL_LINK_BASE_URL for the links in them.
+func registerMailRoutes(r *gin.Engine, basicRes context.BasicRes, admin gin.HandlerFunc) (*mailsvc.Service, string) {
 	logger := basicRes.GetLogger().Nested("mail")
 	cfg, disabledReason := loadMailConfig(basicRes.GetConfigReader(), logger)
 
@@ -69,6 +70,7 @@ func registerMailRoutes(r *gin.Engine, basicRes context.BasicRes, admin gin.Hand
 	r.POST("/mail/test", admin, handlers.PostTestEmail)
 	r.GET("/mail/history", admin, handlers.GetHistory)
 	r.GET("/mail/history/:"+mailapi.EmailIDParam, admin, handlers.GetHistoryEmail)
+	return svc, cfg.LinkBaseURL
 }
 
 // loadMailConfig parses the mail settings. An invalid config is logged and turns mail off.

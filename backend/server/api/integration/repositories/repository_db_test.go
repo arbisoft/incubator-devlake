@@ -45,8 +45,8 @@ const (
 	dbTestOther = "repo-test-other@example.invalid"
 )
 
-// testTx returns a transaction on the E2E database that is rolled back when the test ends, or skips the test.
-func testTx(t *testing.T) dal.Transaction {
+// testDB connects to the E2E database, or skips the test.
+func testDB(t *testing.T) dal.Dal {
 	t.Helper()
 	url := os.Getenv("E2E_DB_URL")
 	if url == "" {
@@ -58,7 +58,13 @@ func testTx(t *testing.T) dal.Transaction {
 	if err != nil {
 		t.Fatalf("connect to E2E_DB_URL: %v", err)
 	}
-	db := dalgorm.NewDalgorm(gormDB)
+	return dalgorm.NewDalgorm(gormDB)
+}
+
+// testTx returns a transaction on the E2E database that is rolled back when the test ends, or skips the test.
+func testTx(t *testing.T) dal.Transaction {
+	t.Helper()
+	db := testDB(t)
 	for _, table := range []interface{}{
 		&crossdomain.Account{}, &crossdomain.ProjectMapping{}, &code.PullRequest{}, &code.PullRequestComment{},
 		&code.PullRequestCommit{}, &code.Commit{}, &code.CommitParent{}, &code.RepoCommit{}, &code.Repo{}, &ticket.Issue{}, &ticket.BoardIssue{},

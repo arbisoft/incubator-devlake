@@ -37,7 +37,7 @@ func builtinRenderer(t *testing.T) *Renderer {
 
 func TestBuiltinTemplatesRender(t *testing.T) {
 	r := builtinRenderer(t)
-	assert.Equal(t, []string{TemplateAlert, TemplateReport}, r.Names())
+	assert.Equal(t, []string{TemplateAlert, TemplateProjectInvite, TemplateReport}, r.Names())
 
 	cases := []struct {
 		name, template string
@@ -69,6 +69,26 @@ func TestBuiltinTemplatesRender(t *testing.T) {
 			htmlHas: []string{"No data for this period."},
 			textHas: []string{"No data for this period."},
 		},
+		{
+			name: "project invite with a link", template: TemplateProjectInvite,
+			data: ProjectInviteData{Title: "Your project is ready", Name: "Ali Khan", ProjectName: "Payments", Score: "33%",
+				Link: "https://devlake.example.com/projects/Payments", Checks: []InviteCheck{
+					{Label: "Ticketing system", Hint: "Connect Jira"},
+					{Label: "Version control", Done: true, Sources: "GitHub"},
+				}},
+			subject: "Your DevLake project Payments is ready",
+			htmlHas: []string{"Hi Ali Khan,", "<strong>Payments</strong>", "Connect Jira", "Connected: GitHub",
+				"<strong>33%</strong>", `href="https://devlake.example.com/projects/Payments"`, "Set up your project"},
+			textHas: []string{"Hi Ali Khan,", "- [ ] Ticketing system: Connect Jira", "- [x] Version control: connected (GitHub)",
+				"Current score: 33%.", "Set up your project: https://devlake.example.com/projects/Payments"},
+		},
+		{
+			name: "project invite without a link", template: TemplateProjectInvite,
+			data:    ProjectInviteData{Title: "Your project is ready", Name: "Ali", ProjectName: "Payments", Score: "0%"},
+			subject: "Your DevLake project Payments is ready",
+			htmlHas: []string{"Open DevLake to set up your project."},
+			textHas: []string{"Open DevLake to set up your project."},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -98,6 +118,20 @@ func TestRenderEscapesHTMLAndBlocksUnsafeLinks(t *testing.T) {
 	assert.Contains(t, out.HTML, "a &amp; b")
 	assert.NotContains(t, out.HTML, "javascript:")
 	assert.Equal(t, "[DevLake alert] <script>alert(1)</script>", out.Subject, "the subject is plain text, not HTML")
+}
+
+func TestProjectInviteEscapesValuesAndHasNoButtonWithoutALink(t *testing.T) {
+	out, err := builtinRenderer(t).Render(TemplateProjectInvite, ProjectInviteData{
+		Title: "Ready", Name: "<b>Ali</b>", ProjectName: "P&<script>", Score: "0%",
+		Checks: []InviteCheck{{Label: "AI usage visibility", Hint: "<i>hint</i>"}},
+	})
+
+	require.Nil(t, err)
+	assert.Contains(t, out.HTML, "&lt;b&gt;Ali&lt;/b&gt;")
+	assert.Contains(t, out.HTML, "P&amp;&lt;script&gt;")
+	assert.Contains(t, out.HTML, "&lt;i&gt;hint&lt;/i&gt;")
+	assert.NotContains(t, out.HTML, "<script>")
+	assert.NotContains(t, out.HTML, "Set up your project</a>")
 }
 
 func TestRenderFoldsNewlinesInTheSubject(t *testing.T) {

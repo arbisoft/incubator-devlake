@@ -21,6 +21,7 @@ package mail
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -38,6 +39,7 @@ const (
 	envTemplateDir    = "MAIL_TEMPLATE_DIR"
 	envAllowedDomains = "MAIL_ALLOWED_RECIPIENT_DOMAINS"
 	envMaxRetries     = "MAIL_MAX_RETRIES"
+	envLinkBaseURL    = "MAIL_LINK_BASE_URL"
 	envSMTPHost       = "SMTP_HOST"
 	envSMTPPort       = "SMTP_PORT"
 	envSMTPUsername   = "SMTP_USERNAME"
@@ -112,6 +114,7 @@ type Config struct {
 	TemplateDir    string   // empty means the built-in templates only
 	AllowedDomains []string // lowercase; empty allows every domain
 	MaxRetries     int      // retries after the first attempt
+	LinkBaseURL    string   // public config-ui address for links in emails, without a trailing /; empty means no links
 	SMTP           SMTPConfig
 }
 
@@ -142,6 +145,7 @@ func ParseConfig(src configSource) (Config, errors.Error) {
 		ReplyTo:        strings.TrimSpace(src.GetString(envReplyTo)),
 		TemplateDir:    strings.TrimSpace(src.GetString(envTemplateDir)),
 		AllowedDomains: splitDomains(src.GetString(envAllowedDomains)),
+		LinkBaseURL:    strings.TrimRight(strings.TrimSpace(src.GetString(envLinkBaseURL)), "/"),
 		SMTP: SMTPConfig{
 			Host:     strings.TrimSpace(src.GetString(envSMTPHost)),
 			Username: strings.TrimSpace(src.GetString(envSMTPUsername)),
@@ -189,6 +193,9 @@ func (c Config) problems() []string {
 	if c.MaxRetries < 0 || c.MaxRetries > maxRetries {
 		out = append(out, fmt.Sprintf("%s must be between 0 and %d", envMaxRetries, maxRetries))
 	}
+	if c.LinkBaseURL != "" && !isLinkBaseURL(c.LinkBaseURL) {
+		out = append(out, envLinkBaseURL+" must be an http or https URL with a host and no query or fragment, for example https://devlake.example.com")
+	}
 	for _, d := range c.AllowedDomains {
 		if strings.Contains(d, "@") || !strings.Contains(d, ".") {
 			out = append(out, fmt.Sprintf("%s has an invalid domain %q", envAllowedDomains, d))
@@ -222,6 +229,17 @@ func (s SMTPConfig) problems() []string {
 		out = append(out, envSMTPAuth+" must be none when "+envSMTPSecurity+"=none")
 	}
 	return out
+}
+
+// isLinkBaseURL reports whether raw can prefix the links in emails: an absolute http or https URL with a host,
+// no user info, query or fragment. A path is allowed, for DevLake served under a prefix.
+func isLinkBaseURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && u.User == nil &&
+		u.RawQuery == "" && u.Fragment == "" && !u.ForceQuery
 }
 
 // parseNumber reads a whole number. An empty value uses fallback; anything else that isn't a number

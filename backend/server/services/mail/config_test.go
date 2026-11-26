@@ -116,3 +116,34 @@ func TestSecretIsRedacted(t *testing.T) {
 	}
 	assert.Equal(t, "app-password-secret", cfg.SMTP.Password.Reveal())
 }
+
+func TestParseConfigLinkBaseURL(t *testing.T) {
+	cases := []struct {
+		name, raw, want string
+		valid           bool
+	}{
+		{name: "empty means no links", raw: "", want: "", valid: true},
+		{name: "trailing slash removed", raw: " https://devlake.example.com/ ", want: "https://devlake.example.com", valid: true},
+		{name: "path prefix kept", raw: "http://localhost:4000/devlake", want: "http://localhost:4000/devlake", valid: true},
+		{name: "no scheme", raw: "devlake.example.com", valid: false},
+		{name: "other scheme", raw: "javascript:alert(1)", valid: false},
+		{name: "query", raw: "https://devlake.example.com?x=1", valid: false},
+		{name: "fragment", raw: "https://devlake.example.com#top", valid: false},
+		{name: "user info", raw: "https://user@devlake.example.com", valid: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := ParseConfig(validSMTPSource().with(envLinkBaseURL, tc.raw))
+
+			if !tc.valid {
+				require.NotNil(t, err)
+				assert.Contains(t, err.Error(), envLinkBaseURL)
+				assert.False(t, cfg.Enabled)
+				return
+			}
+			require.Nil(t, err)
+			assert.True(t, cfg.Enabled)
+			assert.Equal(t, tc.want, cfg.LinkBaseURL)
+		})
+	}
+}

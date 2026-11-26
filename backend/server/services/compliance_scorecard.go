@@ -20,6 +20,7 @@ package services
 import (
 	_ "embed"
 
+	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 )
 
@@ -65,4 +66,31 @@ func GetComplianceScorecard() ([]ComplianceScorecardRow, errors.Error) {
 		return nil, errors.Default.Wrap(scanErr, "error iterating compliance scorecard rows")
 	}
 	return result, nil
+}
+
+// scorecardReader is the one DAL method ProjectComplianceScorecard needs. dal.Dal satisfies it.
+type scorecardReader interface {
+	All(dst interface{}, clauses ...dal.Clause) errors.Error
+}
+
+var _ scorecardReader = (dal.Dal)(nil)
+
+// ProjectComplianceScorecard returns projectName's row of the compliance scorecard, read through db, so other
+// callers show the same result as GET /compliance-scorecard. It returns a NotFound error when projectName is not
+// a project. The name is bound as a parameter, never written into the SQL.
+func ProjectComplianceScorecard(db scorecardReader, projectName string) (*ComplianceScorecardRow, errors.Error) {
+	var rows []ComplianceScorecardRow
+	err := db.All(&rows,
+		dal.Select("scorecard.project, scorecard.issue_visibility, scorecard.pr_visibility, scorecard.ai_visibility, scorecard.compliance"),
+		// The newlines keep a trailing -- comment in the SQL file from swallowing the closing parenthesis.
+		dal.From("(\n"+complianceScorecardSql+"\n) scorecard"),
+		dal.Where("scorecard.project = ?", projectName),
+	)
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "read the compliance scorecard of a project")
+	}
+	if len(rows) == 0 {
+		return nil, errors.NotFound.New("project not found in the compliance scorecard")
+	}
+	return &rows[0], nil
 }

@@ -196,3 +196,25 @@ type AIMonthlyCost struct {
 	OutputTokens int64  `json:"outputTokens"`
 	CostUSD      string `json:"estimatedCostUsd" example:"12.12764220"`
 }
+
+// ProjectUserMapping is the result of POST /integration/map-project-user. Each flag says whether that call changed it.
+type ProjectUserMapping struct {
+	// ProjectName is the project's stored name.
+	ProjectName string `json:"projectName" example:"Payments"`
+	// Email is the user's email, lowercased.
+	Email string `json:"email" example:"lead@arbisoft.com"`
+	// UserCreated is true when the users row was created.
+	UserCreated bool `json:"userCreated"`
+	// NameUpdated is true when the users row existed with another name, which was replaced.
+	NameUpdated bool `json:"nameUpdated"`
+	// AccessCreated is true when the user_project_mapping row was created.
+	AccessCreated bool `json:"accessCreated"`
+}
+
+// InviteEmail identifies the queued project invite in the email history.
+type InviteEmail struct {
+	// ID is the email history id.
+	ID uint64 `json:"id" example:"42"`
+	// Status is QUEUED: the email is sent in the background.
+	Status string `json:"status" example:"QUEUED"`
+}
