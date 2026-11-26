@@ -39,9 +39,6 @@ const (
 	projectPagePath = "/projects/"
 )
 
-// scoreLabels is the compliance score for 0, 1, 2 and 3 of the three checks done.
-var scoreLabels = [...]string{"0%", "33%", "67%", "100%"}
-
 // projectFinder finds a project's stored name. repositories.Onboarding satisfies it.
 type projectFinder interface {
 	ProjectName(name string) (string, bool, errors.Error)
@@ -186,13 +183,8 @@ func inviteData(name, projectName string, c repositories.Compliance, linkBaseURL
 		check("Version control", c.PR, "Connect GitHub, GitLab or another code host to the project."),
 		check("AI usage visibility", c.AI, "Connect Claude Code, GitHub Copilot, Cursor or another AI tool to the project."),
 	}
-	done := 0
-	for _, ch := range checks {
-		if ch.Done {
-			done++
-		}
-	}
-	data := mailsvc.ProjectInviteData{Title: inviteTitle, Name: name, ProjectName: projectName, Checks: checks, Score: scoreLabels[done]}
+	// the score comes from the scorecard row, so the email shows what the readiness card shows
+	data := mailsvc.ProjectInviteData{Title: inviteTitle, Name: name, ProjectName: projectName, Checks: checks, Score: c.Score}
 	if linkBaseURL != "" {
 		data.Link = linkBaseURL + projectPagePath + url.PathEscape(projectName)
 	}

@@ -65,6 +65,7 @@ type Compliance struct {
 	Issue Visibility // ticketing
 	PR    Visibility // version control
 	AI    Visibility // AI usage
+	Score string     // as the readiness card shows it, without its icon, for example "33.3%"
 }
 
 // Onboarding reads and writes what the Integration Service needs to give a user a project: projects, the users rows
@@ -191,7 +192,19 @@ func (r *Onboarding) Compliance(projectName string) (*Compliance, errors.Error) 
 	if err != nil {
 		return nil, err
 	}
-	return &Compliance{Issue: visibility(row.IssueVisibility), PR: visibility(row.PrVisibility), AI: visibility(row.AiVisibility)}, nil
+	return &Compliance{
+		Issue: visibility(row.IssueVisibility), PR: visibility(row.PrVisibility), AI: visibility(row.AiVisibility),
+		Score: score(row.Compliance),
+	}, nil
+}
+
+// score drops the icon in front of a scorecard compliance value, for example "🔶 33.3%" becomes "33.3%".
+func score(column string) string {
+	fields := strings.Fields(column)
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[len(fields)-1]
 }
 
 // visibility reads one scorecard column, for example "✅ Jira, Plane" or "❌ Not available".

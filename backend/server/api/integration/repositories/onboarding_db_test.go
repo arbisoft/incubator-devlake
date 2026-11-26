@@ -178,7 +178,7 @@ func TestOnboardingOnMySQL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Compliance() error = %v", err)
 		}
-		want := Compliance{Issue: Visibility{Visible: true, Sources: "Jira"}, PR: Visibility{Visible: true, Sources: "GitHub"}}
+		want := Compliance{Issue: Visibility{Visible: true, Sources: "Jira"}, PR: Visibility{Visible: true, Sources: "GitHub"}, Score: "66.6%"}
 		if *got != want {
 			t.Errorf("Compliance() = %+v, want %+v", *got, want)
 		}

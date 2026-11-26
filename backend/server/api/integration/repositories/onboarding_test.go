@@ -63,6 +63,15 @@ func TestVisibility(t *testing.T) {
 	}
 }
 
+func TestScore(t *testing.T) {
+	cases := map[string]string{"🚨 00.0%": "00.0%", "🔶 33.3%": "33.3%", "⚠️ 66.6%": "66.6%", "✅ 100%": "100%", "": ""}
+	for column, want := range cases {
+		if got := score(column); got != want {
+			t.Errorf("score(%q) = %q, want %q", column, got, want)
+		}
+	}
+}
+
 func TestNewOnboardingRejectsNil(t *testing.T) {
 	if _, err := NewOnboarding(nil); err == nil {
 		t.Error("NewOnboarding(nil) error = nil, want an error")

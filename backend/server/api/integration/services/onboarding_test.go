@@ -157,7 +157,7 @@ func TestProjectAccessMap(t *testing.T) {
 
 func TestInviteSenderSend(t *testing.T) {
 	ready := fakeOnboarding{storedProject: "Payments", hasAccess: true, userName: "Ali Khan",
-		compliance: repositories.Compliance{PR: repositories.Visibility{Visible: true, Sources: "GitHub"}}}
+		compliance: repositories.Compliance{PR: repositories.Visibility{Visible: true, Sources: "GitHub"}, Score: "33.3%"}}
 	with := func(change func(*fakeOnboarding)) fakeOnboarding {
 		f := ready
 		change(&f)
@@ -210,7 +210,7 @@ func TestInviteSenderSend(t *testing.T) {
 				t.Errorf("SendRequest = %+v", req)
 			}
 			data, ok := req.Data.(mailsvc.ProjectInviteData)
-			if !ok || data.Name != "Ali Khan" || data.Score != "33%" || data.Link != "https://devlake.example.com/projects/Payments" {
+			if !ok || data.Name != "Ali Khan" || data.Score != "33.3%" || data.Link != "https://devlake.example.com/projects/Payments" {
 				t.Errorf("Data = %+v", req.Data)
 			}
 		})
@@ -228,10 +228,10 @@ func TestInviteData(t *testing.T) {
 		wantDone  []bool
 		wantLink  string
 	}{
-		{name: "nothing set up, no link", wantScore: "0%", wantDone: []bool{false, false, false}, project: "P"},
-		{name: "two set up", c: repositories.Compliance{Issue: visible, AI: visible}, wantScore: "67%", wantDone: []bool{true, false, true},
+		{name: "nothing set up, no link", c: repositories.Compliance{Score: "00.0%"}, wantScore: "00.0%", wantDone: []bool{false, false, false}, project: "P"},
+		{name: "two set up", c: repositories.Compliance{Issue: visible, AI: visible, Score: "66.6%"}, wantScore: "66.6%", wantDone: []bool{true, false, true},
 			base: "https://d.example.com", project: "P", wantLink: "https://d.example.com/projects/P"},
-		{name: "all set up, name escaped in the link", c: repositories.Compliance{Issue: visible, PR: visible, AI: visible}, wantScore: "100%",
+		{name: "all set up, name escaped in the link", c: repositories.Compliance{Issue: visible, PR: visible, AI: visible, Score: "100%"}, wantScore: "100%",
 			wantDone: []bool{true, true, true}, base: "https://d.example.com/lake", project: "Team A/B?",
 			wantLink: "https://d.example.com/lake/projects/Team%20A%2FB%3F"},
 	}
