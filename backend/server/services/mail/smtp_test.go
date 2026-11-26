@@ -50,6 +50,7 @@ type fakeSMTP struct {
 	tlsConfig *tls.Config       // nil: STARTTLS is not offered
 	rcptReply string            // reply to RCPT TO; empty means "250 OK"
 	rejects   map[string]string // reply to RCPT TO for single addresses, checked after rcptReply
+	quitReply string            // reply to QUIT; empty means "221 bye"
 	wg        sync.WaitGroup
 
 	mu       sync.Mutex // guards the fields below
@@ -175,6 +176,10 @@ func (s *fakeSMTP) session(conn net.Conn) {
 			s.mu.Unlock()
 			reply("250 OK queued")
 		case "QUIT":
+			if s.quitReply != "" {
+				reply(s.quitReply)
+				return
+			}
 			reply("221 bye")
 			return
 		default:
@@ -255,6 +260,27 @@ func TestSMTPMailerWithoutTLSOrAuth(t *testing.T) {
 	assert.False(t, srv.usedTLS)
 	assert.Empty(t, srv.authUser)
 	assert.Contains(t, srv.data, "text body")
+}
+
+func TestSMTPMailerAFailedQuitAfterDeliveryIsASuccess(t *testing.T) {
+	for _, quit := range []string{"554 5.0.0 closing with an error", "421 4.4.2 timeout"} {
+		t.Run(quit, func(t *testing.T) {
+			srv := startFakeSMTP(t, nil, "")
+			srv.quitReply = quit
+			m, err := NewSMTPMailer(SMTPConfig{Host: "127.0.0.1", Port: srv.port(), Security: SecurityNone, Auth: AuthNone, Timeout: 5 * time.Second})
+			require.Nil(t, err)
+			msg := testMessage()
+			msg.To = []string{"a@arbisoft.com", "b@arbisoft.com"}
+
+			messageID, sendErr := m.Send(context.Background(), msg)
+
+			require.Nil(t, sendErr, "every copy was accepted, so a failed QUIT must not fail or retry the send")
+			assert.NotEmpty(t, messageID)
+			srv.mu.Lock()
+			defer srv.mu.Unlock()
+			assert.Len(t, srv.datas, 2)
+		})
+	}
 }
 
 func TestSMTPMailerClassifiesFailures(t *testing.T) {

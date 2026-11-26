@@ -128,7 +128,14 @@ func (m *SMTPMailer) Send(ctx context.Context, msg *Message) (string, errors.Err
 	if err != nil {
 		return "", errors.Default.Wrap(Permanent(err), "create smtp client: "+err.Error())
 	}
-	sendErr := client.DialAndSendWithContext(ctx, copies...)
+	session, err := client.DialToSMTPClientWithContext(ctx)
+	if err != nil {
+		return "", errors.Default.Wrap(classify(ctx, err), "send through "+m.host+": dial failed: "+err.Error())
+	}
+	sendErr := client.SendWithSMTPClient(session, copies...)
+	// QUIT is sent on its own, after the copies. Once the server has accepted every copy, a failed QUIT
+	// can't undo the delivery, so its error is dropped: counting it would fail the email or send it again.
+	_ = client.CloseWithSMTPClient(session)
 	if sendErr == nil {
 		return messageID, nil
 	}
@@ -146,7 +153,7 @@ func (m *SMTPMailer) Send(ctx context.Context, msg *Message) (string, errors.Err
 	}
 	switch {
 	case len(failed) == 0:
-		// the session failed before any copy was tried: dial, TLS or authentication
+		// the session failed before any copy was tried: the connection check after dialing
 		return "", errors.Default.Wrap(classify(ctx, sendErr), "send through "+m.host+": "+sendErr.Error())
 	case len(failed) < len(copies):
 		return messageID, errors.Default.Wrap(Partial(sendErr), fmt.Sprintf("not delivered to %d of %d recipients through %s: %s",
