@@ -214,10 +214,10 @@ func (w *Worker) drain(ctx context.Context) bool {
 // process makes one attempt to send row and saves the outcome. It first claims the row, which counts
 // the attempt and holds the row until the send has timed out, so no other worker sends it meanwhile.
 // A row whose attempts are already used up is failed without sending, so a crash mid-send can't make
-// the worker retry forever.
+// the worker retry forever, and a lowered MAIL_MAX_RETRIES takes effect on rows already waiting.
 func (w *Worker) process(ctx context.Context, row *models.EmailHistory) errors.Error {
 	if row.Attempts >= w.maxAttempts {
-		return w.failInterrupted(row)
+		return w.failAttemptsUsed(row)
 	}
 	token, tokenErr := w.claimTokens()
 	if tokenErr != nil {
@@ -266,13 +266,17 @@ func (w *Worker) saveOutcome(row *models.EmailHistory) errors.Error {
 	return err
 }
 
-// interruptedMessage is the reason kept on a row whose last attempt never recorded an outcome.
-const interruptedMessage = "the last attempt was interrupted before its result was saved; not sent again"
+// attemptsUsedMessage is the reason kept on a QUEUED row that has no attempts left. Either its last attempt was
+// interrupted before the result was saved, or MAIL_MAX_RETRIES was lowered while it waited for a retry. The row
+// doesn't say which, so the message names both.
+const attemptsUsedMessage = "no attempts left (MAIL_MAX_RETRIES): the last attempt was interrupted before its result " +
+	"was saved, or the retry limit was lowered; not sent again"
 
-// failInterrupted marks a row FAILED without sending. It is only reached when the process stopped
-// during the last allowed attempt, so the email may or may not have been delivered.
-func (w *Worker) failInterrupted(row *models.EmailHistory) errors.Error {
-	msg := interruptedMessage
+// failAttemptsUsed marks a row FAILED without sending. It is reached when the process stopped during the
+// last allowed attempt, so the email may or may not have been delivered, or when MAIL_MAX_RETRIES was
+// lowered below the attempts a waiting row already made.
+func (w *Worker) failAttemptsUsed(row *models.EmailHistory) errors.Error {
+	msg := attemptsUsedMessage
 	row.Status = models.EmailStatusFailed
 	row.NextAttemptAt = nil
 	row.ErrorMessage = &msg
@@ -280,7 +284,7 @@ func (w *Worker) failInterrupted(row *models.EmailHistory) errors.Error {
 	if err := w.store.Save(row); err != nil {
 		return err
 	}
-	w.logger.Error(nil, "mail failed id=%d template=%s attempts=%d: last attempt was interrupted", row.ID, row.Template, row.Attempts)
+	w.logger.Error(nil, "mail failed id=%d template=%s attempts=%d maxAttempts=%d: no attempts left", row.ID, row.Template, row.Attempts, w.maxAttempts)
 	return nil
 }
 

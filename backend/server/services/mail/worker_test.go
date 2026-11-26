@@ -288,9 +288,26 @@ func TestWorkerFailsARowWhoseLastAttemptWasInterrupted(t *testing.T) {
 	assert.Empty(t, m.sent, "an interrupted last attempt is not sent again")
 	assert.Equal(t, models.EmailStatusFailed, row.Status)
 	assert.Equal(t, 4, row.Attempts)
-	assert.Equal(t, interruptedMessage, *row.ErrorMessage)
+	assert.Equal(t, attemptsUsedMessage, *row.ErrorMessage)
 	assert.Equal(t, 1, q.saves)
-	assert.Contains(t, logger.all(), "ERROR mail failed id=6 template=alert attempts=4")
+	assert.Contains(t, logger.all(), "ERROR mail failed id=6 template=alert attempts=4 maxAttempts=4: no attempts left")
+}
+
+func TestWorkerFailsAWaitingRowWhenTheRetryLimitWasLowered(t *testing.T) {
+	// the row failed twice and was waiting for its third attempt when MAIL_MAX_RETRIES went from 3 to 1
+	row := queuedRow(8)
+	row.Attempts = 2
+	previous := "421 try again later"
+	row.ErrorMessage = &previous
+	q, m := &fakeQueue{rows: []*models.EmailHistory{row}}, &fakeMailer{}
+	w, logger := newTestWorker(t, q, m, 1)
+
+	w.drain(context.Background())
+
+	assert.Empty(t, m.sent)
+	assert.Equal(t, models.EmailStatusFailed, row.Status)
+	assert.Contains(t, *row.ErrorMessage, "retry limit was lowered", "the reason must not claim only an interruption")
+	assert.Contains(t, logger.all(), "ERROR mail failed id=8 template=alert attempts=2 maxAttempts=2: no attempts left")
 }
 
 func TestWorkerShutdownKeepsTheRowQueuedWithoutSpendingAnAttempt(t *testing.T) {
