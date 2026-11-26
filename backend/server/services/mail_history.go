@@ -63,13 +63,23 @@ type EmailHistoryQuery struct {
 	To          string `form:"to"`          // RFC 3339; created_at at or before
 }
 
+// historyDB is what MailHistoryService needs from the DAL. dal.Dal satisfies it.
+type historyDB interface {
+	Count(clauses ...dal.Clause) (int64, errors.Error)
+	All(dst interface{}, clauses ...dal.Clause) errors.Error
+	First(dst interface{}, clauses ...dal.Clause) errors.Error
+	IsErrorNotFound(err error) bool
+}
+
+var _ historyDB = (dal.Dal)(nil)
+
 // MailHistoryService reads _devlake_email_history for the admin screen.
 type MailHistoryService struct {
-	db dal.Dal
+	db historyDB
 }
 
 // NewMailHistoryService returns the history reader over db, which must not be nil.
-func NewMailHistoryService(db dal.Dal) (*MailHistoryService, errors.Error) {
+func NewMailHistoryService(db historyDB) (*MailHistoryService, errors.Error) {
 	if db == nil {
 		return nil, errors.Default.New("mail history service: nil dal")
 	}

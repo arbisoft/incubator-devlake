@@ -26,19 +26,30 @@ import (
 	"github.com/apache/incubator-devlake/core/models"
 )
 
+// storeDB is what Store needs from the DAL. dal.Dal satisfies it.
+type storeDB interface {
+	Create(entity interface{}, clauses ...dal.Clause) errors.Error
+	Update(entity interface{}, clauses ...dal.Clause) errors.Error
+	UpdateColumns(entityOrTable interface{}, set []dal.DalSet, clauses ...dal.Clause) errors.Error
+	First(dst interface{}, clauses ...dal.Clause) errors.Error
+	All(dst interface{}, clauses ...dal.Clause) errors.Error
+	Pluck(column string, dest interface{}, clauses ...dal.Clause) errors.Error
+}
+
 // Store reads and writes _devlake_email_history and reads project logins from user_project_mapping.
 type Store struct {
-	db dal.Dal
+	db storeDB
 }
 
 var (
+	_ storeDB       = (dal.Dal)(nil)
 	_ historyWriter = (*Store)(nil)
 	_ queueStore    = (*Store)(nil)
 	_ loginLister   = (*Store)(nil)
 )
 
 // NewStore returns a store over db, which must not be nil.
-func NewStore(db dal.Dal) (*Store, errors.Error) {
+func NewStore(db storeDB) (*Store, errors.Error) {
 	if db == nil {
 		return nil, errors.Default.New("mail store: nil dal")
 	}
