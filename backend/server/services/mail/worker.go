@@ -52,14 +52,16 @@ type queueStore interface {
 	Save(row *models.EmailHistory) errors.Error
 }
 
-// newClaimToken returns a random token that marks one worker's claim on a row.
-func newClaimToken() string {
+// ClaimTokens returns a new token for each claim a worker makes. Two claims must never get the same token.
+type ClaimTokens func() (string, error)
+
+// RandomClaimTokens returns a random hex token from crypto/rand, the default ClaimTokens.
+func RandomClaimTokens() (string, error) {
 	b := make([]byte, claimTokenBytes)
 	if _, err := cryptorand.Read(b); err != nil {
-		// crypto/rand doesn't fail on supported platforms; a time-based token still differs per claim
-		return fmt.Sprintf("t%d", time.Now().UnixNano())
+		return "", err
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
 
 // Backoff returns how long to wait after the given failed attempt (1 for the first).
@@ -95,6 +97,7 @@ type Worker struct {
 	now          func() time.Time
 	backoff      Backoff
 	ready        func() bool
+	claimTokens  ClaimTokens
 	pollInterval time.Duration
 	batchSize    int
 	wake         chan struct{}
@@ -118,6 +121,11 @@ func WithReadiness(ready func() bool) WorkerOption { return func(w *Worker) { w.
 // WithSleep replaces the wait between tries to save a send's outcome; tests pass a no-op.
 func WithSleep(sleep func(time.Duration)) WorkerOption { return func(w *Worker) { w.sleep = sleep } }
 
+// WithClaimTokens replaces how claim tokens are made; tests pass fixed tokens.
+func WithClaimTokens(tokens ClaimTokens) WorkerOption {
+	return func(w *Worker) { w.claimTokens = tokens }
+}
+
 // WithPollInterval changes how often the worker looks for due rows without being woken.
 func WithPollInterval(d time.Duration) WorkerOption { return func(w *Worker) { w.pollInterval = d } }
 
@@ -138,6 +146,7 @@ func NewWorker(store queueStore, mailer Mailer, cfg Config, logger log.Logger, o
 		now:          time.Now,
 		backoff:      ExponentialBackoff(rand.Float64), // jitter only; not security sensitive
 		ready:        func() bool { return true },
+		claimTokens:  RandomClaimTokens,
 		pollInterval: defaultPollInterval,
 		batchSize:    defaultBatchSize,
 		wake:         make(chan struct{}, 1),
@@ -210,8 +219,13 @@ func (w *Worker) process(ctx context.Context, row *models.EmailHistory) errors.E
 	if row.Attempts >= w.maxAttempts {
 		return w.failInterrupted(row)
 	}
+	token, tokenErr := w.claimTokens()
+	if tokenErr != nil {
+		// without a token the claim can't be told apart from another worker's, so the row waits for the next pass
+		return errors.Default.Wrap(tokenErr, fmt.Sprintf("make a claim token for email id=%d", row.ID))
+	}
 	now := w.now().UTC()
-	claimed, err := w.store.Claim(row, newClaimToken(), now, now.Add(w.sendTimeout+claimLeaseMargin))
+	claimed, err := w.store.Claim(row, token, now, now.Add(w.sendTimeout+claimLeaseMargin))
 	if err != nil {
 		return err
 	}

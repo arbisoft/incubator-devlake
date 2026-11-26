@@ -131,6 +131,42 @@ func newTestWorker(t *testing.T, q queueStore, m Mailer, maxRetries int, opts ..
 	return w, logger
 }
 
+func TestWorkerClaimsWithTheInjectedToken(t *testing.T) {
+	row := queuedRow(1)
+	q, m := &fakeQueue{rows: []*models.EmailHistory{row}}, &fakeMailer{}
+	w, _ := newTestWorker(t, q, m, 3, WithClaimTokens(func() (string, error) { return "token-1", nil }))
+
+	w.drain(context.Background())
+
+	require.NotNil(t, row.ClaimToken)
+	assert.Equal(t, "token-1", *row.ClaimToken)
+	assert.Equal(t, models.EmailStatusSent, row.Status)
+}
+
+func TestWorkerLeavesTheRowQueuedWithoutAClaimToken(t *testing.T) {
+	row := queuedRow(1)
+	q, m := &fakeQueue{rows: []*models.EmailHistory{row}}, &fakeMailer{}
+	w, logger := newTestWorker(t, q, m, 3, WithClaimTokens(func() (string, error) { return "", goerrors.New("no entropy") }))
+
+	w.drain(context.Background())
+
+	assert.Equal(t, 0, q.claims, "no claim is made without a token")
+	assert.Empty(t, m.sent)
+	assert.Equal(t, models.EmailStatusQueued, row.Status)
+	assert.Equal(t, 0, row.Attempts)
+	assert.Contains(t, logger.all(), "make a claim token for email id=1")
+}
+
+func TestRandomClaimTokensDiffer(t *testing.T) {
+	a, errA := RandomClaimTokens()
+	b, errB := RandomClaimTokens()
+
+	require.NoError(t, errA)
+	require.NoError(t, errB)
+	assert.Len(t, a, 2*claimTokenBytes)
+	assert.NotEqual(t, a, b)
+}
+
 func TestWorkerSendsAQueuedRow(t *testing.T) {
 	row := queuedRow(1)
 	q, m := &fakeQueue{rows: []*models.EmailHistory{row}}, &fakeMailer{}
