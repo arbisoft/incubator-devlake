@@ -102,7 +102,8 @@ func (s *Store) DueQueued(now time.Time, limit int) ([]*models.EmailHistory, err
 	return rows, nil
 }
 
-// ProjectLogins returns the user_login values mapped to projectName, in login order.
+// ProjectLogins returns the user_login values mapped to projectName, in login order. RecipientResolver
+// is its only user, and nothing calls that yet.
 func (s *Store) ProjectLogins(projectName string) ([]string, errors.Error) {
 	var logins []string
 	err := s.db.Pluck("user_login", &logins,

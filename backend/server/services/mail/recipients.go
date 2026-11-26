@@ -64,7 +64,9 @@ func filterRecipients(candidates []string, allowedDomains []string) recipientFil
 }
 
 // RecipientResolver finds who gets a project's emails. Every caller goes through it, so the later
-// opt-in/config table only changes this type.
+// opt-in/config table only changes this type. Nothing calls it yet: it was built for the alert and
+// report emails (US-42, DEVLAKE-471), which will send to everyone mapped to a project. The project
+// invite doesn't use it, because it goes to one given user.
 type RecipientResolver struct {
 	logins         loginLister
 	allowedDomains []string
