@@ -138,6 +138,18 @@ func TestOnboardingOnMySQL(t *testing.T) {
 		}
 	})
 
+	t.Run("MapUser keeps an admin's capitalized mapping instead of adding a second", func(t *testing.T) {
+		got, err := repo.MapUser("admin.made@example.invalid", "Admin Made", onboardingProject)
+		if err != nil || got.AccessCreated {
+			t.Fatalf("MapUser() = %+v, %v, want no new access", got, err)
+		}
+		count, err := tx.Count(dal.From(&models.UserProjectMapping{}),
+			dal.Where("LOWER(user_login) = ? AND project_name = ?", "admin.made@example.invalid", onboardingProject))
+		if err != nil || count != 1 {
+			t.Errorf("mapping rows for the person = %d, %v, want 1", count, err)
+		}
+	})
+
 	t.Run("HasAccess", func(t *testing.T) {
 		cases := []struct {
 			email, project string

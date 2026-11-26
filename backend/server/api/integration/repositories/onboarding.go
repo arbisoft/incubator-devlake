@@ -148,9 +148,10 @@ func saveUser(tx dal.Transaction, email, name string) (created, renamed bool, er
 	return false, true, nil
 }
 
-// saveMapping adds the user_project_mapping row when it is missing.
+// saveMapping adds the user_project_mapping row when it is missing. A row an admin stored with capital letters
+// counts as present, as in HasAccess, so the same person never gets a second row.
 func saveMapping(tx dal.Transaction, email, projectName string) (bool, errors.Error) {
-	count, err := tx.Count(dal.From(&models.UserProjectMapping{}), dal.Where("user_login = ? AND project_name = ?", email, projectName))
+	count, err := tx.Count(dal.From(&models.UserProjectMapping{}), dal.Where("LOWER(user_login) = ? AND project_name = ?", email, projectName))
 	if err != nil {
 		return false, errors.Default.Wrap(err, "look up the project access")
 	}
