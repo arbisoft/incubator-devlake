@@ -59,8 +59,8 @@ func (f NotifyFunc) Notify() { f() }
 // SendRequest is one email to send. Typed backend functions build it; there is no public endpoint
 // that sends arbitrary email.
 type SendRequest struct {
-	Template    string      // TemplateAlert or TemplateReport
-	Data        interface{} // AlertData or ReportData
+	Template    string      // TemplateAlert, TemplateReport or TemplateProjectInvite
+	Data        interface{} // AlertData, ReportData or ProjectInviteData, matching Template
 	Recipients  []string    // candidate addresses; invalid ones and those outside the allow-list are dropped
 	ProjectName string      // optional
 	Source      string      // optional: what triggered the email, for example "mail_test"

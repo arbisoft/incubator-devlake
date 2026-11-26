@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package mail sends alert and report emails and records each one in _devlake_email_history.
+// Package mail sends alert, report and project invite emails and records each one in _devlake_email_history.
 // The provider is chosen and configured entirely from config/.env.
 package mail
 
