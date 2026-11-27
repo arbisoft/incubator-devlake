@@ -132,6 +132,7 @@ func GetApiProject(
 	query := url.Values{}
 	query.Set("p", "1")
 	query.Set("ps", "100")
+	query.Set("f", "analysisDate")
 	query.Set("filter", sonarqubeSearchProjectsQueryFilter(projectKey))
 	// Use components/search_projects for consistency and normal-token (Browse) support.
 	res, err := apiClient.Get("components/search_projects", query, nil)
