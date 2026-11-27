@@ -55,7 +55,14 @@ func TestNewMailerRejectsAnUnknownDriver(t *testing.T) {
 	assert.Nil(t, m)
 	require.NotNil(t, err)
 	assert.Equal(t, errors.BadInput, err.GetType())
-	assert.Contains(t, err.Error(), `unknown mail driver "carrier-pigeon"`)
+	assert.Contains(t, err.Error(), `unknown mail driver "carrier-pigeon"; use one of log, smtp`)
+}
+
+func TestNewMailerReturnsANilMailerWhenTheDriverFails(t *testing.T) {
+	m, err := NewMailer(Config{Driver: DriverSMTP}, &recordingLogger{})
+
+	require.NotNil(t, err)
+	assert.True(t, m == nil, "a failed driver must return a nil interface, not a nil pointer inside one")
 }
 
 func TestRegisteredDriversAreSorted(t *testing.T) {

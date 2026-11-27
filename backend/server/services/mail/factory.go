@@ -20,6 +20,7 @@ package mail
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/log"
@@ -36,13 +37,23 @@ type mailerFactory func(cfg Config, logger log.Logger) (Mailer, errors.Error)
 
 // mailerFactories is the driver registry (Factory Method, GOF-C1). Adding a provider, for example an
 // HTTP API driver, is one new entry here plus its Mailer implementation; no caller changes.
+// Each entry returns a nil Mailer itself on error: passing a constructor's (*T, error) straight
+// through would turn a nil *T into a non-nil Mailer that panics on first use.
 // The map is never written after package init.
 var mailerFactories = map[string]mailerFactory{
 	DriverSMTP: func(cfg Config, _ log.Logger) (Mailer, errors.Error) {
-		return NewSMTPMailer(cfg.SMTP)
+		m, err := NewSMTPMailer(cfg.SMTP)
+		if err != nil {
+			return nil, err
+		}
+		return m, nil
 	},
 	DriverLog: func(_ Config, logger log.Logger) (Mailer, errors.Error) {
-		return NewLogMailer(logger)
+		m, err := NewLogMailer(logger)
+		if err != nil {
+			return nil, err
+		}
+		return m, nil
 	},
 }
 
@@ -50,7 +61,8 @@ var mailerFactories = map[string]mailerFactory{
 func NewMailer(cfg Config, logger log.Logger) (Mailer, errors.Error) {
 	factory, ok := mailerFactories[cfg.Driver]
 	if !ok {
-		return nil, errors.BadInput.New(fmt.Sprintf("unknown mail driver %q", cfg.Driver))
+		return nil, errors.BadInput.New(fmt.Sprintf("unknown mail driver %q; use one of %s",
+			cfg.Driver, strings.Join(RegisteredDrivers(), ", ")))
 	}
 	return factory(cfg, logger)
 }
