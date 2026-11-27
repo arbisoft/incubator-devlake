@@ -1,0 +1,110 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+import dayjs, { type Dayjs } from 'dayjs';
+
+import type { HistoryParams } from '@/api/mail';
+import { STATUS_TONE, type ListQuery } from '@/ui';
+import type { StatusTone } from '@/ui/types';
+
+import { COPY, DRIVER_LOG, EMAIL_STATUS, EMAIL_TEMPLATE, RECIPIENTS_SHOWN } from './constants';
+import type { EmailHistoryItem, EmailStatus, HistoryFilters, HistorySortKey, MailStatus } from './types';
+
+const orUndefined = (value: string) => (value === '' ? undefined : value);
+
+// buildHistoryQuery maps the list state to GET /mail/history params; the search box is the API's search.
+export const buildHistoryQuery = (
+  { page, pageSize, sortBy, sortOrder, keyword }: ListQuery<HistorySortKey>,
+  { status, template, projectName, from, to }: HistoryFilters,
+): HistoryParams => ({
+  page,
+  pageSize,
+  sortBy,
+  sortOrder,
+  search: keyword,
+  status: orUndefined(status) as EmailStatus | undefined,
+  template: orUndefined(template),
+  projectName: orUndefined(projectName),
+  from: orUndefined(from),
+  to: orUndefined(to),
+});
+
+const statusMeta = (status: string) =>
+  Object.hasOwn(EMAIL_STATUS, status) ? EMAIL_STATUS[status as EmailStatus] : undefined;
+
+export const getStatusTone = (status: string): StatusTone => statusMeta(status)?.tone ?? STATUS_TONE.NEUTRAL;
+
+export const getStatusLabel = (status: string) => statusMeta(status)?.label ?? status;
+
+export const getTemplateLabel = (template: string) =>
+  Object.hasOwn(EMAIL_TEMPLATE, template) ? EMAIL_TEMPLATE[template as keyof typeof EMAIL_TEMPLATE].label : template;
+
+// summarizeRecipients shows the first few addresses and counts the rest.
+export const summarizeRecipients = (recipients: string[]) => ({
+  shown: recipients.slice(0, RECIPIENTS_SHOWN).join(', '),
+  more: Math.max(recipients.length - RECIPIENTS_SHOWN, 0),
+});
+
+// RFC 3339 in UTC with milliseconds. created_at is stored to the millisecond, so cutting them would drop
+// emails created in the last second of the end day.
+const toRFC3339 = (date: Dayjs) => date.toDate().toISOString();
+
+// toDateRange turns the picked days into a created-at range covering both whole local days, up to .999.
+// It takes plain dates because antd's date picker uses its own copy of dayjs.
+export const toDateRange = (start?: Date | null, end?: Date | null) => ({
+  from: start ? toRFC3339(dayjs(start).startOf('day')) : '',
+  to: end ? toRFC3339(dayjs(end).endOf('day')) : '',
+});
+
+// getBanner says whether mail is on and where it sends.
+export const getBanner = (status: MailStatus | undefined, failed: boolean): { tone: StatusTone; message: string } => {
+  if (failed) return { tone: STATUS_TONE.ERROR, message: COPY.banner.failed };
+  if (!status) return { tone: STATUS_TONE.NEUTRAL, message: '' };
+  const { enabled, disabledReason, driver, host, port } = status;
+  if (!enabled) {
+    return disabledReason
+      ? { tone: STATUS_TONE.WARNING, message: COPY.banner.offReason(disabledReason) }
+      : { tone: STATUS_TONE.NEUTRAL, message: COPY.banner.off };
+  }
+  if (driver === DRIVER_LOG) return { tone: STATUS_TONE.INFO, message: COPY.banner.onLog };
+  const address = port ? `${host}:${port}` : (host ?? driver);
+  return { tone: STATUS_TONE.SUCCESS, message: COPY.banner.on(address) };
+};
+
+type HistoryPage = { items: EmailHistoryItem[]; count: number };
+
+// queuedChanged says whether a fresh copy of the page differs for any row that was queued: it moved,
+// left the page, or was updated. A change in the total also counts. Rows that weren't queued are ignored.
+export const queuedChanged = (shown: HistoryPage, fresh: HistoryPage) => {
+  if (fresh.count !== shown.count) return true;
+  const freshById = new Map(fresh.items.map((item) => [item.id, item]));
+  return shown.items.some((item) => {
+    if (item.status !== EMAIL_STATUS.QUEUED.value) return false;
+    const now = freshById.get(item.id);
+    return !now || now.status !== item.status || now.updatedAt !== item.updatedAt;
+  });
+};
+
+export const hasQueued = (items: EmailHistoryItem[]) => items.some((item) => item.status === EMAIL_STATUS.QUEUED.value);
+
+// buildProjectOptions lists the projects the server found for the typed text, keeping the selected
+// project first when the search didn't return it, so the select still shows its name.
+export const buildProjectOptions = (selected: string, found: string[]) => {
+  const names = selected && !found.includes(selected) ? [selected, ...found] : found;
+  return names.map((name) => ({ value: name, label: name }));
+};

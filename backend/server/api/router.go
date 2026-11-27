@@ -47,6 +47,7 @@ import (
 	"github.com/apache/incubator-devlake/server/api/task"
 	userprojectmapping "github.com/apache/incubator-devlake/server/api/user_project_mapping"
 	"github.com/apache/incubator-devlake/server/services"
+	mailsvc "github.com/apache/incubator-devlake/server/services/mail"
 
 	"github.com/gin-gonic/gin"
 )
@@ -99,6 +100,9 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.PUT("/api-keys/:apiKeyId", admin, apikeys.PutApiKey)
 	r.DELETE("/api-keys/:apiKeyId", admin, apikeys.DeleteApiKey)
 
+	// mail status, test email and email history (admin-only)
+	mailService, mailLinkBaseURL := registerMailRoutes(r, basicRes, admin)
+
 	// auth (OIDC and local user login)
 	auth.RegisterRoutes(r)
 
@@ -107,7 +111,7 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	grafanausers.RegisterRoutes(r)
 
 	// Integration Service endpoints, reachable only through /rest/... with a DevLake API key.
-	registerIntegrationRoutes(r, basicRes)
+	registerIntegrationRoutes(r, basicRes, mailService, mailLinkBaseURL)
 
 	// user project mapping api
 	// admin-only: customer-admin sessions; API keys can't manage keys or project access
@@ -127,8 +131,9 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	}
 }
 
-// registerIntegrationRoutes is the composition root for the Integration Service endpoints.
-func registerIntegrationRoutes(r *gin.Engine, basicRes context.BasicRes) {
+// registerIntegrationRoutes is the composition root for the Integration Service endpoints. Project invites are
+// sent through mailService, with links that start with mailLinkBaseURL (none when it is empty).
+func registerIntegrationRoutes(r *gin.Engine, basicRes context.BasicRes, mailService *mailsvc.Service, mailLinkBaseURL string) {
 	db := basicRes.GetDal()
 	activity, err := statsrepositories.NewActivity(db)
 	if err != nil {
@@ -160,6 +165,25 @@ func registerIntegrationRoutes(r *gin.Engine, basicRes context.BasicRes) {
 	r.GET("/stats/:email/github", apiKeyOnly, handlers.GetGitHubStats)
 	r.GET("/stats/:email/ai_usage", apiKeyOnly, handlers.GetAIUsageStats)
 	r.GET("/stats/:email/ai_cost", apiKeyOnly, handlers.GetAICostStats)
+
+	onboarding, err := statsrepositories.NewOnboarding(db)
+	if err != nil {
+		panic(err)
+	}
+	access, err := statsservices.NewProjectAccess(onboarding)
+	if err != nil {
+		panic(err)
+	}
+	invites, err := statsservices.NewInviteSender(onboarding, mailService, mailLinkBaseURL)
+	if err != nil {
+		panic(err)
+	}
+	onboardingHandlers, err := integration.NewOnboardingHandlers(access, invites)
+	if err != nil {
+		panic(err)
+	}
+	r.POST("/integration/map-project-user", apiKeyOnly, onboardingHandlers.PostMapProjectUser)
+	r.POST("/integration/send-invite-email", apiKeyOnly, onboardingHandlers.PostSendInviteEmail)
 }
 
 func registerPluginEndpoints(r *gin.Engine, basicRes context.BasicRes, pluginName string, apiResources map[string]map[string]plugin.ApiResourceHandler) {

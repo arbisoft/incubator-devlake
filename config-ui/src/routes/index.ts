@@ -17,6 +17,7 @@
  */
 
 export * from './api-keys';
+export * from './email-history';
 export * from './blueprint';
 export * from './connection';
 

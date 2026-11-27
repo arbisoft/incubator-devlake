@@ -164,5 +164,6 @@ func All() []plugin.MigrationScript {
 		new(addAiCommits),
 		new(addDashboardDateIndexes),
 		new(changeCqIssueCodeBlocksComponentToText),
+		new(addEmailHistory),
 	}
 }

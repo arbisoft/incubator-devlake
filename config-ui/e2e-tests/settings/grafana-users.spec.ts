@@ -180,13 +180,13 @@ test.describe('Grafana user management ordinary flows', () => {
     await expect(grafana.ready).toBeVisible();
     await expect(grafana.breadcrumb).toContainText(USER_MANAGEMENT_COPY.breadcrumbViews.grafana);
     const shell = new ShellPage(page);
-    await expect(shell.selectedNavItem).toHaveText(shell.navLabels.users);
+    await expect(shell.selectedNavItem).toHaveText(shell.nav.USERS.label);
 
     await grafana.openTab('DevLake');
     const devlake = new SettingsUsersPage(page);
     await expect(page).toHaveURL(PATHS.settingsUsers);
     await expect(devlake.ready).toBeVisible();
-    await expect(shell.selectedNavItem).toHaveText(shell.navLabels.users);
+    await expect(shell.selectedNavItem).toHaveText(shell.nav.USERS.label);
 
     await grafana.openTab('Grafana');
     await expect(page).toHaveURL(grafana.urlPattern);

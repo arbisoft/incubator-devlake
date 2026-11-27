@@ -93,15 +93,15 @@ test.describe('sidebar', () => {
     await projects.open();
     await shell.collapseSidebar();
 
-    await shell.openFlyout(shell.navLabels.advanced);
-    await expect(shell.flyoutItem(shell.navLabels.blueprints)).toBeVisible();
-    await expect(shell.flyoutItem(shell.navLabels.pipelines)).toBeVisible();
+    await shell.openFlyout(shell.nav.ADVANCED.label);
+    await expect(shell.flyoutItem(shell.nav.BLUEPRINTS.label)).toBeVisible();
+    await expect(shell.flyoutItem(shell.nav.PIPELINES.label)).toBeVisible();
 
     await shell.closeFlyout();
     await expect(shell.flyout).toBeHidden();
 
-    await shell.openFlyout(shell.navLabels.advanced);
-    await shell.openFlyoutItem(shell.navLabels.pipelines);
+    await shell.openFlyout(shell.nav.ADVANCED.label);
+    await shell.openFlyoutItem(shell.nav.PIPELINES.label);
     await expect(page).toHaveURL(new PipelinesPage(page).urlPattern);
     expect(browserErrors).toEqual([]);
   });
@@ -112,22 +112,22 @@ test.describe('sidebar', () => {
   }) => {
     const shell = new ShellPage(page);
     await shell.visit(PATHS.projectTab(projectName, 'settings'));
-    await expect(shell.selectedNavItem).toHaveText(shell.navLabels.projects);
+    await expect(shell.selectedNavItem).toHaveText(shell.nav.PROJECTS.label);
 
     await shell.visit(PATHS.blueprint(blueprintId));
-    await expect(shell.selectedNavItem).toHaveText(shell.navLabels.blueprints);
+    await expect(shell.selectedNavItem).toHaveText(shell.nav.BLUEPRINTS.label);
 
     await shell.visit(PATHS.pipelines);
-    await expect(shell.selectedNavItem).toHaveText(shell.navLabels.pipelines);
+    await expect(shell.selectedNavItem).toHaveText(shell.nav.PIPELINES.label);
 
     await shell.visit(PATHS.keys);
-    await expect(shell.selectedNavItem).toHaveText(shell.navLabels.apiKeys);
+    await expect(shell.selectedNavItem).toHaveText(shell.nav.API_KEYS.label);
 
     await shell.visit(PATHS.settingsUsers);
-    await expect(shell.selectedNavItem).toHaveText(shell.navLabels.users);
+    await expect(shell.selectedNavItem).toHaveText(shell.nav.USERS.label);
 
     await shell.visit(PATHS.otel);
-    await expect(shell.selectedNavItem).toHaveText(shell.navLabels.connections);
+    await expect(shell.selectedNavItem).toHaveText(shell.nav.CONNECTIONS.label);
     expect(browserErrors).toEqual([]);
   });
 
@@ -136,9 +136,9 @@ test.describe('sidebar', () => {
     const projects = new ProjectsPage(page);
     await projects.open();
     await expect(projects.ready).toBeVisible();
-    await shell.openNavItem(shell.navLabels.resources);
+    await shell.openNavItem(shell.nav.RESOURCES.label);
 
-    for (const label of [shell.navLabels.docs, shell.navLabels.api]) {
+    for (const label of [shell.nav.DOCS.label, shell.nav.API.label]) {
       await expect(shell.navLink(label)).toHaveAttribute('target', '_blank');
       const opened = await shell.openNavItemInNewTab(label);
       expect(opened).not.toBe(page);
@@ -147,7 +147,7 @@ test.describe('sidebar', () => {
     }
 
     await expect(shell.dashboardsLink).toHaveAttribute('target', '_blank');
-    const dashboards = await shell.openNavItemInNewTab(shell.navLabels.dashboards);
+    const dashboards = await shell.openNavItemInNewTab(shell.nav.DASHBOARDS.label);
     expect(dashboards).not.toBe(page);
     await dashboards.close();
     await expect(page).toHaveURL(projects.urlPattern);
@@ -162,8 +162,8 @@ test.describe('sidebar', () => {
     const adminShell = new ShellPage(page);
     const usersPage = new SettingsUsersPage(page);
     await usersPage.open();
-    await expect(adminShell.navItemByLabel(adminShell.navLabels.settings)).toBeVisible();
-    await expect(adminShell.navItemByLabel(adminShell.navLabels.apiKeys)).toBeVisible();
+    await expect(adminShell.navItemByLabel(adminShell.nav.SETTINGS.label)).toBeVisible();
+    await expect(adminShell.navItemByLabel(adminShell.nav.API_KEYS.label)).toBeVisible();
 
     const testLogin = `${E2E_USER_PREFIX}sidebar_${Date.now()}`;
     const otpDialog = await usersPage.createLocalUser(testLogin, { role: /^Member$/ });
@@ -180,10 +180,10 @@ test.describe('sidebar', () => {
     await memberShell.changePassword('SidebarMember12345!');
     await memberShell.waitUntilPathLeaves('/change-password');
 
-    await expect(memberShell.navItemByLabel(memberShell.navLabels.projects)).toBeVisible();
-    await expect(memberShell.navItemByLabel(memberShell.navLabels.settings)).toHaveCount(0);
+    await expect(memberShell.navItemByLabel(memberShell.nav.PROJECTS.label)).toBeVisible();
+    await expect(memberShell.navItemByLabel(memberShell.nav.SETTINGS.label)).toHaveCount(0);
     await expect(memberShell.usersMenuItem).toHaveCount(0);
-    await expect(memberShell.navItemByLabel(memberShell.navLabels.apiKeys)).toHaveCount(0);
+    await expect(memberShell.navItemByLabel(memberShell.nav.API_KEYS.label)).toHaveCount(0);
 
     const memberKeys = new ApiKeysPage(memberPage);
     await memberKeys.open();

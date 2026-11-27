@@ -149,3 +149,10 @@ describe('layout revalidation', () => {
     expect(layout?.route.shouldRevalidate).toBe(layoutShouldRevalidate);
   });
 });
+
+describe('Email History route', () => {
+  it('is guarded by the admin features loader', () => {
+    const matches = matchRoutes(routes, PATHS.EMAIL_HISTORY()) ?? [];
+    expect(matches.some((match) => match.route.loader === adminFeaturesLoader)).toBe(true);
+  });
+});

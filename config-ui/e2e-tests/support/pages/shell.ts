@@ -23,6 +23,7 @@ import {
   CHANGE_PASSWORD_COPY,
   COMMON_COPY,
   LAYOUT_COPY,
+  LAYOUT_NAV,
   NOT_FOUND_COPY,
   SIDEBAR_COPY,
   THEME_LABEL,
@@ -65,17 +66,17 @@ export class ShellPage extends BasePage {
   // Opens Settings > Users, expanding the Settings group first when it is closed.
   async openUsersMenuItem(): Promise<void> {
     if (!(await this.usersMenuItem.isVisible())) {
-      await this.openNavItem(LAYOUT_COPY.nav.settings);
+      await this.openNavItem(LAYOUT_NAV.SETTINGS.label);
     }
-    await this.openNavItem(LAYOUT_COPY.nav.users);
+    await this.openNavItem(LAYOUT_NAV.USERS.label);
   }
 
-  get navLabels(): typeof LAYOUT_COPY.nav {
-    return LAYOUT_COPY.nav;
+  get nav(): typeof LAYOUT_NAV {
+    return LAYOUT_NAV;
   }
 
   get usersMenuItem(): Locator {
-    return this.navItemByLabel(LAYOUT_COPY.nav.users);
+    return this.navItemByLabel(LAYOUT_NAV.USERS.label);
   }
 
   get collapseToggle(): Locator {
@@ -251,7 +252,7 @@ export class ShellPage extends BasePage {
   }
 
   get dashboardsLink(): Locator {
-    return this.navLink(LAYOUT_COPY.nav.dashboards);
+    return this.navLink(LAYOUT_NAV.DASHBOARDS.label);
   }
 
   // Starts a navigation from inside the page, so the app's own redirect cannot abort it the way a goto would.

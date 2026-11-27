@@ -107,6 +107,15 @@ func setDefaultValue(v *viper.Viper) {
 	v.SetDefault("RESUME_PIPELINES", true)
 	// v.SetDefault("CORS_ALLOW_ORIGIN", "*")
 	v.SetDefault("CONSUME_PIPELINES", true)
+	// mail service (off until MAIL_ENABLED=true); see env.example
+	v.SetDefault("MAIL_ENABLED", false)
+	v.SetDefault("MAIL_DRIVER", "smtp")
+	v.SetDefault("MAIL_FROM_NAME", "DevLake")
+	v.SetDefault("SMTP_PORT", 587)
+	v.SetDefault("SMTP_SECURITY", "starttls")
+	v.SetDefault("SMTP_AUTH", "plain")
+	v.SetDefault("SMTP_TIMEOUT", "15s")
+	v.SetDefault("MAIL_MAX_RETRIES", 3)
 }
 
 func init() {
