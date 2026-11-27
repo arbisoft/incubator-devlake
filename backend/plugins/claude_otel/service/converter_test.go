@@ -332,6 +332,47 @@ func TestMetricSeriesHashIncludesInstrumentationScope(t *testing.T) {
 	}
 }
 
+func TestMetricFactRepository(t *testing.T) {
+	attrs := func(value string) []*commonv1.KeyValue {
+		if value == "" {
+			return nil
+		}
+		return []*commonv1.KeyValue{stringAttribute(repositoryURLAttribute, value)}
+	}
+	tests := []struct {
+		name, point, resource, want string
+	}{
+		{"point attribute wins over resource", "https://github.com/org/alpha", "https://github.com/org/beta", "https://github.com/org/alpha"},
+		{"resource used when the point has none", "", "https://github.com/org/beta", "https://github.com/org/beta"},
+		{"missing", "", "", ""},
+		{"non-URL value", "not a repository", "", ""},
+		{"URL too long to store", "https://github.com/org/" + strings.Repeat("a", 256-len("https://github.com/org/")), "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := metricRepositoryURL(attrs(tt.point), attrs(tt.resource)); got != tt.want {
+				t.Fatalf("metricRepositoryURL() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRepositoryKey(t *testing.T) {
+	empty, alpha := repositoryKey(""), repositoryKey("https://github.com/org/alpha")
+	if len(empty) != 16 || len(alpha) != 16 {
+		t.Fatalf("repositoryKey() lengths = %d, %d, want 16", len(empty), len(alpha))
+	}
+	if string(empty) == string(alpha) {
+		t.Fatal("repositoryKey() gave the same key for '' and a URL")
+	}
+	if string(alpha) != string(repositoryKey("https://github.com/org/alpha")) {
+		t.Fatal("repositoryKey() is not stable for one URL")
+	}
+	if want := "d41d8cd98f00b204e9800998ecf8427e"; fmt.Sprintf("%x", empty) != want {
+		t.Fatalf("repositoryKey(\"\") = %x, want %s", empty, want)
+	}
+}
+
 func TestMetricSeriesHashIgnoresRepositoryAttributes(t *testing.T) {
 	scope := &commonv1.InstrumentationScope{Name: "claude-code", Version: "1"}
 	metric := &metricsv1.Metric{Name: metricTokenUsage}

@@ -25,7 +25,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
@@ -649,8 +648,8 @@ func (b *promptBuilder) applySkillActivated(event *models.OtelEvent, attributes 
 // earlier raw batches. Claude Code derives it once per session, so every event of a prompt
 // carries the same value.
 func repositoryURL(attributes map[string]interface{}) *string {
-	url, ok := normalizeRepositoryURL(eventString(attributes, repositoryURLAttribute))
-	if !ok || utf8.RuneCountInString(url) > maxRepositoryURLLength {
+	url := normalizedRepositoryURL(eventString(attributes, repositoryURLAttribute))
+	if url == "" {
 		return nil
 	}
 	return &url

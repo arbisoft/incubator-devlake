@@ -28,16 +28,18 @@ const (
 )
 
 // OtelHourlyActivity stores Claude Code metrics whose grain is a connection,
-// developer, and UTC hour.
+// developer, UTC hour and repository.
 type OtelHourlyActivity struct {
-	ConnectionId      uint64    `gorm:"primaryKey;index"`
+	ConnectionId      uint64    `gorm:"primaryKey;index;index:idx_otel_hourly_activity_repository,priority:1"`
 	TeamSlug          string    `gorm:"type:varchar(63);index"`
 	OrganizationId    *string   `gorm:"type:char(36);index;index:idx_otel_hourly_activity_daily,priority:1"`
 	UserKey           string    `gorm:"type:varchar(255);primaryKey;index:idx_otel_hourly_activity_daily,priority:2"`
 	UserAccountId     *string   `gorm:"type:varchar(255);index"`
 	UserAccountUUID   *string   `gorm:"type:varchar(255);index"`
 	UserEmail         *string   `gorm:"type:varchar(255);index"`
-	HourStart         time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_activity_daily,priority:3"`
+	HourStart         time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_activity_daily,priority:3;index:idx_otel_hourly_activity_repository,priority:3"`
+	RepositoryKey     []byte    `gorm:"type:binary(16);primaryKey"`
+	RepositoryUrl     string    `gorm:"type:varchar(255);not null;default:'';index:idx_otel_hourly_activity_repository,priority:2"`
 	SessionCount      int64     `gorm:"not null;default:0"`
 	ActiveTimeSeconds string    `gorm:"type:decimal(20,3);not null;default:0"`
 	LinesAdded        int64     `gorm:"not null;default:0"`
@@ -52,21 +54,23 @@ type OtelHourlyActivity struct {
 
 func (OtelHourlyActivity) TableName() string { return OtelHourlyActivityTable }
 
-// OtelHourlyModelUsage stores token and cost metrics by model, query source, effort, agent and skill.
+// OtelHourlyModelUsage stores token and cost metrics by model, query source, effort, agent, skill and repository.
 type OtelHourlyModelUsage struct {
-	ConnectionId        uint64    `gorm:"primaryKey;index"`
+	ConnectionId        uint64    `gorm:"primaryKey;index;index:idx_otel_hourly_model_usage_repository,priority:1"`
 	TeamSlug            string    `gorm:"type:varchar(63);index"`
 	OrganizationId      *string   `gorm:"type:char(36);index;index:idx_otel_hourly_model_usage_daily,priority:1"`
 	UserKey             string    `gorm:"type:varchar(255);primaryKey;index:idx_otel_hourly_model_usage_daily,priority:2"`
 	UserAccountId       *string   `gorm:"type:varchar(255);index"`
 	UserAccountUUID     *string   `gorm:"type:varchar(255);index"`
 	UserEmail           *string   `gorm:"type:varchar(255);index"`
-	HourStart           time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_model_usage_daily,priority:3"`
+	HourStart           time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_model_usage_daily,priority:3;index:idx_otel_hourly_model_usage_repository,priority:3"`
 	Model               string    `gorm:"type:varchar(255);primaryKey"`
 	QuerySource         string    `gorm:"type:varchar(64);primaryKey"`
 	Effort              string    `gorm:"type:varchar(16);primaryKey;default:''"`
 	AgentName           string    `gorm:"type:varchar(64);primaryKey;default:''"`
 	SkillName           string    `gorm:"type:varchar(64);primaryKey;default:''"`
+	RepositoryKey       []byte    `gorm:"type:binary(16);primaryKey"`
+	RepositoryUrl       string    `gorm:"type:varchar(255);not null;default:'';index:idx_otel_hourly_model_usage_repository,priority:2"`
 	InputTokens         int64     `gorm:"not null;default:0"`
 	OutputTokens        int64     `gorm:"not null;default:0"`
 	CacheReadTokens     int64     `gorm:"not null;default:0"`
@@ -80,19 +84,21 @@ type OtelHourlyModelUsage struct {
 
 func (OtelHourlyModelUsage) TableName() string { return OtelHourlyModelUsageTable }
 
-// OtelHourlyToolUsage stores Claude Code edit-tool decision counts by tool, language and decision source.
+// OtelHourlyToolUsage stores Claude Code edit-tool decision counts by tool, language, decision source and repository.
 type OtelHourlyToolUsage struct {
-	ConnectionId    uint64    `gorm:"primaryKey;index"`
+	ConnectionId    uint64    `gorm:"primaryKey;index;index:idx_otel_hourly_tool_usage_repository,priority:1"`
 	TeamSlug        string    `gorm:"type:varchar(63);index"`
 	OrganizationId  *string   `gorm:"type:char(36);index;index:idx_otel_hourly_tool_usage_daily,priority:1"`
 	UserKey         string    `gorm:"type:varchar(255);primaryKey;index:idx_otel_hourly_tool_usage_daily,priority:2"`
 	UserAccountId   *string   `gorm:"type:varchar(255);index"`
 	UserAccountUUID *string   `gorm:"type:varchar(255);index"`
 	UserEmail       *string   `gorm:"type:varchar(255);index"`
-	HourStart       time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_tool_usage_daily,priority:3"`
+	HourStart       time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_tool_usage_daily,priority:3;index:idx_otel_hourly_tool_usage_repository,priority:3"`
 	ToolName        string    `gorm:"type:varchar(100);primaryKey"`
 	Language        string    `gorm:"type:varchar(100);primaryKey"`
 	DecisionSource  string    `gorm:"type:varchar(32);primaryKey;default:''"`
+	RepositoryKey   []byte    `gorm:"type:binary(16);primaryKey"`
+	RepositoryUrl   string    `gorm:"type:varchar(255);not null;default:'';index:idx_otel_hourly_tool_usage_repository,priority:2"`
 	AcceptedCount   int64     `gorm:"not null;default:0"`
 	RejectedCount   int64     `gorm:"not null;default:0"`
 	FirstObservedAt time.Time `gorm:"type:datetime(3)"`
@@ -103,18 +109,20 @@ type OtelHourlyToolUsage struct {
 
 func (OtelHourlyToolUsage) TableName() string { return OtelHourlyToolUsageTable }
 
-// OtelHourlySessionStart stores Claude Code session starts by session and start type.
+// OtelHourlySessionStart stores Claude Code session starts by session, start type and repository.
 type OtelHourlySessionStart struct {
-	ConnectionId    uint64    `gorm:"primaryKey;index"`
+	ConnectionId    uint64    `gorm:"primaryKey;index;index:idx_otel_hourly_session_starts_repository,priority:1"`
 	TeamSlug        string    `gorm:"type:varchar(63);index"`
 	OrganizationId  *string   `gorm:"type:char(36);index;index:idx_otel_hourly_session_starts_daily,priority:1"`
 	UserKey         string    `gorm:"type:varchar(255);primaryKey;index:idx_otel_hourly_session_starts_daily,priority:2"`
 	UserAccountId   *string   `gorm:"type:varchar(255);index"`
 	UserAccountUUID *string   `gorm:"type:varchar(255);index"`
 	UserEmail       *string   `gorm:"type:varchar(255);index"`
-	HourStart       time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_session_starts_daily,priority:3"`
+	HourStart       time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_session_starts_daily,priority:3;index:idx_otel_hourly_session_starts_repository,priority:3"`
 	SessionId       string    `gorm:"type:varchar(128);primaryKey;index;default:''"`
 	StartType       string    `gorm:"type:varchar(16);primaryKey;default:''"`
+	RepositoryKey   []byte    `gorm:"type:binary(16);primaryKey"`
+	RepositoryUrl   string    `gorm:"type:varchar(255);not null;default:'';index:idx_otel_hourly_session_starts_repository,priority:2"`
 	StartCount      int64     `gorm:"not null;default:0"`
 	FirstObservedAt time.Time `gorm:"type:datetime(3)"`
 	LastObservedAt  time.Time `gorm:"type:datetime(3)"`

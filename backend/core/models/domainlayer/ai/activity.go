@@ -73,14 +73,16 @@ type AiActivity struct {
 
 	// Canonical reconciliation metadata is intentionally nullable. Existing writers
 	// retain their legacy contract by leaving these fields unset.
-	WorkspaceKey       *string    `gorm:"type:varchar(255);index" json:"workspaceKey,omitempty"`
-	UserKey            *string    `gorm:"type:varchar(255);index" json:"userKey,omitempty"`
-	UserAccountId      *string    `gorm:"type:varchar(255);index" json:"userAccountId,omitempty"`
-	RecordKind         *string    `gorm:"type:varchar(64);index" json:"recordKind,omitempty"`
-	SourceType         *string    `gorm:"type:varchar(64)" json:"sourceType,omitempty"`
-	SourceConnectionId *uint64    `json:"sourceConnectionId,omitempty"`
-	SourceScopeId      *string    `gorm:"type:varchar(255)" json:"sourceScopeId,omitempty"`
-	SourceUpdatedAt    *time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt,omitempty"`
+	WorkspaceKey       *string `gorm:"type:varchar(255);index" json:"workspaceKey,omitempty"`
+	UserKey            *string `gorm:"type:varchar(255);index" json:"userKey,omitempty"`
+	UserAccountId      *string `gorm:"type:varchar(255);index" json:"userAccountId,omitempty"`
+	RecordKind         *string `gorm:"type:varchar(64);index" json:"recordKind,omitempty"`
+	SourceType         *string `gorm:"type:varchar(64)" json:"sourceType,omitempty"`
+	SourceConnectionId *uint64 `json:"sourceConnectionId,omitempty"`
+	// RepositoryUrl is NULL when the provider can't report one, and '' when Claude OTel reported none.
+	RepositoryUrl   *string    `gorm:"type:varchar(255)" json:"repositoryUrl,omitempty"`
+	SourceScopeId   *string    `gorm:"type:varchar(255)" json:"sourceScopeId,omitempty"`
+	SourceUpdatedAt *time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt,omitempty"`
 }
 
 func (AiActivity) TableName() string {
@@ -108,8 +110,10 @@ type AiModelUsage struct {
 	EstimatedCostUsd    string    `gorm:"type:decimal(20,8);not null" json:"estimatedCostUsd"`
 	SourceType          string    `gorm:"type:varchar(64)" json:"sourceType"`
 	SourceConnectionId  *uint64   `json:"sourceConnectionId,omitempty"`
-	SourceScopeId       *string   `gorm:"type:varchar(255)" json:"sourceScopeId,omitempty"`
-	SourceUpdatedAt     time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt"`
+	// RepositoryUrl is NULL when the provider can't report one, and '' when Claude OTel reported none.
+	RepositoryUrl   *string   `gorm:"type:varchar(255)" json:"repositoryUrl,omitempty"`
+	SourceScopeId   *string   `gorm:"type:varchar(255)" json:"sourceScopeId,omitempty"`
+	SourceUpdatedAt time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt"`
 }
 
 func (AiModelUsage) TableName() string { return "ai_model_usages" }
@@ -131,8 +135,10 @@ type AiToolDecision struct {
 	RejectedCount      int64     `json:"rejectedCount"`
 	SourceType         string    `gorm:"type:varchar(64)" json:"sourceType"`
 	SourceConnectionId *uint64   `json:"sourceConnectionId,omitempty"`
-	SourceScopeId      *string   `gorm:"type:varchar(255)" json:"sourceScopeId,omitempty"`
-	SourceUpdatedAt    time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt"`
+	// RepositoryUrl is NULL when the provider can't report one, and '' when Claude OTel reported none.
+	RepositoryUrl   *string   `gorm:"type:varchar(255)" json:"repositoryUrl,omitempty"`
+	SourceScopeId   *string   `gorm:"type:varchar(255)" json:"sourceScopeId,omitempty"`
+	SourceUpdatedAt time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt"`
 }
 
 func (AiToolDecision) TableName() string { return "ai_tool_decisions" }

@@ -116,6 +116,7 @@ type factUpdate struct {
 	decisionSource string
 	sessionID      string
 	startType      string
+	repositoryURL  string
 	value          metricNumber
 	temporality    metricsv1.AggregationTemporality
 	startNanos     uint64
