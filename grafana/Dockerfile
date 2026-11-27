@@ -27,6 +27,8 @@ FROM golang:1.26.5-bookworm AS query-gate
 WORKDIR /src
 COPY query-gate/ ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/grafana-query-gate .
+COPY dashboards/ /dashboards/
+RUN /out/grafana-query-gate lint /dashboards
 
 FROM grafana/grafana:13.2.2
 COPY ./provisioning/dashboards /etc/grafana/provisioning/dashboards

@@ -84,11 +84,13 @@ type Gate struct {
 	health   *http.Client
 	sem      chan struct{}
 	status   func() gatesync.Status
+
+	shippedErrors int
 }
 
 // New returns the gate handler.
-func New(cfg config.Config, upstream *url.URL, ident *identity.Client, sets func() *templates.Set, status func() gatesync.Status, logger *slog.Logger) http.Handler {
-	g := &Gate{cfg: cfg, upstream: upstream, ident: ident, sets: sets, status: status, logger: logger, health: &http.Client{Timeout: readyTimeout}, sem: make(chan struct{}, 4*runtime.GOMAXPROCS(0))}
+func New(cfg config.Config, upstream *url.URL, ident *identity.Client, sets func() *templates.Set, status func() gatesync.Status, shippedErrors int, logger *slog.Logger) http.Handler {
+	g := &Gate{cfg: cfg, upstream: upstream, ident: ident, sets: sets, status: status, shippedErrors: shippedErrors, logger: logger, health: &http.Client{Timeout: readyTimeout}, sem: make(chan struct{}, 4*runtime.GOMAXPROCS(0))}
 	g.proxy = &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(upstream)
@@ -140,7 +142,7 @@ func (g *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		switch r.URL.Path {
 		case "/gate/healthz":
-			writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "mode": g.cfg.Mode, "templates": g.sets().Len(), "sync": g.status()})
+			writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "mode": g.cfg.Mode, "templates": g.sets().Len(), "shipped_errors": g.shippedErrors, "sync": g.status()})
 			return
 		case "/gate/readyz":
 			g.ready(w, r)
