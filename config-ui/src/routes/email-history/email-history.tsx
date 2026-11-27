@@ -43,8 +43,14 @@ import type { EmailHistoryItem, HistoryFilters, HistorySortKey } from './types';
 import { useQueuedPoll } from './use-queued-poll';
 import { buildHistoryQuery, buildProjectOptions, toDateRange } from './utils';
 
-const statusOptions = Object.values(EMAIL_STATUS).map(({ value, label }) => ({ value, label }));
-const templateOptions = Object.values(EMAIL_TEMPLATE).map(({ value, label }) => ({ value, label }));
+const toOptions = (meta: Record<string, { value: string; label: string }>) =>
+  Object.values(meta).map(({ value, label }) => ({ value, label }));
+
+// The status and template filters differ only in these values.
+const selectFilters = [
+  { param: FILTER_PARAM.STATUS, label: COPY.filters.status, options: toOptions(EMAIL_STATUS) },
+  { param: FILTER_PARAM.TEMPLATE, label: COPY.filters.template, options: toOptions(EMAIL_TEMPLATE) },
+] as const;
 
 export const EmailHistory = () => {
   const list = useListState<HistorySortKey, HistoryFilters>({ filters: DEFAULT_FILTERS });
@@ -98,22 +104,17 @@ export const EmailHistory = () => {
 
   const toolbarFilters = (
     <>
-      <FilterSelect
-        allowClear
-        aria-label={COPY.filters.status}
-        placeholder={COPY.filters.status}
-        options={statusOptions}
-        value={filters.status || undefined}
-        onChange={(value) => setFilter(FILTER_PARAM.STATUS, String(value ?? ''))}
-      />
-      <FilterSelect
-        allowClear
-        aria-label={COPY.filters.template}
-        placeholder={COPY.filters.template}
-        options={templateOptions}
-        value={filters.template || undefined}
-        onChange={(value) => setFilter(FILTER_PARAM.TEMPLATE, String(value ?? ''))}
-      />
+      {selectFilters.map(({ param, label, options }) => (
+        <FilterSelect
+          key={param}
+          allowClear
+          aria-label={label}
+          placeholder={label}
+          options={options}
+          value={filters[param] || undefined}
+          onChange={(value) => setFilter(param, String(value ?? ''))}
+        />
+      ))}
       <ProjectSelect
         allowClear
         showSearch={{ filterOption: false, onSearch: setProjectKeyword }}
