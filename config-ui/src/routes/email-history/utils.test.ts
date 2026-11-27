@@ -16,7 +16,6 @@
  *
  */
 
-import dayjs from 'dayjs';
 import { describe, expect, it } from 'vitest';
 
 import { STATUS_TONE } from '@/ui';
@@ -61,11 +60,11 @@ describe('buildHistoryQuery', () => {
 });
 
 describe('toDateRange', () => {
-  it('covers both whole days in RFC 3339 without milliseconds', () => {
+  it('covers both whole days, to the last millisecond of the end day', () => {
     const { from, to } = toDateRange(new Date(2026, 10, 1, 15), new Date(2026, 10, 2, 3));
-    expect(from).toBe(dayjs('2026-11-01T00:00:00').toDate().toISOString().replace('.000Z', 'Z'));
-    expect(to).toBe(dayjs('2026-11-02T23:59:59').toDate().toISOString().replace('.000Z', 'Z'));
-    expect(from).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    expect(from).toBe(new Date(2026, 10, 1, 0, 0, 0, 0).toISOString());
+    expect(to).toBe(new Date(2026, 10, 2, 23, 59, 59, 999).toISOString());
+    expect(to).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:59\.999Z$/);
   });
 
   it('clears a missing end', () => {

@@ -53,14 +53,11 @@ export const summarizeRecipients = (recipients: string[]) => ({
   more: Math.max(recipients.length - RECIPIENTS_SHOWN, 0),
 });
 
-// RFC 3339 without milliseconds, in UTC, as the API expects.
-const toRFC3339 = (date: Dayjs) =>
-  date
-    .toDate()
-    .toISOString()
-    .replace(/\.\d{3}Z$/, 'Z');
+// RFC 3339 in UTC with milliseconds. created_at is stored to the millisecond, so cutting them would drop
+// emails created in the last second of the end day.
+const toRFC3339 = (date: Dayjs) => date.toDate().toISOString();
 
-// toDateRange turns the picked days into a created-at range covering both whole local days.
+// toDateRange turns the picked days into a created-at range covering both whole local days, up to .999.
 // It takes plain dates because antd's date picker uses its own copy of dayjs.
 export const toDateRange = (start?: Date | null, end?: Date | null) => ({
   from: start ? toRFC3339(dayjs(start).startOf('day')) : '',
