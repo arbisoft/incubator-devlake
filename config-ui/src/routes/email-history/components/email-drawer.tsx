@@ -102,7 +102,7 @@ export const EmailDrawer = ({ open, emailId, onClose }: EmailDrawerProps) => {
         <Content>
           {email.errorMessage && (
             <Alert
-              type={email.status === 'FAILED' ? 'error' : 'warning'}
+              type={email.status === EMAIL_STATUS.FAILED ? 'error' : 'warning'}
               showIcon
               title={COPY.drawer.error}
               description={email.errorMessage}
