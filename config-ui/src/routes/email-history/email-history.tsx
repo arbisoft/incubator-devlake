@@ -48,13 +48,13 @@ const templateOptions = Object.values(EMAIL_TEMPLATE).map(({ value, label }) => 
 
 export const EmailHistory = () => {
   const list = useListState<HistorySortKey, HistoryFilters>({ filters: DEFAULT_FILTERS });
-  const { filters } = list;
+  const { query: listQuery, filters, setFilter, setFilters, isFiltered } = list;
   const { version, refresh } = useRefreshVersion();
   const [openId, setOpenId] = useState<number>();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sending, setSending] = useState(false);
 
-  const query = useMemo(() => buildHistoryQuery(list.query, filters), [list.query, filters]);
+  const query = useMemo(() => buildHistoryQuery(listQuery, filters), [listQuery, filters]);
   const { data, ready, error } = useRefreshData((signal) => API.mail.history(query, signal), [version, query]);
   useQueuedPoll(data, query, refresh);
   const { data: status, error: statusError } = useRefreshData((signal) => API.mail.status(signal), []);
@@ -91,7 +91,7 @@ export const EmailHistory = () => {
   const empty = buildListEmpty({
     failed: error !== undefined,
     onRetry: refresh,
-    filtered: list.isFiltered,
+    filtered: isFiltered,
     empty: COPY.empty,
     noResults: COPY.noResults,
   });
@@ -104,7 +104,7 @@ export const EmailHistory = () => {
         placeholder={COPY.filters.status}
         options={statusOptions}
         value={filters.status || undefined}
-        onChange={(value) => list.setFilter(FILTER_PARAM.STATUS, String(value ?? ''))}
+        onChange={(value) => setFilter(FILTER_PARAM.STATUS, String(value ?? ''))}
       />
       <FilterSelect
         allowClear
@@ -112,7 +112,7 @@ export const EmailHistory = () => {
         placeholder={COPY.filters.template}
         options={templateOptions}
         value={filters.template || undefined}
-        onChange={(value) => list.setFilter(FILTER_PARAM.TEMPLATE, String(value ?? ''))}
+        onChange={(value) => setFilter(FILTER_PARAM.TEMPLATE, String(value ?? ''))}
       />
       <ProjectSelect
         allowClear
@@ -121,14 +121,14 @@ export const EmailHistory = () => {
         placeholder={COPY.filters.project}
         options={projectOptions}
         value={filters.projectName || undefined}
-        onChange={(value) => list.setFilter(FILTER_PARAM.PROJECT, String(value ?? ''))}
+        onChange={(value) => setFilter(FILTER_PARAM.PROJECT, String(value ?? ''))}
         onOpenChange={(open) => !open && setProjectKeyword('')}
       />
       <DatePicker.RangePicker
         aria-label={COPY.filters.dateRange.join(' – ')}
         placeholder={COPY.filters.dateRange}
         value={[filters.from ? dayjs(filters.from) : null, filters.to ? dayjs(filters.to) : null]}
-        onChange={(dates) => list.setFilters(toDateRange(dates?.[0]?.toDate(), dates?.[1]?.toDate()))}
+        onChange={(dates) => setFilters(toDateRange(dates?.[0]?.toDate(), dates?.[1]?.toDate()))}
       />
     </>
   );
