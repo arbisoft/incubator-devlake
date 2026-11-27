@@ -570,7 +570,7 @@
         "spec": {
           "id": 15,
           "title": "AI impact overview",
-          "description": "The selected range, in the selected projects. AI-assisted PRs: share of merged PRs with a Claude co-author trailer or a commit Claude Code reported. Code generated: lines Claude Code added as a share of lines added by merged PRs, capped at 100%. GitLab MRs count the lines added by their commits, merge commits excluded. Code accepted: share of edit decisions that were accepted. AI lines per merged PR: lines Claude Code added divided by merged PRs. Claude active hours: time spent actively in Claude Code sessions, not time saved.",
+          "description": "The selected range, in the selected projects. AI-assisted PRs: share of merged PRs with a Claude co-author trailer or a commit Claude Code reported. Code generated: lines Claude Code added as a share of lines added by merged PRs, capped at 100%. GitLab MRs count the lines added by their commits, merge commits excluded. Code accepted: share of edit decisions that were accepted. AI lines per merged PR: lines Claude Code added divided by merged PRs. Claude active hours: time spent actively in Claude Code sessions, not time saved.\n\nAI-attributed merged PRs (current period) / Total merged PRs (current period)",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -680,7 +680,7 @@
         "spec": {
           "id": 16,
           "title": "",
-          "description": "",
+          "description": "Code generated: (Claude lines added ÷ Total merged PR lines) × 100 (capped at 100%).\n\nCode accepted: (Accepted edit decisions ÷ (Accepted + Rejected edit decisions)) × 100.\n\nAI lines per merged PR: Claude lines added ÷ Total merged PRs in the time frame.\n\nClaude active hours: Total active seconds in Claude Code ÷ 3,600 (from hourly OTEL telemetry).\n\nvs previous period: Current AI-assisted PR % − Previous period's AI-assisted PR % (in percentage points, comparing against an immediately preceding window of the same length).",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1509,7 +1509,7 @@
         "spec": {
           "id": 25,
           "title": "Adoption",
-          "description": "Engineers with Claude Code activity as a share of merged-PR authors, and the share of edits accepted. Up to 31 days, each daily point is the trailing 7 days ending that day; beyond that, one point per week. Edit acceptance is per day or week, not trailing. Same denominator as Engineers Adopted %. GitLab authors and bots are counted but can never match Claude Code, so adoption reads low where they're common.",
+          "description": "Engineers with Claude Code activity as a share of merged-PR authors, and the share of edits accepted. Up to 31 days, each daily point is the trailing 7 days ending that day; beyond that, one point per week. Edit acceptance is per day or week, not trailing. Same denominator as Engineers Adopted %. GitLab authors and bots are counted but can never match Claude Code, so adoption reads low where they're common.\n\nAdoption: Unique PR authors who also used Claude Code (in the 7-day window) / Unique authors who merged a PR (in the 7-day window) * 100\n\nEdit acceptance: Accepted edits (in that period) / Accepted edits + Rejected edits (in that period) * 100",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1644,7 +1644,7 @@
         "spec": {
           "id": 26,
           "title": "Spend by repository",
-          "description": "Claude Code cost per repository over the selected range (last 7 days by default); Mapping says whether the repository belongs to the selected projects. Cost is the exporter's estimate.",
+          "description": "Claude Code cost per repository over the selected range (last 7 days by default): the ten most expensive, then Other, then No repo: spend from sessions with no git repository detected. Green bars are repositories mapped to one of the selected projects, orange ones aren't; hover a bar to see which. Cost is the exporter's estimate.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1664,44 +1664,91 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nrepo_spend AS (\n  SELECT p.repository_url,\n    COUNT(DISTINCT p.session_id) AS sessions,\n    COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS people,\n    SUM(p.estimated_cost_usd) AS cost,\n    EXISTS (SELECT 1 FROM repos r JOIN scoped_repos sr ON sr.repo_id = r.id WHERE LOWER(r.url) = p.repository_url) AS is_mapped\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND p.started_at >= $__timeFrom() AND p.started_at < $__timeTo()\n  GROUP BY p.repository_url\n)\nSELECT COALESCE(REGEXP_REPLACE(repository_url, '^https?://', ''), 'No repository identified') AS Repository,\n  CASE WHEN repository_url IS NULL THEN '–' WHEN is_mapped THEN 'Yes' ELSE 'No' END AS Mapping,\n  sessions AS Sessions,\n  people AS People,\n  cost AS Cost,\n  100 * cost / NULLIF(SUM(cost) OVER (), 0) AS Share\nFROM repo_spend\nORDER BY cost DESC"
+                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nrepo_spend AS (\n  SELECT p.repository_url,\n    SUM(p.estimated_cost_usd) AS cost,\n    EXISTS (SELECT 1 FROM repos r JOIN scoped_repos sr ON sr.repo_id = r.id WHERE LOWER(r.url) = p.repository_url) AS is_mapped\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND p.started_at >= $__timeFrom() AND p.started_at < $__timeTo()\n  GROUP BY p.repository_url\n),\nranked AS (\n  SELECT repository_url, cost, is_mapped, ROW_NUMBER() OVER (ORDER BY cost DESC, repository_url) AS rn,\n    REGEXP_REPLACE(repository_url, '^(https?://)?(github\\\\.com/)?', '') AS full_name\n  FROM repo_spend\n  WHERE repository_url IS NOT NULL\n),\n-- the owner is shown only when two of the top ten share a repository name\ntop AS (\n  SELECT ranked.*, COUNT(*) OVER (PARTITION BY SUBSTRING_INDEX(full_name, '/', -1)) AS same_name\n  FROM ranked\n  WHERE rn <= 10\n),\n-- the ten most expensive repositories, then everything else as one row, then spend with no repository\ngrouped AS (\n  SELECT IF(same_name > 1, full_name, SUBSTRING_INDEX(full_name, '/', -1)) AS name, cost, is_mapped, rn AS ord\n  FROM top\n  UNION ALL\n  SELECT CONCAT('Other (', COUNT(*), IF(COUNT(*) = 1, ' repo)', ' repos)')), SUM(cost), NULL, 11\n  FROM ranked\n  WHERE rn > 10\n  HAVING COUNT(*) > 0\n  UNION ALL\n  SELECT 'No repo', cost, NULL, 12\n  FROM repo_spend\n  WHERE repository_url IS NULL\n)\nSELECT name AS Repository, cost AS Cost, is_mapped AS Mapping\nFROM grouped\nORDER BY ord"
                       }
                     },
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nrepo_spend AS (\n  SELECT p.repository_url,\n    SUM(p.estimated_cost_usd) AS cost,\n    EXISTS (SELECT 1 FROM repos r JOIN scoped_repos sr ON sr.repo_id = r.id WHERE LOWER(r.url) = p.repository_url) AS is_mapped\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND p.started_at >= $__timeFrom() AND p.started_at < $__timeTo()\n  GROUP BY p.repository_url\n),\nranked AS (\n  SELECT repository_url, cost, is_mapped, ROW_NUMBER() OVER (ORDER BY cost DESC, repository_url) AS rn,\n    REGEXP_REPLACE(repository_url, '^(https?://)?(github\\\\.com/)?', '') AS full_name\n  FROM repo_spend\n  WHERE repository_url IS NOT NULL\n),\n-- the owner is shown only when two of the top ten share a repository name\ntop AS (\n  SELECT ranked.*, COUNT(*) OVER (PARTITION BY SUBSTRING_INDEX(full_name, '/', -1)) AS same_name\n  FROM ranked\n  WHERE rn <= 10\n),\n-- the ten most expensive repositories, then everything else as one row, then spend with no repository\ngrouped AS (\n  SELECT IF(same_name > 1, full_name, SUBSTRING_INDEX(full_name, '/', -1)) AS name, cost, is_mapped, rn AS ord\n  FROM top\n  UNION ALL\n  SELECT CONCAT('Other (', COUNT(*), IF(COUNT(*) = 1, ' repo)', ' repos)')), SUM(cost), NULL, 11\n  FROM ranked\n  WHERE rn > 10\n  HAVING COUNT(*) > 0\n  UNION ALL\n  SELECT 'No repository identified', cost, NULL, 12\n  FROM repo_spend\n  WHERE repository_url IS NULL\n)\n-- scale headroom so the longest bar's value label fits\nSELECT MAX(cost) * 1.3 AS Max\nFROM grouped"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "configFromData",
+                  "spec": {
+                    "options": {
+                      "configRefId": "B",
+                      "mappings": [
+                        {
+                          "fieldName": "Max",
+                          "handlerKey": "max"
+                        }
+                      ],
+                      "applyTo": {
+                        "id": "byName",
+                        "options": "Cost"
+                      }
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "table",
+            "group": "barchart",
             "version": "13.2.2",
             "spec": {
               "options": {
-                "cellHeight": "sm",
-                "footer": {
-                  "countRows": false,
-                  "fields": "",
-                  "reducer": [
-                    "sum"
-                  ],
-                  "show": false
+                "barRadius": 0,
+                "barWidth": 0.8,
+                "colorByField": "Mapping",
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": false
                 },
-                "frameIndex": 0,
-                "showHeader": true,
-                "sortBy": [
-                  {
-                    "desc": true,
-                    "displayName": "Cost"
-                  }
-                ]
+                "orientation": "horizontal",
+                "showValue": "always",
+                "stacking": "none",
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                },
+                "xField": "Repository",
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 0
               },
               "fieldConfig": {
                 "defaults": {
+                  "unit": "currencyUSD",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1712,19 +1759,33 @@
                     ]
                   },
                   "color": {
-                    "mode": "thresholds"
+                    "mode": "fixed",
+                    "fixedColor": "green"
                   },
                   "noValue": "–",
                   "custom": {
-                    "align": "auto",
-                    "cellOptions": {
-                      "type": "auto"
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "axisSoftMin": 0,
+                    "fillOpacity": 80,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
                     },
-                    "footer": {
-                      "reducers": []
+                    "lineWidth": 1,
+                    "scaleDistribution": {
+                      "type": "linear"
                     },
-                    "inspect": false
-                  }
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "decimals": 2
                 },
                 "overrides": [
                   {
@@ -1734,64 +1795,8 @@
                     },
                     "properties": [
                       {
-                        "id": "unit",
-                        "value": "currencyUSD"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 2
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Share"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "percent"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 1
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Sessions"
-                    },
-                    "properties": [
-                      {
-                        "id": "decimals",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "People"
-                    },
-                    "properties": [
-                      {
-                        "id": "decimals",
-                        "value": 0
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Repository"
-                    },
-                    "properties": [
-                      {
-                        "id": "custom.minWidth",
-                        "value": 300
+                        "id": "custom.axisPlacement",
+                        "value": "hidden"
                       }
                     ]
                   },
@@ -1802,29 +1807,50 @@
                     },
                     "properties": [
                       {
+                        "id": "unit",
+                        "value": "none"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
                         "id": "mappings",
                         "value": [
                           {
+                            "type": "value",
                             "options": {
-                              "No": {
-                                "color": "orange",
-                                "index": 1,
-                                "text": "No"
-                              },
-                              "Yes": {
+                              "1": {
+                                "text": "Mapped to the project",
                                 "color": "green",
-                                "index": 0,
-                                "text": "Yes"
+                                "index": 0
+                              },
+                              "0": {
+                                "text": "Not mapped to the project",
+                                "color": "orange",
+                                "index": 1
                               }
-                            },
-                            "type": "value"
+                            }
+                          },
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null",
+                              "result": {
+                                "text": "–",
+                                "color": "gray",
+                                "index": 2
+                              }
+                            }
                           }
                         ]
                       },
                       {
-                        "id": "custom.cellOptions",
+                        "id": "custom.hideFrom",
                         "value": {
-                          "type": "color-text"
+                          "legend": true,
+                          "tooltip": false,
+                          "viz": true
                         }
                       }
                     ]
@@ -2313,7 +2339,7 @@
         "spec": {
           "id": 33,
           "title": "By state",
-          "description": "Tickets open now or resolved in the selected range per group, split into done, in progress and to do. Jira uses its status; GitHub and GitLab issues count as in progress when a linked pull request is open, otherwise when they have an assignee. Blocked tickets count as in progress. Hover a bar for the done, in progress and to do counts. A ticket with several labels is counted under each. Milestone is Jira's first fix version or a GitHub milestone; GitLab has none. The date is the latest ticket due date.",
+          "description": "Tickets open now or resolved in the selected range per group, split into done, in progress and to do. Jira uses its status; GitHub and GitLab issues count as in progress when a linked pull request is open, otherwise when they have an assignee. Blocked tickets count as in progress. Names longer than 34 characters are shortened; hover a bar for the full name, the due date and the done, in progress and to do counts. A ticket with several labels is counted under each. Milestone is Jira's first fix version or a GitHub milestone; GitLab has none. The due date is the latest ticket due date in the group.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2333,7 +2359,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nopen_pr_issues AS (\n  SELECT DISTINCT pri.issue_id\n  FROM pull_request_issues pri\n  JOIN pull_requests p2 ON p2.id = pri.pull_request_id AND p2.status = 'OPEN'\n)\n, tickets AS (\n  SELECT i.id, i.due_date, i.fix_versions, i.epic_key, i.id LIKE 'jira:%' AS is_jira, CASE WHEN i.original_status = 'Closed' THEN 'DONE' WHEN i.original_status IN ('To Do', 'To do', 'Todo') THEN 'TODO' WHEN i.original_status = 'Ready for Development' THEN 'TODO' WHEN i.id NOT LIKE 'jira:%' AND i.status <> 'DONE' THEN CASE WHEN i_opr.issue_id IS NOT NULL THEN 'IN_PROGRESS' WHEN COALESCE(i.assignee_id, '') <> '' THEN 'IN_PROGRESS' ELSE 'TODO' END ELSE i.status END AS bucket\n  FROM issues i\n  LEFT JOIN open_pr_issues i_opr ON i_opr.issue_id = i.id\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND (i.resolution_date IS NULL\n      OR (i.resolution_date >= $__timeFrom() AND i.resolution_date < $__timeTo()\n        AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')))\n),\nepics AS (\n  SELECT e.issue_key, MIN(e.title) AS title\n  FROM issues e\n  WHERE e.type = 'EPIC' AND e.issue_key <> '' AND e.id IN (SELECT issue_id FROM scoped_issues)\n  GROUP BY e.issue_key\n),\ngrouped AS (\n  SELECT t.id, COALESCE(il.label_name, 'Unlabelled') AS grp, NULL AS due\n  FROM tickets t LEFT JOIN issue_labels il ON il.issue_id = t.id\n  WHERE '$grouping' = 'Label'\n  UNION\n  SELECT bi.issue_id, b.name, NULL\n  FROM scoped_boards sb\n  JOIN board_issues bi ON bi.board_id = sb.board_id\n  JOIN boards b ON b.id = bi.board_id\n  WHERE '$grouping' = 'Board'\n  UNION\n  SELECT t.id, COALESCE(NULLIF(TRIM(SUBSTRING_INDEX(t.fix_versions, ',', 1)), ''), 'No milestone'), IF(NULLIF(TRIM(SUBSTRING_INDEX(t.fix_versions, ',', 1)), '') IS NULL, NULL, t.due_date)\n  FROM tickets t\n  WHERE '$grouping' = 'Milestone' AND t.is_jira\n  UNION\n  SELECT t.id, COALESCE(s.name, 'No milestone'), NULL\n  FROM tickets t\n  LEFT JOIN sprint_issues si ON si.issue_id = t.id\n  LEFT JOIN sprints s ON s.id = si.sprint_id\n  WHERE '$grouping' = 'Milestone' AND NOT t.is_jira\n  UNION\n  SELECT t.id, COALESCE(e.title, 'No epic'), IF(e.title IS NULL, NULL, t.due_date)\n  FROM tickets t\n  LEFT JOIN epics e ON e.issue_key = t.epic_key\n  WHERE '$grouping' = 'Epic'\n)\nSELECT CONCAT(g.grp, ' · ', COUNT(*), ' issues',\n    IF(MAX(g.due) IS NOT NULL, CONCAT(' · due ', DATE_FORMAT(MAX(g.due), '%e %b')), ''),\n    ' · ', ROUND(100 * SUM(t.bucket = 'DONE') / COUNT(*)), '% · ',\n    CASE WHEN SUM(t.is_jira) = COUNT(*) THEN 'Jira status' WHEN SUM(t.is_jira) = 0 THEN 'linked PRs or assignee' ELSE 'mixed' END) AS label,\n  SUM(t.bucket = 'DONE') AS Done,\n  SUM(t.bucket = 'IN_PROGRESS') AS \"In progress\",\n  SUM(t.bucket NOT IN ('DONE', 'IN_PROGRESS')) AS \"To do\"\nFROM grouped g\nJOIN tickets t ON t.id = g.id\nGROUP BY g.grp\nORDER BY COUNT(*) DESC, g.grp\nLIMIT 15"
+                        "rawSql": "WITH\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nopen_pr_issues AS (\n  SELECT DISTINCT pri.issue_id\n  FROM pull_request_issues pri\n  JOIN pull_requests p2 ON p2.id = pri.pull_request_id AND p2.status = 'OPEN'\n)\n, tickets AS (\n  SELECT i.id, i.due_date, i.fix_versions, i.epic_key, i.id LIKE 'jira:%' AS is_jira, CASE WHEN i.original_status = 'Closed' THEN 'DONE' WHEN i.original_status IN ('To Do', 'To do', 'Todo') THEN 'TODO' WHEN i.original_status = 'Ready for Development' THEN 'TODO' WHEN i.id NOT LIKE 'jira:%' AND i.status <> 'DONE' THEN CASE WHEN i_opr.issue_id IS NOT NULL THEN 'IN_PROGRESS' WHEN COALESCE(i.assignee_id, '') <> '' THEN 'IN_PROGRESS' ELSE 'TODO' END ELSE i.status END AS bucket\n  FROM issues i\n  LEFT JOIN open_pr_issues i_opr ON i_opr.issue_id = i.id\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND (i.resolution_date IS NULL\n      OR (i.resolution_date >= $__timeFrom() AND i.resolution_date < $__timeTo()\n        AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')))\n),\nepics AS (\n  SELECT e.issue_key, MIN(e.title) AS title\n  FROM issues e\n  WHERE e.type = 'EPIC' AND e.issue_key <> '' AND e.id IN (SELECT issue_id FROM scoped_issues)\n  GROUP BY e.issue_key\n),\ngrouped AS (\n  SELECT t.id, COALESCE(il.label_name, 'Unlabelled') AS grp, NULL AS due\n  FROM tickets t LEFT JOIN issue_labels il ON il.issue_id = t.id\n  WHERE '$grouping' = 'Label'\n  UNION\n  SELECT bi.issue_id, b.name, NULL\n  FROM scoped_boards sb\n  JOIN board_issues bi ON bi.board_id = sb.board_id\n  JOIN boards b ON b.id = bi.board_id\n  WHERE '$grouping' = 'Board'\n  UNION\n  SELECT t.id, COALESCE(NULLIF(TRIM(SUBSTRING_INDEX(t.fix_versions, ',', 1)), ''), 'No milestone'), IF(NULLIF(TRIM(SUBSTRING_INDEX(t.fix_versions, ',', 1)), '') IS NULL, NULL, t.due_date)\n  FROM tickets t\n  WHERE '$grouping' = 'Milestone' AND t.is_jira\n  UNION\n  SELECT t.id, COALESCE(s.name, 'No milestone'), NULL\n  FROM tickets t\n  LEFT JOIN sprint_issues si ON si.issue_id = t.id\n  LEFT JOIN sprints s ON s.id = si.sprint_id\n  WHERE '$grouping' = 'Milestone' AND NOT t.is_jira\n  UNION\n  SELECT t.id, COALESCE(e.title, 'No epic'), IF(e.title IS NULL, NULL, t.due_date)\n  FROM tickets t\n  LEFT JOIN epics e ON e.issue_key = t.epic_key\n  WHERE '$grouping' = 'Epic'\n)\nSELECT CONCAT(IF(CHAR_LENGTH(g.grp) > 34, CONCAT(RTRIM(LEFT(g.grp, 33)), '…'), g.grp),\n    ' · ', ROUND(100 * SUM(t.bucket = 'DONE') / COUNT(*)), '%') AS label,\n  SUM(t.bucket = 'DONE') AS Done,\n  SUM(t.bucket = 'IN_PROGRESS') AS \"In progress\",\n  SUM(t.bucket NOT IN ('DONE', 'IN_PROGRESS')) AS \"To do\",\n  g.grp AS Name,\n  DATE_FORMAT(MAX(g.due), '%e %b %Y') AS Due\nFROM grouped g\nJOIN tickets t ON t.id = g.id\nGROUP BY g.grp\nORDER BY COUNT(*) DESC, g.grp\nLIMIT 15"
                       }
                     },
                     "refId": "A",
@@ -2490,7 +2516,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH RECURSIVE\nperiods AS (\n  SELECT CAST(IF((TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31), DATE($__timeFrom()), DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY)) AS DATETIME) AS period_start\n  UNION ALL\n  SELECT period_start + INTERVAL IF((TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31), 1, 7) DAY FROM periods WHERE period_start + INTERVAL IF((TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31), 1, 7) DAY < $__timeTo()\n),\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nclosed AS (\n  SELECT i.id, i.resolution_date\n  FROM issues i\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND i.resolution_date >= LEAST(NOW() - INTERVAL 70 DAY, ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND), $__timeFrom() - INTERVAL 63 DAY) AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n),\n-- positions 1..60 inside a comma-separated sprint list (prod lists hold at most 16)\nlist_positions AS (\n  SELECT a.d + 10 * b.d + 1 AS n\n  FROM (SELECT 0 AS d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) a\n  CROSS JOIN (SELECT 0 AS d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5) b\n),\nsprint_changes AS (\n  SELECT DISTINCT ic.issue_id, ic.created_date, ic.original_to_value, COALESCE(ic.original_from_value, '') AS from_value\n  FROM issue_changelogs ic\n  JOIN (SELECT DISTINCT id FROM closed) cl ON cl.id = ic.issue_id\n  WHERE ic.field_name = 'Sprint'\n),\n-- one row per sprint the change added the issue to\nsprint_adds AS (\n  SELECT DISTINCT sc.issue_id, sc.created_date, SUBSTRING_INDEX(SUBSTRING_INDEX(sc.original_to_value, ',', lp.n), ',', -1) AS sprint_id\n  FROM sprint_changes sc\n  JOIN list_positions lp ON lp.n <= LENGTH(sc.original_to_value) - LENGTH(REPLACE(sc.original_to_value, ',', '')) + 1\n  WHERE sc.original_to_value <> ''\n    AND NOT FIND_IN_SET(SUBSTRING_INDEX(SUBSTRING_INDEX(sc.original_to_value, ',', lp.n), ',', -1), sc.from_value)\n),\n-- changes made within an hour of a from-sprint closing are carry-overs, not new work\ncarry_overs AS (\n  SELECT DISTINCT sc.issue_id, sc.created_date\n  FROM sprint_changes sc\n  JOIN list_positions lp ON lp.n <= LENGTH(sc.from_value) - LENGTH(REPLACE(sc.from_value, ',', '')) + 1\n  JOIN sprints p ON p.id = SUBSTRING_INDEX(SUBSTRING_INDEX(sc.from_value, ',', lp.n), ',', -1)\n  WHERE sc.from_value <> '' AND p.completed_date BETWEEN sc.created_date - INTERVAL 1 HOUR AND sc.created_date + INTERVAL 1 HOUR\n),\nunplanned AS (\n  SELECT sa.issue_id AS id\n  FROM sprint_adds sa\n  JOIN sprints s ON s.id = sa.sprint_id\n  LEFT JOIN carry_overs co ON co.issue_id = sa.issue_id AND co.created_date = sa.created_date\n  WHERE sa.created_date > s.started_date AND (s.completed_date IS NULL OR sa.created_date < s.completed_date)\n    AND co.issue_id IS NULL\n  UNION\n  -- Jira tickets created straight into a sprint that was already running\n  SELECT si.issue_id\n  FROM sprint_issues si\n  JOIN (SELECT DISTINCT id FROM closed WHERE id LIKE 'jira:%') cl ON cl.id = si.issue_id\n  JOIN issues i ON i.id = si.issue_id\n  JOIN sprints s ON s.id = si.sprint_id\n  WHERE i.created_date > s.started_date AND (s.completed_date IS NULL OR i.created_date < s.completed_date)\n    AND NOT COALESCE(i.is_subtask, 0)\n  UNION\n  SELECT il.issue_id\n  FROM issue_labels il\n  WHERE il.label_name = 'Mid-Sprint-Task' AND il.issue_id IN (SELECT id FROM closed)\n),\nunplanned_ids AS (\n  SELECT DISTINCT id FROM unplanned\n)\n, typed AS (\n  SELECT IF((TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31), DATE(c.resolution_date), DATE_SUB(DATE(c.resolution_date), INTERVAL WEEKDAY(c.resolution_date) DAY)) AS period_start,\n    CASE WHEN u.id IS NOT NULL THEN 'Unplanned' WHEN (i.type = 'BUG' OR EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = i.id AND il.label_name IN ('bug','Production-Bug'))) THEN 'Bug' ELSE 'Feature' END AS segment\n  FROM closed c\n  JOIN issues i ON i.id = c.id\n  LEFT JOIN unplanned_ids u ON u.id = c.id\n  WHERE c.resolution_date >= $__timeFrom() AND c.resolution_date < $__timeTo()\n)\nSELECT DATE_FORMAT(GREATEST(w.period_start, $__timeFrom()), '%e %b') AS Period,\n  COUNT(CASE WHEN t.segment = 'Feature' THEN 1 END) AS Feature,\n  COUNT(CASE WHEN t.segment = 'Bug' THEN 1 END) AS Bug,\n  COUNT(CASE WHEN t.segment = 'Unplanned' THEN 1 END) AS Unplanned\nFROM periods w\nLEFT JOIN typed t ON t.period_start = w.period_start\nGROUP BY w.period_start\nORDER BY w.period_start"
+                        "rawSql": "WITH RECURSIVE\nperiods AS (\n  SELECT CAST(IF((TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31), DATE($__timeFrom()), DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY)) AS DATETIME) AS period_start\n  UNION ALL\n  SELECT period_start + INTERVAL IF((TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31), 1, 7) DAY FROM periods WHERE period_start + INTERVAL IF((TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31), 1, 7) DAY < $__timeTo()\n),\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nclosed AS (\n  SELECT i.id, i.resolution_date\n  FROM issues i\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND i.resolution_date >= LEAST(NOW() - INTERVAL 70 DAY, ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND), $__timeFrom() - INTERVAL 63 DAY) AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n),\n-- positions 1..60 inside a comma-separated sprint list (prod lists hold at most 16)\nlist_positions AS (\n  SELECT a.d + 10 * b.d + 1 AS n\n  FROM (SELECT 0 AS d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) a\n  CROSS JOIN (SELECT 0 AS d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5) b\n),\nsprint_changes AS (\n  SELECT DISTINCT ic.issue_id, ic.created_date, ic.original_to_value, COALESCE(ic.original_from_value, '') AS from_value\n  FROM issue_changelogs ic\n  JOIN (SELECT DISTINCT id FROM closed) cl ON cl.id = ic.issue_id\n  WHERE ic.field_name = 'Sprint'\n),\n-- one row per sprint the change added the issue to\nsprint_adds AS (\n  SELECT DISTINCT sc.issue_id, sc.created_date, SUBSTRING_INDEX(SUBSTRING_INDEX(sc.original_to_value, ',', lp.n), ',', -1) AS sprint_id\n  FROM sprint_changes sc\n  JOIN list_positions lp ON lp.n <= LENGTH(sc.original_to_value) - LENGTH(REPLACE(sc.original_to_value, ',', '')) + 1\n  WHERE sc.original_to_value <> ''\n    AND NOT FIND_IN_SET(SUBSTRING_INDEX(SUBSTRING_INDEX(sc.original_to_value, ',', lp.n), ',', -1), sc.from_value)\n),\n-- changes made within an hour of a from-sprint closing are carry-overs, not new work\ncarry_overs AS (\n  SELECT DISTINCT sc.issue_id, sc.created_date\n  FROM sprint_changes sc\n  JOIN list_positions lp ON lp.n <= LENGTH(sc.from_value) - LENGTH(REPLACE(sc.from_value, ',', '')) + 1\n  JOIN sprints p ON p.id = SUBSTRING_INDEX(SUBSTRING_INDEX(sc.from_value, ',', lp.n), ',', -1)\n  WHERE sc.from_value <> '' AND p.completed_date BETWEEN sc.created_date - INTERVAL 1 HOUR AND sc.created_date + INTERVAL 1 HOUR\n),\nunplanned AS (\n  SELECT sa.issue_id AS id\n  FROM sprint_adds sa\n  JOIN sprints s ON s.id = sa.sprint_id\n  LEFT JOIN carry_overs co ON co.issue_id = sa.issue_id AND co.created_date = sa.created_date\n  WHERE sa.created_date > s.started_date AND (s.completed_date IS NULL OR sa.created_date < s.completed_date)\n    AND co.issue_id IS NULL\n  UNION\n  -- Jira tickets created straight into a sprint that was already running\n  SELECT si.issue_id\n  FROM sprint_issues si\n  JOIN (SELECT DISTINCT id FROM closed WHERE id LIKE 'jira:%') cl ON cl.id = si.issue_id\n  JOIN issues i ON i.id = si.issue_id\n  JOIN sprints s ON s.id = si.sprint_id\n  WHERE i.created_date > s.started_date AND (s.completed_date IS NULL OR i.created_date < s.completed_date)\n    AND NOT COALESCE(i.is_subtask, 0)\n  UNION\n  SELECT il.issue_id\n  FROM issue_labels il\n  WHERE il.label_name = 'Mid-Sprint-Task' AND il.issue_id IN (SELECT id FROM closed)\n),\nunplanned_ids AS (\n  SELECT DISTINCT id FROM unplanned\n)\n, typed AS (\n  SELECT IF((TIMESTAMPDIFF(DAY, $__timeFrom(), $__timeTo()) <= 31), DATE(c.resolution_date), DATE_SUB(DATE(c.resolution_date), INTERVAL WEEKDAY(c.resolution_date) DAY)) AS period_start,\n    CASE WHEN u.id IS NOT NULL THEN 'Unplanned' WHEN (i.type = 'BUG' OR EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = i.id AND il.label_name IN ('bug','Production-Bug'))) THEN 'Bug' ELSE 'Feature' END AS segment\n  FROM closed c\n  JOIN issues i ON i.id = c.id\n  LEFT JOIN unplanned_ids u ON u.id = c.id\n  WHERE c.resolution_date >= $__timeFrom() AND c.resolution_date < $__timeTo()\n)\nSELECT DATE_FORMAT(GREATEST(w.period_start, $__timeFrom()), '%m/%d') AS Period,\n  COUNT(CASE WHEN t.segment = 'Feature' THEN 1 END) AS Feature,\n  COUNT(CASE WHEN t.segment = 'Bug' THEN 1 END) AS Bug,\n  COUNT(CASE WHEN t.segment = 'Unplanned' THEN 1 END) AS Unplanned\nFROM periods w\nLEFT JOIN typed t ON t.period_start = w.period_start\nGROUP BY w.period_start\nORDER BY w.period_start"
                       }
                     },
                     "refId": "A",
@@ -2527,8 +2553,8 @@
                   "sort": "none"
                 },
                 "xField": "Period",
-                "xTickLabelRotation": 0,
-                "xTickLabelSpacing": 0
+                "xTickLabelRotation": 45,
+                "xTickLabelSpacing": 30
               },
               "fieldConfig": {
                 "defaults": {
@@ -2798,91 +2824,6 @@
           }
         }
       },
-      "panel-4": {
-        "kind": "Panel",
-        "spec": {
-          "id": 4,
-          "title": "Tickets closed",
-          "description": "Tickets closed in the selected range (last 7 days by default), vs the previous period of the same length; epics and cancelled or invalid tickets are not counted.",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "mysql",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "devlake-mysql"
-                      },
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "WITH\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nclosed AS (\n  SELECT i.id, i.resolution_date\n  FROM issues i\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND i.resolution_date >= LEAST(NOW() - INTERVAL 70 DAY, ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND), $__timeFrom() - INTERVAL 63 DAY) AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n)\nSELECT $__timeFrom() AS time, COUNT(DISTINCT id) AS value FROM closed WHERE resolution_date >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND resolution_date < $__timeFrom()\nUNION ALL\nSELECT $__timeTo() AS time, COUNT(DISTINCT id) AS value FROM closed WHERE resolution_date >= $__timeFrom() AND resolution_date < $__timeTo()\nORDER BY time"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "13.2.2",
-            "spec": {
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "showPercentChange": true,
-                "text": {},
-                "textMode": "value",
-                "wideLayout": true
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "none",
-                  "decimals": 0,
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": 0,
-                        "color": "text"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "text"
-                  },
-                  "noValue": "–"
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
       "panel-44": {
         "kind": "Panel",
         "spec": {
@@ -2973,7 +2914,7 @@
         "spec": {
           "id": 45,
           "title": "Change failure rate",
-          "description": "Share of production deployments in the selected range followed, before the next production deployment, by a merged revert or hotfix PR in the same repository; the label compares with the previous period of the same length.",
+          "description": "A proxy until production incidents are recorded: change failure rate = prod deploy failure rate + rollbacks. Share of finished production deploy runs in the selected range that failed or were a rollback (see Rollbacks on the Flow tab); cancelled runs are not counted. The label compares with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2993,7 +2934,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT value FROM (\nWITH\nproject_cicd AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, deploys AS (\n  SELECT dc.cicd_deployment_id AS id, dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM project_cicd)\n    AND dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%'\n    AND dc.finished_date >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_deployment_id, dc.cicd_scope_id, LOWER(dc.environment)\n),\nspans AS (\n  SELECT id, scope_id, repo_id, ts, LEAD(ts) OVER (PARTITION BY scope_id, env ORDER BY ts) AS next_ts FROM deploys\n),\nfixes AS (\n  SELECT pr.base_repo_id AS repo_id, pr.merged_date\n  FROM pull_requests pr\n  WHERE pr.merged_date >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND)\n    AND (pr.title LIKE 'Revert%' OR pr.head_ref LIKE 'hotfix/%' OR pr.head_ref LIKE 'revert-%')\n),\nfailed AS (\n  SELECT DISTINCT s.id\n  FROM spans s\n  JOIN fixes f ON f.repo_id = s.repo_id AND f.merged_date > s.ts AND f.merged_date <= COALESCE(s.next_ts, NOW())\n),\nrates AS (\n  SELECT\n    100 * COUNT(DISTINCT CASE WHEN ts >= $__timeFrom() AND id IN (SELECT id FROM failed) THEN id END)\n      / NULLIF(COUNT(DISTINCT CASE WHEN ts >= $__timeFrom() THEN id END), 0) AS cur,\n    100 * COUNT(DISTINCT CASE WHEN ts < $__timeFrom() AND id IN (SELECT id FROM failed) THEN id END)\n      / NULLIF(COUNT(DISTINCT CASE WHEN ts < $__timeFrom() THEN id END), 0) AS prev\n  FROM deploys\n  WHERE ts < $__timeTo()\n)\nSELECT ROUND(cur, 1) AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 1), ' pts vs previous period') END AS label FROM rates\n) AS labelled"
+                        "rawSql": "SELECT value FROM (\nWITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_runs AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.started_date) AS st, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MAX(dc.result = 'FAILURE') AS failed,\n    CASE WHEN MIN(dc.ref_name) REGEXP '[0-9]+[.][0-9]+' THEN '#release' ELSE COALESCE(MIN(dc.ref_name), '') END AS lane\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n),\nshipped AS (\n  SELECT id, scope_id, env, lane, st, sha, MIN(st) OVER (PARTITION BY scope_id, env, lane, sha) AS first_st\n  FROM prod_runs\n  WHERE failed = 0\n),\nlane_seq AS (\n  SELECT id, sha, first_st, LAG(sha) OVER w AS prev_sha, LAG(first_st) OVER w AS prev_first_st\n  FROM shipped\n  WINDOW w AS (PARTITION BY scope_id, env, lane ORDER BY st, id)\n),\nrollbacks AS (\n  SELECT id FROM lane_seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_st < prev_first_st\n),\nrates AS (\n  SELECT\n    100 * SUM(ts >= $__timeFrom() AND (failed = 1 OR id IN (SELECT id FROM rollbacks))) / NULLIF(SUM(ts >= $__timeFrom()), 0) AS cur,\n    100 * SUM(ts < $__timeFrom() AND (failed = 1 OR id IN (SELECT id FROM rollbacks))) / NULLIF(SUM(ts < $__timeFrom()), 0) AS prev\n  FROM prod_runs\n  WHERE ts >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND ts < $__timeTo()\n)\nSELECT ROUND(cur, 1) AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 1), ' pts vs previous period') END AS label FROM rates\n) AS labelled"
                       }
                     },
                     "refId": "A",
@@ -3014,7 +2955,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nproject_cicd AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, deploys AS (\n  SELECT dc.cicd_deployment_id AS id, dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM project_cicd)\n    AND dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%'\n    AND dc.finished_date >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_deployment_id, dc.cicd_scope_id, LOWER(dc.environment)\n),\nspans AS (\n  SELECT id, scope_id, repo_id, ts, LEAD(ts) OVER (PARTITION BY scope_id, env ORDER BY ts) AS next_ts FROM deploys\n),\nfixes AS (\n  SELECT pr.base_repo_id AS repo_id, pr.merged_date\n  FROM pull_requests pr\n  WHERE pr.merged_date >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND)\n    AND (pr.title LIKE 'Revert%' OR pr.head_ref LIKE 'hotfix/%' OR pr.head_ref LIKE 'revert-%')\n),\nfailed AS (\n  SELECT DISTINCT s.id\n  FROM spans s\n  JOIN fixes f ON f.repo_id = s.repo_id AND f.merged_date > s.ts AND f.merged_date <= COALESCE(s.next_ts, NOW())\n),\nrates AS (\n  SELECT\n    100 * COUNT(DISTINCT CASE WHEN ts >= $__timeFrom() AND id IN (SELECT id FROM failed) THEN id END)\n      / NULLIF(COUNT(DISTINCT CASE WHEN ts >= $__timeFrom() THEN id END), 0) AS cur,\n    100 * COUNT(DISTINCT CASE WHEN ts < $__timeFrom() AND id IN (SELECT id FROM failed) THEN id END)\n      / NULLIF(COUNT(DISTINCT CASE WHEN ts < $__timeFrom() THEN id END), 0) AS prev\n  FROM deploys\n  WHERE ts < $__timeTo()\n)\nSELECT ROUND(cur, 1) AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 1), ' pts vs previous period') END AS label FROM rates"
+                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_runs AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.started_date) AS st, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MAX(dc.result = 'FAILURE') AS failed,\n    CASE WHEN MIN(dc.ref_name) REGEXP '[0-9]+[.][0-9]+' THEN '#release' ELSE COALESCE(MIN(dc.ref_name), '') END AS lane\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n),\nshipped AS (\n  SELECT id, scope_id, env, lane, st, sha, MIN(st) OVER (PARTITION BY scope_id, env, lane, sha) AS first_st\n  FROM prod_runs\n  WHERE failed = 0\n),\nlane_seq AS (\n  SELECT id, sha, first_st, LAG(sha) OVER w AS prev_sha, LAG(first_st) OVER w AS prev_first_st\n  FROM shipped\n  WINDOW w AS (PARTITION BY scope_id, env, lane ORDER BY st, id)\n),\nrollbacks AS (\n  SELECT id FROM lane_seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_st < prev_first_st\n),\nrates AS (\n  SELECT\n    100 * SUM(ts >= $__timeFrom() AND (failed = 1 OR id IN (SELECT id FROM rollbacks))) / NULLIF(SUM(ts >= $__timeFrom()), 0) AS cur,\n    100 * SUM(ts < $__timeFrom() AND (failed = 1 OR id IN (SELECT id FROM rollbacks))) / NULLIF(SUM(ts < $__timeFrom()), 0) AS prev\n  FROM prod_runs\n  WHERE ts >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND ts < $__timeTo()\n)\nSELECT ROUND(cur, 1) AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 1), ' pts vs previous period') END AS label FROM rates"
                       }
                     },
                     "refId": "B",
@@ -3527,8 +3468,8 @@
                     },
                     "properties": [
                       {
-                        "id": "custom.minWidth",
-                        "value": 320
+                        "id": "custom.width",
+                        "value": 296
                       }
                     ]
                   },
@@ -3597,6 +3538,18 @@
                         "value": {
                           "type": "color-text"
                         }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Repo"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 196
                       }
                     ]
                   }
@@ -4027,7 +3980,7 @@
         "spec": {
           "id": 53,
           "title": "By team",
-          "description": "One row per selected project, treated as a team. Counts cover the selected range (last 7 days by default); cycle time (tickets closed) and change failure (same repository) too; Open bugs counts every open bug however old. Team size is not a headcount: it counts distinct people with a merged PR, a review or a closed ticket in the selected range (last 7 days by default), and someone who works across two teams is counted in both. Bots are left out. People are matched by name, so one person with different names in different tools is counted more than once. In the queue and Oldest come from Needs attention; Claude use is the share of merged-PR authors with Claude Code activity. Same denominator as Engineers Adopted %. GitLab authors and bots are counted but can never match Claude Code, so adoption reads low where they're common.",
+          "description": "One row per selected project, treated as a team. Counts cover the selected range (last 7 days by default); cycle time (tickets closed) and change failure (failed or rolled-back production deploys, as on the Quality tab) too; Open bugs counts every open bug however old. Team size is not a headcount: it counts the people the Team Contribution tab lists for the team in the selected range (anyone who opened a PR, reviewed or commented, committed, closed or filed a ticket, or moved a Jira status), and someone who works across two teams is counted in both. Bots are left out. People are matched by name, so one person with different names in different tools is counted more than once. In the queue and Oldest come from Needs attention; AI Adoption (%) is the share of merged-PR authors with Claude Code activity. Same denominator as Engineers Adopted %. GitLab authors and bots are counted but can never match Claude Code, so adoption reads low where they're common.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -4047,7 +4000,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nproject_repos AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_boards AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nclosed AS (\n  SELECT i.id, i.resolution_date\n  FROM issues i\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND i.resolution_date >= LEAST(NOW() - INTERVAL 70 DAY, ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND), $__timeFrom() - INTERVAL 63 DAY) AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n),\nteams AS (\n  SELECT p.name AS project_name\n  FROM projects p\n  WHERE p.name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged_prs AS (\n  SELECT pr.id, pp.project_name, pr.author_id, pr.author_name\n  FROM pull_requests pr\n  JOIN project_repos pp ON pp.repo_id = pr.base_repo_id\n  WHERE pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n),\nteam_issues AS (\n  SELECT DISTINCT pb.project_name, bi.issue_id\n  FROM project_boards pb\n  JOIN board_issues bi ON bi.board_id = pb.board_id\n),\nclosed_team AS (\n  SELECT ti.project_name, c.id, c.resolution_date\n  FROM closed c\n  JOIN team_issues ti ON ti.issue_id = c.id\n)\n, people AS (\n  SELECT mp.project_name, COALESCE(NULLIF(a.full_name, ''), NULLIF(a.user_name, ''), mp.author_name) AS person, COALESCE(a.user_name, mp.author_name) AS login\n  FROM merged_prs mp\n  LEFT JOIN accounts a ON a.id = mp.author_id\n  UNION\n  SELECT pp.project_name, COALESCE(NULLIF(a.full_name, ''), NULLIF(a.user_name, ''), cm.account_id), a.user_name\n  FROM pull_request_comments cm\n  JOIN pull_requests pr ON pr.id = cm.pull_request_id\n  JOIN project_repos pp ON pp.repo_id = pr.base_repo_id\n  LEFT JOIN accounts a ON a.id = cm.account_id\n  WHERE cm.type = 'REVIEW' AND cm.created_date >= $__timeFrom() AND cm.created_date < $__timeTo()\n  UNION\n  SELECT ct.project_name, i.assignee_name, NULL\n  FROM closed_team ct\n  JOIN issues i ON i.id = ct.id\n  WHERE ct.resolution_date >= $__timeFrom() AND ct.resolution_date < $__timeTo() AND i.assignee_name <> ''\n),\nteam_size AS (\n  SELECT project_name, COUNT(DISTINCT person) AS people\n  FROM people\n  WHERE person IS NOT NULL AND person <> '' AND NOT (person LIKE '%[bot]' OR person LIKE '%-bot' OR person LIKE '% bot' OR person LIKE 'project\\_%\\_bot\\_%') AND NOT (COALESCE(login, '') LIKE '%[bot]' OR COALESCE(login, '') LIKE '%-bot' OR COALESCE(login, '') LIKE '% bot' OR COALESCE(login, '') LIKE 'project\\_%\\_bot\\_%')\n  GROUP BY project_name\n),\npr_counts AS (\n  SELECT project_name, COUNT(DISTINCT id) AS prs FROM merged_prs GROUP BY project_name\n),\nticket_counts AS (\n  SELECT project_name, COUNT(DISTINCT id) AS tickets FROM closed_team WHERE resolution_date >= $__timeFrom() AND resolution_date < $__timeTo() GROUP BY project_name\n)\nSELECT t.project_name AS Team,\n  COALESCE(ts.people, 0) AS \"Team size\",\n  COALESCE(pc.prs, 0) AS PRs,\n  COALESCE(tc.tickets, 0) AS Tickets\nFROM teams t\nLEFT JOIN team_size ts ON ts.project_name = t.project_name\nLEFT JOIN pr_counts pc ON pc.project_name = t.project_name\nLEFT JOIN ticket_counts tc ON tc.project_name = t.project_name\nORDER BY t.project_name"
+                        "rawSql": "WITH\nproject_repos AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_boards AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nclosed AS (\n  SELECT i.id, i.resolution_date\n  FROM issues i\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND i.resolution_date >= LEAST(NOW() - INTERVAL 70 DAY, ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND), $__timeFrom() - INTERVAL 63 DAY) AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n),\nteams AS (\n  SELECT p.name AS project_name\n  FROM projects p\n  WHERE p.name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged_prs AS (\n  SELECT pr.id, pp.project_name, pr.author_id, pr.author_name\n  FROM pull_requests pr\n  JOIN project_repos pp ON pp.repo_id = pr.base_repo_id\n  WHERE pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n),\nteam_issues AS (\n  SELECT DISTINCT pb.project_name, bi.issue_id\n  FROM project_boards pb\n  JOIN board_issues bi ON bi.board_id = pb.board_id\n),\nclosed_team AS (\n  SELECT ti.project_name, c.id, c.resolution_date\n  FROM closed c\n  JOIN team_issues ti ON ti.issue_id = c.id\n)\n, win_prs AS (\n  SELECT pr.id, pr.author_id, pr.author_name, pr.base_repo_id, pr.created_date\n  FROM pull_requests pr\n  WHERE pr.created_date >= $__timeFrom() AND pr.created_date < $__timeTo()\n),\nwin_comments AS (\n  SELECT cm.id, cm.type, cm.account_id, cm.pull_request_id, cm.created_date\n  FROM pull_request_comments cm\n  WHERE cm.created_date >= $__timeFrom() AND cm.created_date < $__timeTo() AND cm.type IN ('REVIEW', 'DIFF', 'NORMAL')\n),\nwin_commits AS (\n  SELECT c.sha, c.author_name, c.authored_date\n  FROM commits c\n  WHERE c.authored_date >= $__timeFrom() AND c.authored_date < $__timeTo()\n),\nwin_changelogs AS (\n  SELECT ic.id, ic.issue_id, ic.author_name, ic.created_date, ic.original_from_value, ic.original_to_value, ic.field_name\n  FROM issue_changelogs ic\n  WHERE ic.field_name = 'status' AND ic.created_date >= $__timeFrom() AND ic.created_date < $__timeTo() AND ic.author_name <> ''\n),\nevents AS (\n  SELECT COALESCE(NULLIF(a.full_name, ''), NULLIF(a.user_name, ''), pr.author_name) AS person, pp.project_name, 'pr' AS kind, pr.id AS ref, DATE(pr.created_date) AS day, a.user_name AS login\n  FROM win_prs pr\n  JOIN project_repos pp ON pp.repo_id = pr.base_repo_id\n  LEFT JOIN accounts a ON a.id = pr.author_id\n  UNION ALL\n  SELECT COALESCE(NULLIF(ca.full_name, ''), NULLIF(ca.user_name, ''), 'Unmapped account'), pp.project_name,\n    CASE WHEN cm.type <> 'REVIEW' THEN 'comment' WHEN cm.account_id <> pr.author_id THEN 'review' ELSE 'own_review' END,\n    CASE WHEN cm.type = 'REVIEW' AND cm.account_id <> pr.author_id THEN cm.pull_request_id ELSE cm.id END, DATE(cm.created_date), ca.user_name\n  FROM win_comments cm\n  JOIN pull_requests pr ON pr.id = cm.pull_request_id\n  JOIN project_repos pp ON pp.repo_id = pr.base_repo_id\n  -- converted to accounts.id's collation so the primary key is used\n  LEFT JOIN accounts ca ON ca.id = CONVERT(cm.account_id USING utf8mb4) COLLATE utf8mb4_unicode_ci\n  UNION ALL\n  SELECT STRAIGHT_JOIN c.author_name, pp.project_name, 'commit', c.sha, DATE(c.authored_date), NULL\n  FROM win_commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  JOIN project_repos pp ON pp.repo_id = rc.repo_id\n  UNION ALL\n  SELECT STRAIGHT_JOIN i.assignee_name, pb.project_name, 'ticket', i.id, NULL, NULL\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_boards pb ON pb.board_id = bi.board_id\n  WHERE i.resolution_date >= $__timeFrom() AND i.resolution_date < $__timeTo()\n    AND COALESCE(i.type, '') <> 'EPIC' AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid') AND i.assignee_name <> ''\n  UNION ALL\n  SELECT STRAIGHT_JOIN i.creator_name, pb.project_name, 'bug', i.id, NULL, NULL\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_boards pb ON pb.board_id = bi.board_id\n  WHERE i.created_date >= $__timeFrom() AND i.created_date < $__timeTo() AND (i.type = 'BUG' OR EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = i.id AND il.label_name IN ('bug','Production-Bug'))) AND i.creator_name <> ''\n  UNION ALL\n  SELECT STRAIGHT_JOIN ic.author_name, pb.project_name, CASE WHEN (ic.field_name = 'status' AND ((ic.original_from_value IN ('In QA','QA','QA Review','Internal QA','Testing','Davd''s QA Staging','In Staging','Ready for QA') AND ic.original_to_value IN ('Verified on Staging','ACCEPTANCE','Ready for Deployment','READY FOR RELEASE TO PRODUCTIO','READY FOR RELEASE TO PRODUCTION','Ready to Release','Done','Done - In Prod')) OR ic.original_to_value = 'Verified on Staging')) THEN 'verified' ELSE 'status' END, ic.id, DATE(ic.created_date), NULL\n  FROM win_changelogs ic\n  JOIN board_issues bi ON bi.issue_id = ic.issue_id\n  JOIN project_boards pb ON pb.board_id = bi.board_id\n),\nteam_size AS (\n  SELECT project_name, COUNT(DISTINCT person) AS people\n  FROM events\n  WHERE person IS NOT NULL AND person <> '' AND NOT (person LIKE '%[bot]' OR person LIKE '%-bot' OR person LIKE '% bot' OR person LIKE 'project\\_%\\_bot\\_%') AND NOT (COALESCE(login, '') LIKE '%[bot]' OR COALESCE(login, '') LIKE '%-bot' OR COALESCE(login, '') LIKE '% bot' OR COALESCE(login, '') LIKE 'project\\_%\\_bot\\_%')\n  GROUP BY project_name\n),\npr_counts AS (\n  SELECT project_name, COUNT(DISTINCT id) AS prs FROM merged_prs GROUP BY project_name\n),\nticket_counts AS (\n  SELECT project_name, COUNT(DISTINCT id) AS tickets FROM closed_team WHERE resolution_date >= $__timeFrom() AND resolution_date < $__timeTo() GROUP BY project_name\n)\nSELECT t.project_name AS Team,\n  COALESCE(ts.people, 0) AS \"Team size\",\n  COALESCE(pc.prs, 0) AS PRs,\n  COALESCE(tc.tickets, 0) AS Tickets\nFROM teams t\nLEFT JOIN team_size ts ON ts.project_name = t.project_name\nLEFT JOIN pr_counts pc ON pc.project_name = t.project_name\nLEFT JOIN ticket_counts tc ON tc.project_name = t.project_name\nORDER BY t.project_name"
                       }
                     },
                     "refId": "A",
@@ -4089,7 +4042,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nproject_boards AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_cicd AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n),\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nclosed AS (\n  SELECT i.id, i.resolution_date\n  FROM issues i\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND i.resolution_date >= LEAST(NOW() - INTERVAL 70 DAY, ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND), $__timeFrom() - INTERVAL 63 DAY) AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n),\nstarted AS (\n  SELECT h.issue_id AS id, MIN(h.start_date) AS started_date\n  FROM issue_status_history h\n  WHERE h.status = 'IN_PROGRESS' AND h.issue_id IN (SELECT id FROM closed)\n  GROUP BY h.issue_id\n),\nteams AS (\n  SELECT p.name AS project_name\n  FROM projects p\n  WHERE p.name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nteam_issues AS (\n  SELECT DISTINCT pb.project_name, bi.issue_id\n  FROM project_boards pb\n  JOIN board_issues bi ON bi.board_id = pb.board_id\n),\nclosed_team AS (\n  SELECT ti.project_name, c.id, c.resolution_date\n  FROM closed c\n  JOIN team_issues ti ON ti.issue_id = c.id\n)\n, cycle_ranked AS (\n  SELECT ct.project_name, TIMESTAMPDIFF(MINUTE, st.started_date, ct.resolution_date) / 1440 AS days,\n    ROW_NUMBER() OVER (PARTITION BY ct.project_name ORDER BY TIMESTAMPDIFF(MINUTE, st.started_date, ct.resolution_date)) AS rn,\n    COUNT(*) OVER (PARTITION BY ct.project_name) AS n\n  FROM closed_team ct\n  JOIN started st ON st.id = ct.id\n  WHERE ct.resolution_date >= $__timeFrom() AND ct.resolution_date < $__timeTo()\n),\ncycle_p85 AS (\n  SELECT project_name, MAX(days) AS p85\n  FROM cycle_ranked\n  WHERE rn = CEIL(0.85 * n)\n  GROUP BY project_name\n),\nspans AS (\n  SELECT scope_id, id, repo_id, ts, LEAD(ts) OVER (PARTITION BY scope_id, env ORDER BY ts) AS next_ts\n  FROM prod_deploys\n  WHERE failed = 0 AND ts >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND)\n),\nfixes AS (\n  SELECT pr.base_repo_id AS repo_id, pr.merged_date\n  FROM pull_requests pr\n  WHERE pr.merged_date >= $__timeFrom() AND pr.merged_date < NOW()\n    AND (pr.title LIKE 'Revert%' OR pr.head_ref LIKE 'hotfix/%' OR pr.head_ref LIKE 'revert-%')\n),\nfailed_ids AS (\n  SELECT DISTINCT s.id\n  FROM spans s\n  JOIN fixes f ON f.repo_id = s.repo_id AND f.merged_date > s.ts AND f.merged_date <= COALESCE(s.next_ts, NOW())\n  WHERE s.ts >= $__timeFrom() AND s.ts < $__timeTo()\n),\nteam_deploys AS (\n  SELECT pc.project_name, s.id, s.ts, s.id IN (SELECT id FROM failed_ids) AS failed\n  FROM spans s\n  JOIN project_cicd pc ON pc.scope_id = s.scope_id\n  WHERE s.ts >= $__timeFrom() AND s.ts < $__timeTo()\n),\nchange_failure AS (\n  SELECT project_name, 100 * COUNT(DISTINCT CASE WHEN failed THEN id END) / NULLIF(COUNT(DISTINCT id), 0) AS pct\n  FROM team_deploys\n  GROUP BY project_name\n),\nbug_counts AS (\n  SELECT pb.project_name, COUNT(DISTINCT i.id) AS bugs\n  FROM project_boards pb\n  JOIN board_issues bi ON bi.board_id = pb.board_id\n  JOIN issues i ON i.id = bi.issue_id\n  WHERE i.resolution_date IS NULL AND COALESCE(i.original_status, '') <> 'Closed'\n    AND (i.status <> 'DONE' OR i.original_status IN ('To Do', 'To do', 'Todo', 'Ready for Development')) AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid') AND (i.type = 'BUG' OR EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = i.id AND il.label_name IN ('bug','Production-Bug')))\n  GROUP BY pb.project_name\n)\nSELECT t.project_name AS Team,\n  ROUND(cp.p85, 1) AS \"Cycle p85 (d)\",\n  ROUND(cf.pct, 1) AS \"Change failure\",\n  COALESCE(bc.bugs, 0) AS \"Open bugs\"\nFROM teams t\nLEFT JOIN cycle_p85 cp ON cp.project_name = t.project_name\nLEFT JOIN change_failure cf ON cf.project_name = t.project_name\nLEFT JOIN bug_counts bc ON bc.project_name = t.project_name\nORDER BY t.project_name"
+                        "rawSql": "WITH\nproject_boards AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nproject_cicd AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_runs AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.started_date) AS st, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MAX(dc.result = 'FAILURE') AS failed,\n    CASE WHEN MIN(dc.ref_name) REGEXP '[0-9]+[.][0-9]+' THEN '#release' ELSE COALESCE(MIN(dc.ref_name), '') END AS lane\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n),\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nclosed AS (\n  SELECT i.id, i.resolution_date\n  FROM issues i\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND i.resolution_date >= LEAST(NOW() - INTERVAL 70 DAY, ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND), $__timeFrom() - INTERVAL 63 DAY) AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n),\nstarted AS (\n  SELECT h.issue_id AS id, MIN(h.start_date) AS started_date\n  FROM issue_status_history h\n  WHERE h.status = 'IN_PROGRESS' AND h.issue_id IN (SELECT id FROM closed)\n  GROUP BY h.issue_id\n),\nteams AS (\n  SELECT p.name AS project_name\n  FROM projects p\n  WHERE p.name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nteam_issues AS (\n  SELECT DISTINCT pb.project_name, bi.issue_id\n  FROM project_boards pb\n  JOIN board_issues bi ON bi.board_id = pb.board_id\n),\nclosed_team AS (\n  SELECT ti.project_name, c.id, c.resolution_date\n  FROM closed c\n  JOIN team_issues ti ON ti.issue_id = c.id\n)\n, cycle_ranked AS (\n  SELECT ct.project_name, TIMESTAMPDIFF(MINUTE, st.started_date, ct.resolution_date) / 1440 AS days,\n    ROW_NUMBER() OVER (PARTITION BY ct.project_name ORDER BY TIMESTAMPDIFF(MINUTE, st.started_date, ct.resolution_date)) AS rn,\n    COUNT(*) OVER (PARTITION BY ct.project_name) AS n\n  FROM closed_team ct\n  JOIN started st ON st.id = ct.id\n  WHERE ct.resolution_date >= $__timeFrom() AND ct.resolution_date < $__timeTo()\n),\ncycle_p85 AS (\n  SELECT project_name, MAX(days) AS p85\n  FROM cycle_ranked\n  WHERE rn = CEIL(0.85 * n)\n  GROUP BY project_name\n),\nshipped AS (\n  SELECT id, scope_id, env, lane, st, sha, MIN(st) OVER (PARTITION BY scope_id, env, lane, sha) AS first_st\n  FROM prod_runs\n  WHERE failed = 0\n),\nlane_seq AS (\n  SELECT id, sha, first_st, LAG(sha) OVER w AS prev_sha, LAG(first_st) OVER w AS prev_first_st\n  FROM shipped\n  WINDOW w AS (PARTITION BY scope_id, env, lane ORDER BY st, id)\n),\nrollbacks AS (\n  SELECT id FROM lane_seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_st < prev_first_st\n),\nteam_deploys AS (\n  SELECT pc.project_name, r.id, (r.failed = 1 OR r.id IN (SELECT id FROM rollbacks)) AS failed\n  FROM prod_runs r\n  JOIN project_cicd pc ON pc.scope_id = r.scope_id\n  WHERE r.ts >= $__timeFrom() AND r.ts < $__timeTo()\n),\nchange_failure AS (\n  SELECT project_name, 100 * COUNT(DISTINCT CASE WHEN failed THEN id END) / NULLIF(COUNT(DISTINCT id), 0) AS pct\n  FROM team_deploys\n  GROUP BY project_name\n),\nbug_counts AS (\n  SELECT pb.project_name, COUNT(DISTINCT i.id) AS bugs\n  FROM project_boards pb\n  JOIN board_issues bi ON bi.board_id = pb.board_id\n  JOIN issues i ON i.id = bi.issue_id\n  WHERE i.resolution_date IS NULL AND COALESCE(i.original_status, '') <> 'Closed'\n    AND (i.status <> 'DONE' OR i.original_status IN ('To Do', 'To do', 'Todo', 'Ready for Development')) AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid') AND (i.type = 'BUG' OR EXISTS (SELECT 1 FROM issue_labels il WHERE il.issue_id = i.id AND il.label_name IN ('bug','Production-Bug')))\n  GROUP BY pb.project_name\n)\nSELECT t.project_name AS Team,\n  ROUND(cp.p85, 1) AS \"Cycle p85 (d)\",\n  ROUND(cf.pct, 1) AS \"Change failure\",\n  COALESCE(bc.bugs, 0) AS \"Open bugs\"\nFROM teams t\nLEFT JOIN cycle_p85 cp ON cp.project_name = t.project_name\nLEFT JOIN change_failure cf ON cf.project_name = t.project_name\nLEFT JOIN bug_counts bc ON bc.project_name = t.project_name\nORDER BY t.project_name"
                       }
                     },
                     "refId": "C",
@@ -4110,7 +4063,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nproject_repos AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\ngh_emails AS (\n  SELECT author_email, MIN(author_id) AS gid\n  FROM _tool_github_commits\n  WHERE author_id > 0\n  GROUP BY author_email\n  HAVING COUNT(DISTINCT author_id) = 1\n),\nteams AS (\n  SELECT p.name AS project_name\n  FROM projects p\n  WHERE p.name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged_prs AS (\n  SELECT pr.id, pp.project_name, pr.author_id, pr.author_name\n  FROM pull_requests pr\n  JOIN project_repos pp ON pp.repo_id = pr.base_repo_id\n  WHERE pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n)\n, project_conns AS (\n  SELECT DISTINCT cp.project_name, cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nauthors AS (\n  SELECT DISTINCT mp.project_name,\n    CASE WHEN mp.author_id LIKE 'github:GithubAccount:%' THEN CONCAT('gh:', SUBSTRING_INDEX(mp.author_id, ':', -1)) ELSE mp.author_id END AS author_key\n  FROM merged_prs mp\n),\nai_users AS (\n  SELECT DISTINCT pcn.project_name, CONCAT('gh:', ge.gid) AS author_key\n  FROM ai_activities a\n  JOIN project_conns pcn ON pcn.connection_id = a.source_connection_id\n  JOIN gh_emails ge ON ge.author_email = a.user_email\n  WHERE a.record_kind = 'canonical_activity' AND a.user_email <> ''\n    AND a.date > DATE($__timeFrom()) AND a.date <= DATE($__timeTo())\n),\nclaude_use AS (\n  SELECT au.project_name,\n    100 * COUNT(DISTINCT CASE WHEN u.author_key IS NOT NULL THEN au.author_key END) / NULLIF(COUNT(DISTINCT au.author_key), 0) AS pct\n  FROM authors au\n  LEFT JOIN ai_users u ON u.project_name = au.project_name AND u.author_key = au.author_key\n  GROUP BY au.project_name\n)\nSELECT t.project_name AS Team,\n  ROUND(cu.pct) AS \"Claude use\"\nFROM teams t\nLEFT JOIN claude_use cu ON cu.project_name = t.project_name\nORDER BY t.project_name"
+                        "rawSql": "WITH\nproject_repos AS (\n  SELECT DISTINCT pm.project_name, pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\ngh_emails AS (\n  SELECT author_email, MIN(author_id) AS gid\n  FROM _tool_github_commits\n  WHERE author_id > 0\n  GROUP BY author_email\n  HAVING COUNT(DISTINCT author_id) = 1\n),\nteams AS (\n  SELECT p.name AS project_name\n  FROM projects p\n  WHERE p.name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged_prs AS (\n  SELECT pr.id, pp.project_name, pr.author_id, pr.author_name\n  FROM pull_requests pr\n  JOIN project_repos pp ON pp.repo_id = pr.base_repo_id\n  WHERE pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n)\n, project_conns AS (\n  SELECT DISTINCT cp.project_name, cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nauthors AS (\n  SELECT DISTINCT mp.project_name,\n    CASE WHEN mp.author_id LIKE 'github:GithubAccount:%' THEN CONCAT('gh:', SUBSTRING_INDEX(mp.author_id, ':', -1)) ELSE mp.author_id END AS author_key\n  FROM merged_prs mp\n),\nai_users AS (\n  SELECT DISTINCT pcn.project_name, CONCAT('gh:', ge.gid) AS author_key\n  FROM ai_activities a\n  JOIN project_conns pcn ON pcn.connection_id = a.source_connection_id\n  JOIN gh_emails ge ON ge.author_email = a.user_email\n  WHERE a.record_kind = 'canonical_activity' AND a.user_email <> ''\n    AND a.date > DATE($__timeFrom()) AND a.date <= DATE($__timeTo())\n),\nclaude_use AS (\n  SELECT au.project_name,\n    100 * COUNT(DISTINCT CASE WHEN u.author_key IS NOT NULL THEN au.author_key END) / NULLIF(COUNT(DISTINCT au.author_key), 0) AS pct\n  FROM authors au\n  LEFT JOIN ai_users u ON u.project_name = au.project_name AND u.author_key = au.author_key\n  GROUP BY au.project_name\n)\nSELECT t.project_name AS Team,\n  ROUND(cu.pct) AS \"AI Adoption (%)\"\nFROM teams t\nLEFT JOIN claude_use cu ON cu.project_name = t.project_name\nORDER BY t.project_name"
                       }
                     },
                     "refId": "D",
@@ -4137,7 +4090,6 @@
                       "excludeByName": {},
                       "indexByName": {
                         "Change failure": 5,
-                        "Claude use": 9,
                         "Cycle p85 (d)": 4,
                         "In the queue": 7,
                         "Oldest (d)": 8,
@@ -4145,7 +4097,8 @@
                         "PRs": 2,
                         "Team": 0,
                         "Team size": 1,
-                        "Tickets": 3
+                        "Tickets": 3,
+                        "AI Adoption (%)": 9
                       },
                       "renameByName": {}
                     }
@@ -4339,7 +4292,7 @@
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Claude use"
+                      "options": "AI Adoption (%)"
                     },
                     "properties": [
                       {
@@ -4352,7 +4305,7 @@
                       },
                       {
                         "id": "custom.width",
-                        "value": 110
+                        "value": 135
                       }
                     ]
                   }
@@ -4665,7 +4618,7 @@
         "spec": {
           "id": 59,
           "title": "Rollbacks",
-          "description": "Production deployments in the selected range that shipped a different commit from the one before and one that had been shipped earlier on the same scope and environment, vs the previous period of the same length. Re-runs of the same build are not counted.",
+          "description": "Production deployments in the selected range that went back to an older commit: one first shipped before the commit of the previous deploy on the same scope, environment and lane, vs the previous period of the same length. Refs with a version number (tags and release branches) share one lane and every other branch has its own, so a branch deploying between releases is not a rollback. Re-runs of the same build are not counted.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -4685,7 +4638,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT value FROM (\nWITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n)\n, seq AS (\n  SELECT id, ts, sha,\n    LAG(sha) OVER (PARTITION BY scope_id, env ORDER BY ts) AS prev_sha,\n    MIN(ts) OVER (PARTITION BY scope_id, env, sha) AS first_ts\n  FROM prod_deploys\n  WHERE failed = 0\n),\nrollbacks AS (\n  SELECT id, ts FROM seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_ts < ts\n),\ncounts AS (\n  SELECT COUNT(DISTINCT CASE WHEN ts >= $__timeFrom() THEN id END) AS cur,\n    COUNT(DISTINCT CASE WHEN ts < $__timeFrom() THEN id END) AS prev\n  FROM rollbacks\n  WHERE ts >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND ts < $__timeTo()\n)\nSELECT cur AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 0), ' vs previous period') END AS label FROM counts\n) AS labelled"
+                        "rawSql": "SELECT value FROM (\nWITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_runs AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.started_date) AS st, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MAX(dc.result = 'FAILURE') AS failed,\n    CASE WHEN MIN(dc.ref_name) REGEXP '[0-9]+[.][0-9]+' THEN '#release' ELSE COALESCE(MIN(dc.ref_name), '') END AS lane\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n),\nshipped AS (\n  SELECT id, scope_id, env, lane, st, sha, MIN(st) OVER (PARTITION BY scope_id, env, lane, sha) AS first_st\n  FROM prod_runs\n  WHERE failed = 0\n),\nlane_seq AS (\n  SELECT id, sha, first_st, LAG(sha) OVER w AS prev_sha, LAG(first_st) OVER w AS prev_first_st\n  FROM shipped\n  WINDOW w AS (PARTITION BY scope_id, env, lane ORDER BY st, id)\n),\nrollbacks AS (\n  SELECT id FROM lane_seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_st < prev_first_st\n),\ncounts AS (\n  SELECT COUNT(DISTINCT CASE WHEN ts >= $__timeFrom() THEN id END) AS cur,\n    COUNT(DISTINCT CASE WHEN ts < $__timeFrom() THEN id END) AS prev\n  FROM prod_runs\n  WHERE id IN (SELECT id FROM rollbacks) AND ts >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND ts < $__timeTo()\n)\nSELECT cur AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 0), ' vs previous period') END AS label FROM counts\n) AS labelled"
                       }
                     },
                     "refId": "A",
@@ -4706,7 +4659,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_deploys AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.repo_id) AS repo_id, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MIN(dc.url) AS url, MAX(dc.result = 'FAILURE') AS failed\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n)\n, seq AS (\n  SELECT id, ts, sha,\n    LAG(sha) OVER (PARTITION BY scope_id, env ORDER BY ts) AS prev_sha,\n    MIN(ts) OVER (PARTITION BY scope_id, env, sha) AS first_ts\n  FROM prod_deploys\n  WHERE failed = 0\n),\nrollbacks AS (\n  SELECT id, ts FROM seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_ts < ts\n),\ncounts AS (\n  SELECT COUNT(DISTINCT CASE WHEN ts >= $__timeFrom() THEN id END) AS cur,\n    COUNT(DISTINCT CASE WHEN ts < $__timeFrom() THEN id END) AS prev\n  FROM rollbacks\n  WHERE ts >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND ts < $__timeTo()\n)\nSELECT cur AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 0), ' vs previous period') END AS label FROM counts"
+                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_runs AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.started_date) AS st, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MAX(dc.result = 'FAILURE') AS failed,\n    CASE WHEN MIN(dc.ref_name) REGEXP '[0-9]+[.][0-9]+' THEN '#release' ELSE COALESCE(MIN(dc.ref_name), '') END AS lane\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n),\nshipped AS (\n  SELECT id, scope_id, env, lane, st, sha, MIN(st) OVER (PARTITION BY scope_id, env, lane, sha) AS first_st\n  FROM prod_runs\n  WHERE failed = 0\n),\nlane_seq AS (\n  SELECT id, sha, first_st, LAG(sha) OVER w AS prev_sha, LAG(first_st) OVER w AS prev_first_st\n  FROM shipped\n  WINDOW w AS (PARTITION BY scope_id, env, lane ORDER BY st, id)\n),\nrollbacks AS (\n  SELECT id FROM lane_seq WHERE prev_sha IS NOT NULL AND sha <> prev_sha AND first_st < prev_first_st\n),\ncounts AS (\n  SELECT COUNT(DISTINCT CASE WHEN ts >= $__timeFrom() THEN id END) AS cur,\n    COUNT(DISTINCT CASE WHEN ts < $__timeFrom() THEN id END) AS prev\n  FROM prod_runs\n  WHERE id IN (SELECT id FROM rollbacks) AND ts >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND ts < $__timeTo()\n)\nSELECT cur AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 0), ' vs previous period') END AS label FROM counts"
                       }
                     },
                     "refId": "B",
@@ -4767,6 +4720,134 @@
                 "defaults": {
                   "unit": "none",
                   "decimals": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "text"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "text"
+                  },
+                  "noValue": "–"
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-69": {
+        "kind": "Panel",
+        "spec": {
+          "id": 69,
+          "title": "Prod deploy failure rate",
+          "description": "Share of finished production deploy runs in the selected range (last 7 days by default) that failed; a failed run that is retried counts as a failure, and cancelled runs are not counted. The label compares with the previous period of the same length.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT value FROM (\nWITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_runs AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.started_date) AS st, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MAX(dc.result = 'FAILURE') AS failed,\n    CASE WHEN MIN(dc.ref_name) REGEXP '[0-9]+[.][0-9]+' THEN '#release' ELSE COALESCE(MIN(dc.ref_name), '') END AS lane\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n),\nrates AS (\n  SELECT\n    100 * SUM(ts >= $__timeFrom() AND (failed = 1)) / NULLIF(SUM(ts >= $__timeFrom()), 0) AS cur,\n    100 * SUM(ts < $__timeFrom() AND (failed = 1)) / NULLIF(SUM(ts < $__timeFrom()), 0) AS prev\n  FROM prod_runs\n  WHERE ts >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND ts < $__timeTo()\n)\nSELECT ROUND(cur, 1) AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 1), ' pts vs previous period') END AS label FROM rates\n) AS labelled"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nprod_runs AS (\n  SELECT dc.cicd_scope_id AS scope_id, LOWER(dc.environment) AS env, dc.cicd_deployment_id AS id,\n    MIN(dc.started_date) AS st, MIN(dc.finished_date) AS ts, MIN(dc.commit_sha) AS sha, MAX(dc.result = 'FAILURE') AS failed,\n    CASE WHEN MIN(dc.ref_name) REGEXP '[0-9]+[.][0-9]+' THEN '#release' ELSE COALESCE(MIN(dc.ref_name), '') END AS lane\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result IN ('SUCCESS', 'FAILURE') AND LOWER(dc.environment) LIKE '%prod%'\n    AND LOWER(COALESCE(dc.original_result, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped') AND LOWER(COALESCE(dc.original_status, '')) NOT IN ('cancelled', 'canceled', 'aborted', 'stopped')\n    AND dc.finished_date < NOW()\n  GROUP BY dc.cicd_scope_id, LOWER(dc.environment), dc.cicd_deployment_id\n),\nrates AS (\n  SELECT\n    100 * SUM(ts >= $__timeFrom() AND (failed = 1)) / NULLIF(SUM(ts >= $__timeFrom()), 0) AS cur,\n    100 * SUM(ts < $__timeFrom() AND (failed = 1)) / NULLIF(SUM(ts < $__timeFrom()), 0) AS prev\n  FROM prod_runs\n  WHERE ts >= ($__timeFrom() - INTERVAL TIMESTAMPDIFF(SECOND, $__timeFrom(), $__timeTo()) SECOND) AND ts < $__timeTo()\n)\nSELECT ROUND(cur, 1) AS value, CASE WHEN cur IS NULL OR prev IS NULL THEN '– vs previous period' ELSE CONCAT(CASE WHEN ROUND(cur - prev, 1) > 0 THEN '+' WHEN ROUND(cur - prev, 1) < 0 THEN '-' ELSE '±' END, FORMAT(ABS(ROUND(cur - prev, 1)), 1), ' pts vs previous period') END AS label FROM rates"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "configFromData",
+                  "spec": {
+                    "options": {
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "configRefId": "B",
+                      "mappings": [
+                        {
+                          "fieldName": "label",
+                          "handlerKey": "displayName"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/.*/",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {
+                  "titleSize": 13
+                },
+                "textMode": "value_and_name",
+                "wideLayout": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "decimals": 1,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -5002,7 +5083,7 @@
         "spec": {
           "id": 61,
           "title": "Where the time goes in a pull request",
-          "description": "Median and 85th percentile hours for each stage, for PRs merged in the selected range; each stage counts the PRs where it is recorded. Deploy covers only PRs linked to a production deployment, and the label shows how many. The stage to fix is the one with the widest gap between the two.",
+          "description": "Median and 85th percentile hours for each stage, for PRs merged in the selected range; each stage counts the PRs where it is recorded. Pickup and review start at the first comment or review from someone other than the author; bot accounts such as code review bots are left out, so a PR only a bot commented on has no pickup or review time. Deploy covers only PRs linked to a production deployment, and the label shows how many. The stage to fix is the one with the widest gap between the two.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -5022,7 +5103,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, prs AS (\n  SELECT pr.id, MIN(ppm.pr_coding_time) AS coding, MIN(ppm.pr_pickup_time) AS pickup,\n    MIN(ppm.pr_review_time) AS review, MIN(ppm.pr_deploy_time) AS deploy\n  FROM pull_requests pr\n  JOIN project_pr_metrics ppm ON ppm.id = pr.id AND ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n  GROUP BY pr.id\n),\nstages AS (\n  SELECT 'Coding' AS stage, 1 AS ord, coding AS minutes FROM prs WHERE coding IS NOT NULL\n  UNION ALL SELECT 'Pickup', 2, pickup FROM prs WHERE pickup IS NOT NULL\n  UNION ALL SELECT 'Review', 3, review FROM prs WHERE review IS NOT NULL\n  UNION ALL SELECT 'Deploy', 4, deploy FROM prs WHERE deploy IS NOT NULL\n),\nranked AS (\n  SELECT stage, ord, minutes / 60 AS hours,\n    ROW_NUMBER() OVER (PARTITION BY stage ORDER BY minutes) AS rn,\n    COUNT(*) OVER (PARTITION BY stage) AS n\n  FROM stages\n)\nSELECT CASE WHEN stage = 'Deploy' THEN CONCAT('Deploy (n=', MAX(n), ')') ELSE stage END AS Stage,\n  ROUND(MAX(CASE WHEN rn = CEIL(0.5 * n) THEN hours END), 1) AS \"Median (h)\",\n  ROUND(MAX(CASE WHEN rn = CEIL(0.85 * n) THEN hours END), 1) AS \"p85 (h)\"\nFROM ranked\nGROUP BY stage, ord\nORDER BY ord"
+                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, prs AS (\n  SELECT pr.id, pr.author_id, pr.created_date, pr.merged_date, MIN(ppm.pr_coding_time) AS coding, MIN(ppm.pr_deploy_time) AS deploy\n  FROM pull_requests pr\n  JOIN project_pr_metrics ppm ON ppm.id = pr.id AND ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= $__timeFrom() AND pr.merged_date < $__timeTo()\n  GROUP BY pr.id, pr.author_id, pr.created_date, pr.merged_date\n),\n-- first comment or review before the merge from someone other than the author, bots left out\nfirst_review AS (\n  SELECT cm.pull_request_id AS id, MIN(cm.created_date) AS reviewed_at\n  FROM pull_request_comments cm\n  JOIN prs ON prs.id = cm.pull_request_id\n  -- converted to accounts.id's collation so the primary key is used\n  LEFT JOIN accounts a ON a.id = CONVERT(cm.account_id USING utf8mb4) COLLATE utf8mb4_unicode_ci\n  WHERE (COALESCE(prs.author_id, '') = '' OR cm.account_id <> prs.author_id)\n    AND cm.created_date <= prs.merged_date\n    AND NOT (COALESCE(a.user_name, '') LIKE '%[bot]' OR COALESCE(a.user_name, '') LIKE '%-bot' OR COALESCE(a.user_name, '') LIKE '% bot' OR COALESCE(a.user_name, '') LIKE 'project\\_%\\_bot\\_%')\n  GROUP BY cm.pull_request_id\n),\nstages AS (\n  SELECT 'Coding' AS stage, 1 AS ord, coding AS minutes FROM prs WHERE coding IS NOT NULL\n  UNION ALL SELECT 'Pickup', 2, TIMESTAMPDIFF(MINUTE, prs.created_date, fr.reviewed_at) FROM prs JOIN first_review fr ON fr.id = prs.id\n  UNION ALL SELECT 'Review', 3, TIMESTAMPDIFF(MINUTE, fr.reviewed_at, prs.merged_date) FROM prs JOIN first_review fr ON fr.id = prs.id\n  UNION ALL SELECT 'Deploy', 4, deploy FROM prs WHERE deploy IS NOT NULL\n),\nranked AS (\n  SELECT stage, ord, minutes / 60 AS hours,\n    ROW_NUMBER() OVER (PARTITION BY stage ORDER BY minutes) AS rn,\n    COUNT(*) OVER (PARTITION BY stage) AS n\n  FROM stages\n)\nSELECT CASE WHEN stage = 'Deploy' THEN CONCAT('Deploy (n=', MAX(n), ')') ELSE stage END AS Stage,\n  ROUND(MAX(CASE WHEN rn = CEIL(0.5 * n) THEN hours END), 1) AS \"Median (h)\",\n  ROUND(MAX(CASE WHEN rn = CEIL(0.85 * n) THEN hours END), 1) AS \"p85 (h)\"\nFROM ranked\nGROUP BY stage, ord\nORDER BY ord"
                       }
                     },
                     "refId": "A",
@@ -6058,15 +6139,6 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "panel-4"
-                        }
-                      }
-                    },
-                    {
-                      "kind": "AutoGridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
                           "name": "panel-5"
                         }
                       }
@@ -6279,7 +6351,7 @@
                                 "spec": {
                                   "x": 4,
                                   "y": 0,
-                                  "width": 4,
+                                  "width": 3,
                                   "height": 4,
                                   "element": {
                                     "kind": "ElementReference",
@@ -6290,7 +6362,7 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 8,
+                                  "x": 7,
                                   "y": 0,
                                   "width": 4,
                                   "height": 4,
@@ -6303,9 +6375,9 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 12,
+                                  "x": 11,
                                   "y": 0,
-                                  "width": 4,
+                                  "width": 3,
                                   "height": 4,
                                   "element": {
                                     "kind": "ElementReference",
@@ -6316,9 +6388,22 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 16,
+                                  "x": 14,
                                   "y": 0,
                                   "width": 4,
+                                  "height": 4,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-69"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 18,
+                                  "y": 0,
+                                  "width": 3,
                                   "height": 4,
                                   "element": {
                                     "kind": "ElementReference",
@@ -6329,9 +6414,9 @@
                               {
                                 "kind": "GridLayoutItem",
                                 "spec": {
-                                  "x": 20,
+                                  "x": 21,
                                   "y": 0,
-                                  "width": 4,
+                                  "width": 3,
                                   "height": 4,
                                   "element": {
                                     "kind": "ElementReference",
@@ -6451,7 +6536,7 @@
                     {
                       "kind": "TabsLayoutTab",
                       "spec": {
-                        "title": "Capacity",
+                        "title": "Team Contribution",
                         "layout": {
                           "kind": "GridLayout",
                           "spec": {
@@ -6712,7 +6797,7 @@
                                   "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-26"
+                                    "name": "panel-28"
                                   }
                                 }
                               },
@@ -6725,7 +6810,7 @@
                                   "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-28"
+                                    "name": "panel-29"
                                   }
                                 }
                               },
@@ -6738,7 +6823,7 @@
                                   "height": 7,
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-29"
+                                    "name": "panel-26"
                                   }
                                 }
                               }
