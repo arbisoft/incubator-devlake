@@ -18,6 +18,7 @@ limitations under the License.
 package service
 
 import (
+	"crypto/md5"
 	"fmt"
 	"math/big"
 	"strings"
@@ -31,7 +32,7 @@ import (
 const seriesTemporalityCumulative = "cumulative"
 
 var hourlyIdentityColumns = []string{
-	"connection_id", "team_slug", "organization_id", "user_key", "user_account_id", "user_account_uuid", "user_email", "hour_start",
+	"connection_id", "team_slug", "organization_id", "user_key", "user_account_id", "user_account_uuid", "user_email", "hour_start", "repository_url", "repository_key",
 }
 
 // applyHourlyUpdates writes one batch's prepared facts inside the conversion transaction.
@@ -182,6 +183,7 @@ func upsertHourlyFact(tx dal.Transaction, update factUpdate, value metricNumber,
 	params := append([]interface{}{
 		update.connection.ID, update.connection.TeamSlug, update.organizationID, update.identity.key,
 		update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour,
+		update.repositoryURL, repositoryKey(update.repositoryURL),
 	}, dimensionValues...)
 	params = append(params, value.sqlString(), update.observedAt, lastObservedAt)
 	placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(params)), ", ")
@@ -194,6 +196,12 @@ func upsertHourlyFact(tx dal.Transaction, update factUpdate, value metricNumber,
 		table, strings.Join(columns, ", "), placeholders, update.column,
 	)
 	return tx.Exec(query, params...)
+}
+
+// repositoryKey is the fixed-width primary-key form of a repository URL, MD5 of its bytes.
+func repositoryKey(url string) []byte {
+	sum := md5.Sum([]byte(url))
+	return sum[:]
 }
 
 func hourlyFactTarget(update factUpdate) (string, []string, []interface{}) {

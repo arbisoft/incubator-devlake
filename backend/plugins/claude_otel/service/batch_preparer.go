@@ -287,6 +287,7 @@ func (p *batchPreparer) prepareDatapoint(
 		query:          defaultDimension(truncate(attributeString(pointAttrs, "query_source"), querySourceDimensionLength)),
 		tool:           defaultDimension(truncate(attributeString(pointAttrs, "tool_name"), toolDimensionLength)),
 		language:       defaultDimension(truncate(attributeString(pointAttrs, "language"), toolDimensionLength)),
+		repositoryURL:  metricRepositoryURL(pointAttrs, resourceAttrs),
 		value:          value,
 		temporality:    temporality,
 		startNanos:     point.GetStartTimeUnixNano(),
@@ -321,6 +322,14 @@ func sessionStartID(pointAttrs, resourceAttrs []*commonv1.KeyValue) string {
 		return ""
 	}
 	return id
+}
+
+// metricRepositoryURL returns the point's repository URL, else the resource's, in stored form, or "" when there is none.
+func metricRepositoryURL(pointAttrs, resourceAttrs []*commonv1.KeyValue) string {
+	if url := normalizedRepositoryURL(attributeString(pointAttrs, repositoryURLAttribute)); url != "" {
+		return url
+	}
+	return normalizedRepositoryURL(attributeString(resourceAttrs, repositoryURLAttribute))
 }
 
 // otlpSignal names one OTLP signal's resource and record in attribution errors.

@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -36,18 +37,19 @@ import (
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/service"
 	"github.com/stretchr/testify/require"
+	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 )
 
 const (
 	dateLayout              = "2006-01-02"
 	resourcesSkippedCode    = "resources_skipped"
-	hourlyActivityOrder     = "connection_id, user_key, hour_start"
-	hourlyModelOrder        = "connection_id, user_key, hour_start, model, query_source, effort, agent_name, skill_name"
-	hourlyToolOrder         = "connection_id, user_key, hour_start, tool_name, language, decision_source"
-	hourlySessionStartOrder = "connection_id, user_key, hour_start, session_id, start_type"
-	canonicalActivityOrder  = "workspace_key, user_key, date, type, interface_type"
-	canonicalModelOrder     = "workspace_key, user_key, date, model"
-	canonicalToolOrder      = "workspace_key, user_key, date, tool_name"
+	hourlyActivityOrder     = "connection_id, user_key, hour_start, repository_url"
+	hourlyModelOrder        = "connection_id, user_key, hour_start, model, query_source, effort, agent_name, skill_name, repository_url"
+	hourlyToolOrder         = "connection_id, user_key, hour_start, tool_name, language, decision_source, repository_url"
+	hourlySessionStartOrder = "connection_id, user_key, hour_start, session_id, start_type, repository_url"
+	canonicalActivityOrder  = "workspace_key, user_key, date, type, interface_type, repository_url"
+	canonicalModelOrder     = "workspace_key, user_key, date, model, repository_url"
+	canonicalToolOrder      = "workspace_key, user_key, date, tool_name, repository_url"
 )
 
 var e2eUser = &common.User{Name: "E2E", Email: "e2e@example.com"}
@@ -348,7 +350,7 @@ func TestRebindAndReplayRebuildsOnlyTheReboundTeam(t *testing.T) {
 			day := w.day(offset)
 			end := day.AddDate(0, 0, 1)
 			require.Positive(t, w.count(&models.OtelHourlyActivity{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND hour_start >= ? AND hour_start < ?", fixture.a.ID, orgR, who.userKey(), day, end), "%s %s", who.name, day.Format(dateLayout))
-			require.Equal(t, int64(1), w.count(&ai.AiActivity{}, "workspace_key = ? AND user_key = ? AND date = ?", orgR, who.userKey(), day.Format(dateLayout)), "%s %s", who.name, day.Format(dateLayout))
+			require.Equal(t, int64(1), w.count(&ai.AiActivity{}, "workspace_key = ? AND user_key = ? AND date = ? AND repository_url = ?", orgR, who.userKey(), day.Format(dateLayout), ""), "%s %s", who.name, day.Format(dateLayout))
 		}
 	}
 	require.Equal(t, int64(1), w.count(&models.OtelAuditEvent{}, "action = ? AND connection_id = ?", models.OtelAuditActionOrganizationRebind, fixture.a.ID))
@@ -377,29 +379,33 @@ func (w *world) requireSharedCanonicalMatchesHourly(connectionID uint64, day tim
 	canonical := "workspace_key = ? AND user_key = ? AND date = ?"
 	label := day.Format(dateLayout)
 
-	var sessions, added, removed, commits, prs int
+	type activitySums struct{ sessions, added, removed, commits, prs int }
+	wantActivity := make(map[string]activitySums)
 	for _, row := range snapshot[models.OtelHourlyActivity](w, hourlyActivityOrder, hourly, connectionID, orgR, key, day, end) {
-		sessions += int(row.SessionCount)
-		added += int(row.LinesAdded)
-		removed += int(row.LinesRemoved)
-		commits += int(row.CommitsCreated)
-		prs += int(row.PrsCreated)
+		sum := wantActivity[row.RepositoryUrl]
+		wantActivity[row.RepositoryUrl] = activitySums{sum.sessions + int(row.SessionCount), sum.added + int(row.LinesAdded), sum.removed + int(row.LinesRemoved), sum.commits + int(row.CommitsCreated), sum.prs + int(row.PrsCreated)}
 	}
-	activity := snapshot[ai.AiActivity](w, canonicalActivityOrder, canonical, orgR, key, label)
-	require.Len(t, activity, 1, label)
-	require.Equal(t, []int{sessions, added, removed, commits, prs},
-		[]int{activity[0].NumSessions, activity[0].LinesAdded, activity[0].LinesRemoved, activity[0].CommitsCreated, activity[0].PrsCreated}, label)
+	gotActivity := make(map[string]activitySums)
+	for _, row := range snapshot[ai.AiActivity](w, canonicalActivityOrder, canonical, orgR, key, label) {
+		require.NotNil(t, row.RepositoryUrl, label)
+		require.NotContains(t, gotActivity, *row.RepositoryUrl, "%s: more than one canonical row for a repository", label)
+		gotActivity[*row.RepositoryUrl] = activitySums{row.NumSessions, row.LinesAdded, row.LinesRemoved, row.CommitsCreated, row.PrsCreated}
+	}
+	require.NotEmpty(t, wantActivity, label)
+	require.Equal(t, wantActivity, gotActivity, label)
 
 	type usage struct {
 		input, output, cacheRead, cacheCreation int64
 		cost                                    *big.Rat
 	}
-	wantUsage := make(map[string]*usage)
+	type usageKey struct{ model, repository string }
+	wantUsage := make(map[usageKey]*usage)
 	for _, row := range snapshot[models.OtelHourlyModelUsage](w, hourlyModelOrder, hourly, connectionID, orgR, key, day, end) {
-		sum := wantUsage[row.Model]
+		id := usageKey{row.Model, row.RepositoryUrl}
+		sum := wantUsage[id]
 		if sum == nil {
 			sum = &usage{cost: new(big.Rat)}
-			wantUsage[row.Model] = sum
+			wantUsage[id] = sum
 		}
 		cost, ok := new(big.Rat).SetString(row.EstimatedCostUSD)
 		require.True(t, ok)
@@ -409,30 +415,33 @@ func (w *world) requireSharedCanonicalMatchesHourly(connectionID uint64, day tim
 		sum.cacheCreation += row.CacheCreationTokens
 		sum.cost.Add(sum.cost, cost)
 	}
-	gotUsage := make(map[string]*usage)
+	gotUsage := make(map[usageKey]*usage)
 	for _, row := range snapshot[ai.AiModelUsage](w, canonicalModelOrder, canonical, orgR, key, label) {
+		require.NotNil(t, row.RepositoryUrl, label)
 		cost, ok := new(big.Rat).SetString(row.EstimatedCostUsd)
 		require.True(t, ok)
-		gotUsage[row.Model] = &usage{row.InputTokens, row.OutputTokens, row.CacheReadTokens, row.CacheCreationTokens, cost}
+		gotUsage[usageKey{row.Model, *row.RepositoryUrl}] = &usage{row.InputTokens, row.OutputTokens, row.CacheReadTokens, row.CacheCreationTokens, cost}
 	}
 	require.NotEmpty(t, wantUsage, label)
 	require.Equal(t, len(wantUsage), len(gotUsage), label)
-	for model, want := range wantUsage {
-		got := gotUsage[model]
-		require.NotNil(t, got, "%s %s", label, model)
-		require.Equal(t, []int64{want.input, want.output, want.cacheRead, want.cacheCreation}, []int64{got.input, got.output, got.cacheRead, got.cacheCreation}, "%s %s", label, model)
-		require.Zero(t, want.cost.Cmp(got.cost), "%s %s cost %s vs %s", label, model, want.cost.FloatString(8), got.cost.FloatString(8))
+	for id, want := range wantUsage {
+		got := gotUsage[id]
+		require.NotNil(t, got, "%s %v", label, id)
+		require.Equal(t, []int64{want.input, want.output, want.cacheRead, want.cacheCreation}, []int64{got.input, got.output, got.cacheRead, got.cacheCreation}, "%s %v", label, id)
+		require.Zero(t, want.cost.Cmp(got.cost), "%s %v cost %s vs %s", label, id, want.cost.FloatString(8), got.cost.FloatString(8))
 	}
 
 	type decisions struct{ accepted, rejected int64 }
-	wantTools := make(map[string]decisions)
+	wantTools := make(map[usageKey]decisions)
 	for _, row := range snapshot[models.OtelHourlyToolUsage](w, hourlyToolOrder, hourly, connectionID, orgR, key, day, end) {
-		sum := wantTools[row.ToolName]
-		wantTools[row.ToolName] = decisions{sum.accepted + row.AcceptedCount, sum.rejected + row.RejectedCount}
+		id := usageKey{row.ToolName, row.RepositoryUrl}
+		sum := wantTools[id]
+		wantTools[id] = decisions{sum.accepted + row.AcceptedCount, sum.rejected + row.RejectedCount}
 	}
-	gotTools := make(map[string]decisions)
+	gotTools := make(map[usageKey]decisions)
 	for _, row := range snapshot[ai.AiToolDecision](w, canonicalToolOrder, canonical, orgR, key, label) {
-		gotTools[row.ToolName] = decisions{row.AcceptedCount, row.RejectedCount}
+		require.NotNil(t, row.RepositoryUrl, label)
+		gotTools[usageKey{row.ToolName, *row.RepositoryUrl}] = decisions{row.AcceptedCount, row.RejectedCount}
 	}
 	require.NotEmpty(t, wantTools, label)
 	require.Equal(t, wantTools, gotTools, label)
@@ -592,4 +601,155 @@ func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
 	require.Equal(t, models.OtelReplayKindLogs, replays[len(replays)-1].Kind)
 	require.Positive(t, replays[len(replays)-1].ReplayedBatches)
 	require.Equal(t, reboundR, w.logFactsOf(fixture.a.ID, orgR))
+}
+
+const (
+	repoAlpha      = "https://github.com/org/alpha"
+	repoBetaSSH    = "git@github.com:Org/Beta.git"
+	repoBeta       = "https://github.com/org/beta"
+	providerClaude = "claude"
+)
+
+// preRepositoryID is the canonical ID of a row without a repository: its grain has no repository element.
+func preRepositoryID(kind ai.IDKind, workspace string, grain ...string) string {
+	return ai.CanonicalKey{Kind: kind, Provider: providerClaude, WorkspaceKey: workspace, Grain: grain}.ID()
+}
+
+func repositoryRequest(at time.Time, sessions []repositorySession) *collectormetrics.ExportMetricsServiceRequest {
+	request := &collectormetrics.ExportMetricsServiceRequest{}
+	for index, session := range sessions {
+		request.ResourceMetrics = append(request.ResourceMetrics, withRepository(a1.resource(at.Add(time.Duration(index)*time.Minute), session.seed), session.sent))
+	}
+	return request
+}
+
+// repositorySession is one session's export: the seed varies its values, sent is the repository it reports and stored is what is kept.
+type repositorySession struct {
+	seed         int
+	sent, stored string
+}
+
+func TestRepositorySplitsHourlyAndCanonicalFacts(t *testing.T) {
+	w := newWorld(t)
+	connection := w.connection(a1.team, a1.org, w.day(-5))
+	day := w.day(-1)
+	hour := day.Add(9 * time.Hour)
+	sessions := []repositorySession{{1, repoAlpha, repoAlpha}, {2, repoBetaSSH, repoBeta}, {4, "", ""}}
+	w.insertMetricRequest(repositoryRequest(hour, sessions))
+	w.drainNow()
+
+	repositories := func(urls []string) []string { slices.Sort(urls); return urls }
+	want := []string{"", repoAlpha, repoBeta}
+	hourly := w.factsOf(connection.ID)
+	var activityRepos, modelRepos, toolRepos []string
+	for _, row := range hourly.Activity {
+		require.True(t, hour.Equal(row.HourStart))
+		require.Len(t, row.RepositoryKey, 16)
+		activityRepos = append(activityRepos, row.RepositoryUrl)
+	}
+	for _, row := range hourly.Model {
+		modelRepos = append(modelRepos, row.RepositoryUrl)
+	}
+	for _, row := range hourly.Tool {
+		toolRepos = append(toolRepos, row.RepositoryUrl)
+	}
+	require.Equal(t, want, repositories(activityRepos))
+	require.Equal(t, want, repositories(modelRepos))
+	require.Equal(t, want, repositories(slices.Compact(repositories(toolRepos))))
+
+	require.Len(t, hourly.SessionStart, len(sessions))
+	for _, row := range hourly.SessionStart {
+		matched := false
+		for _, session := range sessions {
+			if row.SessionId == "sess-alpha-alpha1-"+strconv.Itoa(session.seed) {
+				require.Equal(t, session.stored, row.RepositoryUrl, row.SessionId)
+				matched = true
+			}
+		}
+		require.True(t, matched, row.SessionId)
+	}
+
+	var activityURLs, modelURLs, toolURLs []string
+	for _, row := range hourly.AiActivity {
+		activityURLs = append(activityURLs, *row.RepositoryUrl)
+	}
+	for _, row := range hourly.AiModel {
+		modelURLs = append(modelURLs, *row.RepositoryUrl)
+	}
+	for _, row := range hourly.AiTool {
+		toolURLs = append(toolURLs, *row.RepositoryUrl)
+	}
+	require.Equal(t, want, repositories(activityURLs))
+	require.Equal(t, want, repositories(modelURLs))
+	require.Equal(t, want, repositories(toolURLs))
+
+	// A row without a repository keeps the ID it had before repositories were recorded.
+	label := day.Format(dateLayout)
+	for _, row := range hourly.AiActivity {
+		if *row.RepositoryUrl == "" {
+			require.Equal(t, int64(1), w.count(&ai.AiActivity{}, "id = ? AND repository_url = ?", preRepositoryID(ai.IDKindActivity, a1.org, a1.userKey(), label, "CODE_EDIT", "cli"), ""))
+		}
+	}
+	for _, row := range hourly.AiModel {
+		if *row.RepositoryUrl == "" {
+			require.Equal(t, int64(1), w.count(&ai.AiModelUsage{}, "id = ? AND repository_url = ?", preRepositoryID(ai.IDKindModelUsage, a1.org, a1.userKey(), label, row.Model), ""))
+		}
+	}
+	for _, row := range hourly.AiTool {
+		if *row.RepositoryUrl == "" {
+			require.Equal(t, int64(1), w.count(&ai.AiToolDecision{}, "id = ? AND repository_url = ?", preRepositoryID(ai.IDKindToolDecision, a1.org, a1.userKey(), label, row.ToolName), ""))
+		}
+	}
+
+	live := w.factsOfWithIDs(connection.ID)
+	_, err := service.CreateOtelReplay(e2eUser, &service.OtelReplayInput{OtelReplayRange: w.replayDates(-1, -1)})
+	require.NoError(t, err)
+	w.drainNow()
+	require.Equal(t, hourly, w.factsOf(connection.ID))
+	require.Equal(t, live, w.factsOfWithIDs(connection.ID))
+	_, err = service.CreateOtelReplay(e2eUser, &service.OtelReplayInput{OtelReplayRange: w.replayDates(-1, -1)})
+	require.NoError(t, err)
+	w.drainNow()
+	require.Equal(t, hourly, w.factsOf(connection.ID))
+	require.Equal(t, live, w.factsOfWithIDs(connection.ID))
+	w.requireReplaysCompleted()
+}
+
+// factsOfWithIDs lists the canonical row IDs the connection produced, which snapshots clear.
+func (w *world) factsOfWithIDs(connectionID uint64) []string {
+	var ids []string
+	for _, table := range []string{"ai_activities", "ai_model_usages", "ai_tool_decisions"} {
+		var tableIDs []string
+		require.NoError(w.t, w.tester.Db.Raw("SELECT id FROM "+table+" WHERE source_connection_id = ? ORDER BY id", connectionID).Scan(&tableIDs).Error)
+		ids = append(ids, tableIDs...)
+	}
+	return ids
+}
+
+func TestLiveRepositoryRowsJoinAnExistingUserDay(t *testing.T) {
+	w := newWorld(t)
+	connection := w.connection(a1.team, a1.org, w.day(-5))
+	day := w.day(-1)
+	hour := day.Add(9 * time.Hour)
+	w.insertMetricRequest(repositoryRequest(hour, []repositorySession{{1, "", ""}}))
+	w.drainNow()
+	w.insertMetricRequest(repositoryRequest(hour.Add(time.Hour), []repositorySession{{2, repoAlpha, repoAlpha}}))
+	w.drainNow()
+
+	label := day.Format(dateLayout)
+	rows := snapshot[ai.AiActivity](w, canonicalActivityOrder, "workspace_key = ? AND user_key = ? AND date = ?", a1.org, a1.userKey(), label)
+	require.Len(t, rows, 2)
+	require.Equal(t, "", *rows[0].RepositoryUrl)
+	require.Equal(t, repoAlpha, *rows[1].RepositoryUrl)
+	require.Equal(t, int64(1), w.count(&ai.AiActivity{}, "id = ? AND repository_url = ?", preRepositoryID(ai.IDKindActivity, a1.org, a1.userKey(), label, "CODE_EDIT", "cli"), ""))
+
+	var sessions, added int
+	for _, row := range snapshot[models.OtelHourlyActivity](w, hourlyActivityOrder, "connection_id = ?", connection.ID) {
+		sessions += int(row.SessionCount)
+		added += int(row.LinesAdded)
+	}
+	require.Equal(t, sessions, rows[0].NumSessions+rows[1].NumSessions)
+	require.Equal(t, added, rows[0].LinesAdded+rows[1].LinesAdded)
+	require.Positive(t, rows[0].NumSessions)
+	require.Positive(t, rows[1].NumSessions)
 }

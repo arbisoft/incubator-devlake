@@ -20,6 +20,7 @@ package service
 import (
 	"net/url"
 	"strings"
+	"unicode/utf8"
 
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
 )
@@ -128,4 +129,13 @@ func normalizeRepositoryAttributes(attributes []*commonv1.KeyValue) {
 		normalized, _ := normalizeRepositoryURL(attribute.GetValue().GetStringValue())
 		attribute.Value = &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: normalized}}
 	}
+}
+
+// normalizedRepositoryURL returns the stored form of a repository URL, or "" when the value is not a remote repository URL or is too long to store whole.
+func normalizedRepositoryURL(value string) string {
+	normalized, ok := normalizeRepositoryURL(value)
+	if !ok || utf8.RuneCountInString(normalized) > maxRepositoryURLLength {
+		return ""
+	}
+	return normalized
 }

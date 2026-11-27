@@ -215,6 +215,19 @@ func (a actor) resource(at time.Time, seed int) *metricsv1.ResourceMetrics {
 	}
 }
 
+// withRepository adds the repository as a point attribute of every datapoint of the resource.
+func withRepository(resource *metricsv1.ResourceMetrics, repositoryURL string) *metricsv1.ResourceMetrics {
+	if repositoryURL == "" {
+		return resource
+	}
+	for _, metric := range resource.ScopeMetrics[0].Metrics {
+		for _, point := range metric.GetSum().DataPoints {
+			point.Attributes = withAttrs(point.Attributes, strAttr("vcs.repository.url.full", repositoryURL))
+		}
+	}
+	return resource
+}
+
 // resourceSpec places one actor's export at a time with a value seed.
 type resourceSpec struct {
 	who  actor

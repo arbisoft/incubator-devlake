@@ -33,5 +33,6 @@ func All() []plugin.MigrationScript {
 		new(addClaudeCodeOtelHourlyAttribution),
 		new(addClaudeCodeOtelHourlySessionStarts),
 		new(addClaudeCodeOtelEventSessionNameIndex),
+		new(addClaudeCodeOtelHourlyRepository),
 	}
 }

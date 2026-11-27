@@ -162,38 +162,53 @@ func firstEmail(activityRows []*models.OtelHourlyActivity, modelRows []*models.O
 	return ""
 }
 
+// canonicalGrain appends the repository to a canonical row's grain only when there is one, so rows without a repository keep their IDs.
+func canonicalGrain(repositoryURL string, grain ...string) []string {
+	if repositoryURL == "" {
+		return grain
+	}
+	return append(grain, repositoryURL)
+}
+
 func writeCanonicalActivity(tx dal.Transaction, target dailyTarget, accountID, email string, rows []*models.OtelHourlyActivity) error {
-	var sessions, linesAdded, linesRemoved, commits, prs int64
-	connections := make(map[uint64]struct{})
-	updatedAt := time.Time{}
+	byRepository := make(map[string][]*models.OtelHourlyActivity)
 	for _, row := range rows {
-		sessions += row.SessionCount
-		linesAdded += row.LinesAdded
-		linesRemoved += row.LinesRemoved
-		commits += row.CommitsCreated
-		prs += row.PrsCreated
-		connections[row.ConnectionId] = struct{}{}
-		updatedAt = latestTime(updatedAt, row.LastObservedAt)
+		byRepository[row.RepositoryUrl] = append(byRepository[row.RepositoryUrl], row)
 	}
-	activity := &ai.AiActivity{
-		DomainEntity:  domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindActivity, Provider: aiProviderClaude, WorkspaceKey: target.workspaceKey, Grain: []string{target.userKey, ai.DayGrain(target.date), aiActivityTypeCodeEdit, aiInterfaceTypeCLI}}.ID()),
-		Provider:      aiProviderClaude,
-		AccountId:     accountID,
-		UserEmail:     email,
-		Date:          target.date,
-		Type:          aiActivityTypeCodeEdit,
-		InterfaceType: aiInterfaceTypeCLI,
-		NumSessions:   int(sessions), LinesAdded: int(linesAdded), LinesRemoved: int(linesRemoved), CommitsCreated: int(commits), PrsCreated: int(prs),
-		WorkspaceKey:       stringPointer(target.workspaceKey),
-		UserKey:            stringPointer(target.userKey),
-		UserAccountId:      target.userAccountID,
-		RecordKind:         stringPointer(ai.CanonicalActivityRecordKind),
-		SourceType:         stringPointer(aiSourceOtel),
-		SourceConnectionId: soleConnectionID(connections),
-		SourceUpdatedAt:    timePointer(updatedAt),
-	}
-	if err := tx.CreateOrUpdate(activity); err != nil {
-		return fmt.Errorf("write canonical Claude activity: %w", err)
+	for repositoryURL, group := range byRepository {
+		var sessions, linesAdded, linesRemoved, commits, prs int64
+		connections := make(map[uint64]struct{})
+		updatedAt := time.Time{}
+		for _, row := range group {
+			sessions += row.SessionCount
+			linesAdded += row.LinesAdded
+			linesRemoved += row.LinesRemoved
+			commits += row.CommitsCreated
+			prs += row.PrsCreated
+			connections[row.ConnectionId] = struct{}{}
+			updatedAt = latestTime(updatedAt, row.LastObservedAt)
+		}
+		activity := &ai.AiActivity{
+			DomainEntity:  domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindActivity, Provider: aiProviderClaude, WorkspaceKey: target.workspaceKey, Grain: canonicalGrain(repositoryURL, target.userKey, ai.DayGrain(target.date), aiActivityTypeCodeEdit, aiInterfaceTypeCLI)}.ID()),
+			Provider:      aiProviderClaude,
+			AccountId:     accountID,
+			UserEmail:     email,
+			Date:          target.date,
+			Type:          aiActivityTypeCodeEdit,
+			InterfaceType: aiInterfaceTypeCLI,
+			NumSessions:   int(sessions), LinesAdded: int(linesAdded), LinesRemoved: int(linesRemoved), CommitsCreated: int(commits), PrsCreated: int(prs),
+			WorkspaceKey:       stringPointer(target.workspaceKey),
+			UserKey:            stringPointer(target.userKey),
+			UserAccountId:      target.userAccountID,
+			RecordKind:         stringPointer(ai.CanonicalActivityRecordKind),
+			SourceType:         stringPointer(aiSourceOtel),
+			SourceConnectionId: soleConnectionID(connections),
+			RepositoryUrl:      stringPointer(repositoryURL),
+			SourceUpdatedAt:    timePointer(updatedAt),
+		}
+		if err := tx.CreateOrUpdate(activity); err != nil {
+			return fmt.Errorf("write canonical Claude activity: %w", err)
+		}
 	}
 	return nil
 }
@@ -202,15 +217,16 @@ func writeCanonicalModelUsage(tx dal.Transaction, target dailyTarget, accountID,
 	totals := make(map[string]*ai.AiModelUsage)
 	connections := make(map[string]map[uint64]struct{})
 	for _, row := range rows {
-		usage := totals[row.Model]
+		key := row.Model + "\x00" + row.RepositoryUrl
+		usage := totals[key]
 		if usage == nil {
 			usage = &ai.AiModelUsage{
-				DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindModelUsage, Provider: aiProviderClaude, WorkspaceKey: target.workspaceKey, Grain: []string{target.userKey, ai.DayGrain(target.date), row.Model}}.ID()),
+				DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindModelUsage, Provider: aiProviderClaude, WorkspaceKey: target.workspaceKey, Grain: canonicalGrain(row.RepositoryUrl, target.userKey, ai.DayGrain(target.date), row.Model)}.ID()),
 				Provider:     aiProviderClaude, WorkspaceKey: target.workspaceKey, AccountId: accountID, UserKey: target.userKey, UserAccountId: target.userAccountID, UserEmail: email, Date: target.date, Model: row.Model,
-				EstimatedCostUsd: "0.00000000", SourceType: aiSourceOtel,
+				EstimatedCostUsd: "0.00000000", SourceType: aiSourceOtel, RepositoryUrl: stringPointer(row.RepositoryUrl),
 			}
-			totals[row.Model] = usage
-			connections[row.Model] = make(map[uint64]struct{})
+			totals[key] = usage
+			connections[key] = make(map[uint64]struct{})
 		}
 		usage.InputTokens += row.InputTokens
 		usage.OutputTokens += row.OutputTokens
@@ -222,10 +238,10 @@ func writeCanonicalModelUsage(tx dal.Transaction, target dailyTarget, accountID,
 		}
 		usage.EstimatedCostUsd = cost
 		usage.SourceUpdatedAt = latestTime(usage.SourceUpdatedAt, row.LastObservedAt)
-		connections[row.Model][row.ConnectionId] = struct{}{}
+		connections[key][row.ConnectionId] = struct{}{}
 	}
-	for model, usage := range totals {
-		usage.SourceConnectionId = soleConnectionID(connections[model])
+	for key, usage := range totals {
+		usage.SourceConnectionId = soleConnectionID(connections[key])
 		if err := tx.CreateOrUpdate(usage); err != nil {
 			return fmt.Errorf("write canonical Claude model usage: %w", err)
 		}
@@ -237,22 +253,24 @@ func writeCanonicalToolDecisions(tx dal.Transaction, target dailyTarget, account
 	totals := make(map[string]*ai.AiToolDecision)
 	connections := make(map[string]map[uint64]struct{})
 	for _, row := range rows {
-		decision := totals[row.ToolName]
+		key := row.ToolName + "\x00" + row.RepositoryUrl
+		decision := totals[key]
 		if decision == nil {
 			decision = &ai.AiToolDecision{
-				DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindToolDecision, Provider: aiProviderClaude, WorkspaceKey: target.workspaceKey, Grain: []string{target.userKey, ai.DayGrain(target.date), row.ToolName}}.ID()),
+				DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindToolDecision, Provider: aiProviderClaude, WorkspaceKey: target.workspaceKey, Grain: canonicalGrain(row.RepositoryUrl, target.userKey, ai.DayGrain(target.date), row.ToolName)}.ID()),
 				Provider:     aiProviderClaude, WorkspaceKey: target.workspaceKey, AccountId: accountID, UserKey: target.userKey, UserAccountId: target.userAccountID, UserEmail: email, Date: target.date, ToolName: row.ToolName, SourceType: aiSourceOtel,
+				RepositoryUrl: stringPointer(row.RepositoryUrl),
 			}
-			totals[row.ToolName] = decision
-			connections[row.ToolName] = make(map[uint64]struct{})
+			totals[key] = decision
+			connections[key] = make(map[uint64]struct{})
 		}
 		decision.AcceptedCount += row.AcceptedCount
 		decision.RejectedCount += row.RejectedCount
 		decision.SourceUpdatedAt = latestTime(decision.SourceUpdatedAt, row.LastObservedAt)
-		connections[row.ToolName][row.ConnectionId] = struct{}{}
+		connections[key][row.ConnectionId] = struct{}{}
 	}
-	for tool, decision := range totals {
-		decision.SourceConnectionId = soleConnectionID(connections[tool])
+	for key, decision := range totals {
+		decision.SourceConnectionId = soleConnectionID(connections[key])
 		if err := tx.CreateOrUpdate(decision); err != nil {
 			return fmt.Errorf("write canonical Claude tool decisions: %w", err)
 		}

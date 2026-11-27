@@ -83,3 +83,16 @@ func TestCumulativeSessionCountWritesOneDeltaToBothFacts(t *testing.T) {
 	require.Equal(t, int64(3), starts[0].StartCount)
 	require.Zero(t, w.count(&models.OtelHourlySessionStart{}, "connection_id = ? AND hour_start = ?", connection.ID, h.Add(time.Hour)))
 }
+
+func TestSessionStartCarriesItsSessionRepository(t *testing.T) {
+	w := newWorld(t)
+	connection := w.connection(a1.team, a1.org, w.day(-5))
+	h := w.day(-1).Add(9 * time.Hour)
+	w.insertMetricRequest(repositoryRequest(h, []repositorySession{{1, repoAlpha, repoAlpha}}))
+	w.drainNow()
+
+	starts := snapshot[models.OtelHourlySessionStart](w, hourlySessionStartOrder, "connection_id = ?", connection.ID)
+	require.Len(t, starts, 1)
+	require.Equal(t, repoAlpha, starts[0].RepositoryUrl)
+	require.Len(t, starts[0].RepositoryKey, 16)
+}

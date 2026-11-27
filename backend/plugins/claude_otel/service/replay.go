@@ -387,9 +387,9 @@ func (c *rawConverter) replayBatchFailure(batch *models.OtelMetricBatch, err err
 }
 
 func hourlyAggregateKey(update factUpdate) string {
-	return fmt.Sprintf("%d\x00%d\x00%s\x00%d\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s",
+	return fmt.Sprintf("%d\x00%d\x00%s\x00%d\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s",
 		update.fact, update.connection.ID, update.identity.key, update.hour.Unix(), update.model, update.query, update.tool, update.language,
-		update.effort, update.agent, update.skill, update.decisionSource, update.sessionID, update.startType, update.column)
+		update.effort, update.agent, update.skill, update.decisionSource, update.sessionID, update.startType, update.column, update.repositoryURL)
 }
 
 // commitReplayDay fences both leases and replaces one completed UTC day atomically. The
