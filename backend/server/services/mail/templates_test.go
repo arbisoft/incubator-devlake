@@ -188,6 +188,8 @@ func TestLoadRendererRejectsBrokenTemplates(t *testing.T) {
 	}{
 		{"syntax error", fstest.MapFS{"alert.html": {Data: []byte(`{{define "content"}}{{.Title}{{end}}`)}}, "parse mail template alert.html"},
 		{"no subject", fstest.MapFS{"report.txt": {Data: []byte(`body only`)}}, `report.txt must define "subject"`},
+		{"no content", fstest.MapFS{"alert.html": {Data: []byte(`<p>{{.Title}}</p>`)}}, `alert.html must define "content"`},
+		{"no layout", fstest.MapFS{"layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)}}, `layout.html must define "layout"`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

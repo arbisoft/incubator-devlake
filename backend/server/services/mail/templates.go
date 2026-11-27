@@ -40,6 +40,7 @@ const (
 const (
 	layoutFile      = "layout.html"
 	layoutName      = "layout"
+	contentName     = "content"
 	subjectName     = "subject"
 	maxSubjectRunes = 255 // _devlake_email_history.subject is varchar(255)
 )
@@ -143,7 +144,8 @@ func (o overlayFS) Open(name string) (fs.File, error) {
 }
 
 // LoadRenderer reads and parses every template from fsys: layout.html plus <name>.html and
-// <name>.txt for each template. The .txt file must define "subject". Any missing or broken file
+// <name>.txt for each template. layout.html must define "layout", each .html file "content", and each
+// .txt file "subject". Any missing or broken file
 // is an error, so a bad MAIL_TEMPLATE_DIR fails at startup rather than on the first send.
 func LoadRenderer(fsys fs.FS) (*Renderer, errors.Error) {
 	if fsys == nil {
@@ -179,6 +181,13 @@ func parseTemplate(fsys fs.FS, name, layout string) (parsedTemplate, errors.Erro
 	}
 	if err != nil {
 		return parsedTemplate{}, errors.Default.Wrap(err, "parse mail template "+name+".html")
+	}
+	// Parse doesn't check that a template the layout calls exists; Render would only fail on the first send
+	if html.Lookup(layoutName) == nil {
+		return parsedTemplate{}, errors.Default.New("mail template " + layoutFile + ` must define "layout"`)
+	}
+	if html.Lookup(contentName) == nil {
+		return parsedTemplate{}, errors.Default.New("mail template " + name + `.html must define "content"`)
 	}
 	text, err := texttemplate.New(name + ".txt").Option("missingkey=error").Parse(string(textSrc))
 	if err != nil {
