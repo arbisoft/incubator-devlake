@@ -491,7 +491,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Purple bars: Claude Code OTel cost, left USD axis. Neutral bars: merged PRs, right count axis. Different scales: compare each colour across weeks, not bar heights against each other. Completed weeks only; weeks begin Monday, and weeks with no data show as zero. Weeks before Claude Code OTel collection started show no AI bars and a per-PR ratio of 0: that means no data, not no usage. Lines: escaped defects per 100 merged PRs; they have no axis, so hover for the values. Red counts defects opened within 14 days after a successful deployment whose environment contains `prod`; amber does the same for staging, dev, QA, UAT, test and demo environments. A defect inside both windows counts on both lines, so the lines are not additive. Escaped defects are project-wide: they and the PRs they are divided by ignore the Developer filter. Hover for AI cost per merged PR (left out when no PRs merged) and its change from the previous week. AI cost uses the Project and OTel Teams filters; merged PRs use Project only, so selecting a team narrows only the AI bars. Both sides follow the Developer filter.",
+      "description": "Purple bars: Claude Code OTel tokens used (input, output, cache read and cache creation), left axis. Neutral bars: tasks done, right count axis. Tokens are shown instead of cost because the cost is the relative API list price, not what is paid. Different scales: compare each colour across weeks, not bar heights against each other. Completed weeks only; weeks begin Monday, and weeks with no data show as zero. Weeks before Claude Code OTel collection started show no AI bars and a per-task ratio of 0: that means no data, not no usage. Tasks done uses the Tasks Done definition: resolved issues on the project's boards, excluding bugs, incidents and epics, by resolution date. Lines: escaped defects per 100 merged PRs; they have no axis, so hover for the values. Red counts defects opened within 14 days after a successful deployment whose environment contains `prod`; amber does the same for staging, dev, QA, UAT, test and demo environments. A defect inside both windows counts on both lines, so the lines are not additive. Tasks done, escaped defects and the PRs they are divided by are project-wide and ignore the Developer filter. Hover for tokens per task done (left out when no tasks were done) and its change from the previous week; with a developer selected, that ratio divides one developer's tokens by the project's tasks. Tokens use the Project, OTel Teams and Developer filters; tasks use Project only.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -593,16 +593,16 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "AI cost per merged PR"
+              "options": "Tokens per task done"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyUSD"
+                "value": "short"
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 0
               },
               {
                 "id": "custom.fillOpacity",
@@ -648,12 +648,12 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "AI cost"
+              "options": "Tokens used"
             },
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyUSD"
+                "value": "short"
               },
               {
                 "id": "color",
@@ -668,7 +668,7 @@
               },
               {
                 "id": "custom.axisLabel",
-                "value": "AI cost (USD)"
+                "value": "Tokens used"
               },
               {
                 "id": "custom.axisPlacement",
@@ -676,7 +676,7 @@
               },
               {
                 "id": "displayName",
-                "value": "AI cost · left USD axis"
+                "value": "Tokens used · left axis"
               },
               {
                 "id": "custom.barAlignment",
@@ -687,7 +687,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "PRs merged"
+              "options": "Tasks done"
             },
             "properties": [
               {
@@ -707,7 +707,7 @@
               },
               {
                 "id": "custom.axisLabel",
-                "value": "PRs merged"
+                "value": "Tasks done"
               },
               {
                 "id": "custom.axisPlacement",
@@ -715,7 +715,7 @@
               },
               {
                 "id": "displayName",
-                "value": "PRs merged · right count axis"
+                "value": "Tasks done · right count axis"
               },
               {
                 "id": "custom.barAlignment",
@@ -726,7 +726,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "AI cost per merged PR · WoW change"
+              "options": "Tokens per task done · WoW change"
             },
             "properties": [
               {
@@ -1044,11 +1044,11 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH RECURSIVE weekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT pr.id) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n),\nweekly_spend AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date) AND ('__all' IN ($developer_emails) OR user_email IN ($developer_emails))\n  GROUP BY 1\n),\nweekly_prs_all AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT pr.id) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n  GROUP BY 1\n),\ndeploys AS (\n  SELECT DISTINCT pm.project_name, cdc.finished_date, CASE WHEN LOWER(cdc.environment) LIKE '%prod%' THEN 'prod' WHEN LOWER(cdc.environment) REGEXP 'stag|dev|qa|uat|test|demo' THEN 'nonprod' END AS env\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND cdc.result = 'SUCCESS' AND (LOWER(cdc.environment) LIKE '%prod%' OR LOWER(cdc.environment) REGEXP 'stag|dev|qa|uat|test|demo') AND cdc.finished_date BETWEEN DATE_SUB($__timeFrom(), INTERVAL 14 DAY) AND $__timeTo()\n),\nweekly_defects AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.created_date), INTERVAL WEEKDAY(i.created_date) DAY), '%Y-%m-%d') AS week,\n    COUNT(DISTINCT CASE WHEN d.env = 'prod' THEN i.id END) AS prod,\n    COUNT(DISTINCT CASE WHEN d.env = 'nonprod' THEN i.id END) AS nonprod\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN deploys d ON d.project_name = pm.project_name\n    AND i.created_date BETWEEN d.finished_date AND DATE_ADD(d.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (i.type IN ('BUG','INCIDENT') OR LOWER(COALESCE(i.original_type,'')) REGEXP 'bug|defect|incident') AND $__timeFilter(i.created_date)\n  GROUP BY 1\n),\nwk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\nr AS (\n  SELECT w.week, COALESCE(a.v, 0) AS ai, COALESCE(p.n, 0) AS prs, COALESCE(a.v, 0) / NULLIF(p.n, 0) AS ratio,\n    COALESCE(pa.n, 0) AS prs_all, COALESCE(d.prod, 0) AS def_prod, COALESCE(d.nonprod, 0) AS def_nonprod\n  FROM weeks w\n  LEFT JOIN weekly_spend a ON a.week = w.week\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_prs_all pa ON pa.week = w.week\n  LEFT JOIN weekly_defects d ON d.week = w.week\n)\nSELECT TIMESTAMP(r.week) + INTERVAL 84 HOUR AS \"time\",\n  UNIX_TIMESTAMP(r.week) * 1000 AS \"Week starting\",\n  ROUND(ratio, 2) AS \"AI cost per merged PR\",\n  ROUND(ai, 2) AS \"AI cost\",\n  prs AS \"PRs merged\",\n  ROUND(100 * (ratio / NULLIF(LAG(ratio) OVER (ORDER BY r.week), 0) - 1), 1) AS \"AI cost per merged PR · WoW change\",\n  ROUND(100 * def_prod / NULLIF(prs_all, 0), 1) AS \"Escaped defect rate · prod\",\n  ROUND(100 * def_nonprod / NULLIF(prs_all, 0), 1) AS \"Escaped defect rate · staging/dev\",\n  def_prod AS \"Escaped defects · prod\",\n  def_nonprod AS \"Escaped defects · staging/dev\",\n  prs_all AS \"PRs merged · project-wide\"\nFROM r\nORDER BY r.week",
+          "rawSql": "WITH RECURSIVE weekly_tasks AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.resolution_date), INTERVAL WEEKDAY(i.resolution_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM issues i JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND i.type NOT IN ('BUG','INCIDENT','EPIC') AND LOWER(COALESCE(i.original_type,'')) NOT REGEXP 'bug|defect|incident|epic' AND i.resolution_date IS NOT NULL AND $__timeFilter(i.resolution_date)\n  GROUP BY 1\n),\nweekly_tokens AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date) AND ('__all' IN ($developer_emails) OR user_email IN ($developer_emails))\n  GROUP BY 1\n),\nweekly_prs_all AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT pr.id) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n  GROUP BY 1\n),\ndeploys AS (\n  SELECT DISTINCT pm.project_name, cdc.finished_date, CASE WHEN LOWER(cdc.environment) LIKE '%prod%' THEN 'prod' WHEN LOWER(cdc.environment) REGEXP 'stag|dev|qa|uat|test|demo' THEN 'nonprod' END AS env\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND cdc.result = 'SUCCESS' AND (LOWER(cdc.environment) LIKE '%prod%' OR LOWER(cdc.environment) REGEXP 'stag|dev|qa|uat|test|demo') AND cdc.finished_date BETWEEN DATE_SUB($__timeFrom(), INTERVAL 14 DAY) AND $__timeTo()\n),\nweekly_defects AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.created_date), INTERVAL WEEKDAY(i.created_date) DAY), '%Y-%m-%d') AS week,\n    COUNT(DISTINCT CASE WHEN d.env = 'prod' THEN i.id END) AS prod,\n    COUNT(DISTINCT CASE WHEN d.env = 'nonprod' THEN i.id END) AS nonprod\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN deploys d ON d.project_name = pm.project_name\n    AND i.created_date BETWEEN d.finished_date AND DATE_ADD(d.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (i.type IN ('BUG','INCIDENT') OR LOWER(COALESCE(i.original_type,'')) REGEXP 'bug|defect|incident') AND $__timeFilter(i.created_date)\n  GROUP BY 1\n),\nwk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\nr AS (\n  SELECT w.week, COALESCE(a.v, 0) AS ai, COALESCE(t.v, 0) AS tasks, COALESCE(a.v, 0) / NULLIF(t.v, 0) AS ratio,\n    COALESCE(pa.n, 0) AS prs_all, COALESCE(d.prod, 0) AS def_prod, COALESCE(d.nonprod, 0) AS def_nonprod\n  FROM weeks w\n  LEFT JOIN weekly_tokens a ON a.week = w.week\n  LEFT JOIN weekly_tasks t ON t.week = w.week\n  LEFT JOIN weekly_prs_all pa ON pa.week = w.week\n  LEFT JOIN weekly_defects d ON d.week = w.week\n)\nSELECT TIMESTAMP(r.week) + INTERVAL 84 HOUR AS \"time\",\n  UNIX_TIMESTAMP(r.week) * 1000 AS \"Week starting\",\n  ROUND(ratio) AS \"Tokens per task done\",\n  ai AS \"Tokens used\",\n  tasks AS \"Tasks done\",\n  ROUND(100 * (ratio / NULLIF(LAG(ratio) OVER (ORDER BY r.week), 0) - 1), 1) AS \"Tokens per task done · WoW change\",\n  ROUND(100 * def_prod / NULLIF(prs_all, 0), 1) AS \"Escaped defect rate · prod\",\n  ROUND(100 * def_nonprod / NULLIF(prs_all, 0), 1) AS \"Escaped defect rate · staging/dev\",\n  def_prod AS \"Escaped defects · prod\",\n  def_nonprod AS \"Escaped defects · staging/dev\",\n  prs_all AS \"PRs merged · project-wide\"\nFROM r\nORDER BY r.week",
           "refId": "A"
         }
       ],
-      "title": "AI Cost, PRs Merged and Escaped Defect Rate (Weekly)",
+      "title": "AI Tokens, Tasks Done and Escaped Defect Rate (Weekly)",
       "type": "timeseries"
     },
     {
