@@ -34,10 +34,10 @@ import {
   TeamOutlined,
 } from '@ant-design/icons';
 
+import type { ComponentType } from 'react';
+
 import { THEME_MODE } from '@/theme/constants';
 import type { ThemeMode } from '@/theme/tokens';
-
-import type { NavMeta } from './types';
 
 // NAV_GATE names who can see a nav item. An item without a gate is shown to everyone.
 export const NAV_GATE = {
@@ -65,7 +65,11 @@ export const NAV = {
   GITHUB: { key: 'github', label: 'GitHub', icon: GithubOutlined, gate: NAV_GATE.COPYRIGHT },
   SLACK: { key: 'slack', label: 'Slack', icon: SlackOutlined, gate: NAV_GATE.COPYRIGHT },
   DASHBOARDS: { key: 'dashboards', label: 'Dashboards', icon: BarChartOutlined, gate: NAV_GATE.COPYRIGHT },
-} as const satisfies Record<string, NavMeta>;
+} as const satisfies Record<
+  string,
+  // NavMeta in types.ts; spelled out here so the e2e tests can import this file without the app's types
+  { key: string; label: string; icon: ComponentType; gate?: (typeof NAV_GATE)[keyof typeof NAV_GATE] }
+>;
 
 export const NAV_DIVIDER_KEY = 'divider';
 
