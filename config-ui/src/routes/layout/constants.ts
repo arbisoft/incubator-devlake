@@ -16,35 +16,58 @@
  *
  */
 
+import {
+  ApiOutlined,
+  BarChartOutlined,
+  BookOutlined,
+  BuildOutlined,
+  ExperimentOutlined,
+  GithubOutlined,
+  HistoryOutlined,
+  KeyOutlined,
+  LockOutlined,
+  MailOutlined,
+  PartitionOutlined,
+  ProjectOutlined,
+  SettingOutlined,
+  SlackOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
+
 import { THEME_MODE } from '@/theme/constants';
 import type { ThemeMode } from '@/theme/tokens';
 
-export const NAV_KEY = {
-  PROJECTS: 'projects',
-  CONNECTIONS: 'connections',
-  ADVANCED: 'advanced',
-  BLUEPRINTS: 'blueprints',
-  PIPELINES: 'pipelines',
-  API_KEYS: 'api-keys',
-  EMAIL_HISTORY: 'email-history',
-  SETTINGS: 'settings',
-  USERS: 'users',
-  AUTHENTICATION: 'authentication',
-  ACTIVITY: 'activity',
-  RESOURCES: 'resources',
-  DOCS: 'docs',
-  API: 'api',
-  GITHUB: 'github',
-  SLACK: 'slack',
-  DIVIDER: 'divider',
-  DASHBOARDS: 'dashboards',
+import type { NavMeta } from './types';
+
+// NAV_GATE names who can see a nav item. An item without a gate is shown to everyone.
+export const NAV_GATE = {
+  ACCESS: 'access', // customer administrators, when access control is on
+  ADMIN: 'admin', // administrators, or everyone when access control is off
+  COPYRIGHT: 'copyright', // hidden when the copyright is hidden
 } as const;
 
-export const ACCESS_NAV_KEYS: string[] = [NAV_KEY.SETTINGS, NAV_KEY.USERS, NAV_KEY.AUTHENTICATION, NAV_KEY.ACTIVITY];
+// NAV is every sidebar item: its key, label, icon and who sees it. nav.ts places them in the tree.
+export const NAV = {
+  PROJECTS: { key: 'projects', label: 'Projects', icon: ProjectOutlined },
+  CONNECTIONS: { key: 'connections', label: 'Connections', icon: ApiOutlined },
+  ADVANCED: { key: 'advanced', label: 'Advanced', icon: ExperimentOutlined },
+  BLUEPRINTS: { key: 'blueprints', label: 'Blueprints', icon: BuildOutlined },
+  PIPELINES: { key: 'pipelines', label: 'Pipelines', icon: PartitionOutlined },
+  API_KEYS: { key: 'api-keys', label: 'API Keys', icon: KeyOutlined, gate: NAV_GATE.ADMIN },
+  EMAIL_HISTORY: { key: 'email-history', label: 'Email History', icon: MailOutlined, gate: NAV_GATE.ADMIN },
+  SETTINGS: { key: 'settings', label: 'Settings', icon: SettingOutlined, gate: NAV_GATE.ACCESS },
+  USERS: { key: 'users', label: 'User Management', icon: TeamOutlined, gate: NAV_GATE.ACCESS },
+  AUTHENTICATION: { key: 'authentication', label: 'Authentication', icon: LockOutlined, gate: NAV_GATE.ACCESS },
+  ACTIVITY: { key: 'activity', label: 'Recent Activities', icon: HistoryOutlined, gate: NAV_GATE.ACCESS },
+  RESOURCES: { key: 'resources', label: 'Resources', icon: BookOutlined },
+  DOCS: { key: 'docs', label: 'Docs', icon: BookOutlined },
+  API: { key: 'api', label: 'API', icon: ApiOutlined },
+  GITHUB: { key: 'github', label: 'GitHub', icon: GithubOutlined, gate: NAV_GATE.COPYRIGHT },
+  SLACK: { key: 'slack', label: 'Slack', icon: SlackOutlined, gate: NAV_GATE.COPYRIGHT },
+  DASHBOARDS: { key: 'dashboards', label: 'Dashboards', icon: BarChartOutlined, gate: NAV_GATE.COPYRIGHT },
+} as const satisfies Record<string, NavMeta>;
 
-export const ADMIN_NAV_KEYS: string[] = [NAV_KEY.API_KEYS, NAV_KEY.EMAIL_HISTORY];
-
-export const COPYRIGHT_HIDDEN_NAV_KEYS: string[] = [NAV_KEY.DASHBOARDS, NAV_KEY.GITHUB, NAV_KEY.SLACK];
+export const NAV_DIVIDER_KEY = 'divider';
 
 export const ACCOUNT_MENU_KEY = {
   VERSION: 'version',
@@ -74,25 +97,6 @@ export const LINK_IDENTITY = {
 
 export const COPY = {
   initializationFailed: 'The application could not be initialized. Reload and try again.',
-  nav: {
-    projects: 'Projects',
-    connections: 'Connections',
-    advanced: 'Advanced',
-    blueprints: 'Blueprints',
-    pipelines: 'Pipelines',
-    apiKeys: 'API Keys',
-    emailHistory: 'Email History',
-    settings: 'Settings',
-    users: 'User Management',
-    authentication: 'Authentication',
-    activity: 'Recent Activities',
-    resources: 'Resources',
-    docs: 'Docs',
-    api: 'API',
-    github: 'GitHub',
-    slack: 'Slack',
-    dashboards: 'Dashboards',
-  },
   account: {
     fallbackName: 'Account',
     version: (version: string) => `Version ${version}`,

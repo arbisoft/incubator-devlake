@@ -16,8 +16,12 @@
  *
  */
 
+import type { ComponentType } from 'react';
+
 import type { AccessCurrent, LinkableOIDCProvider } from '@/api/access';
 import type { ThemeMode } from '@/theme/tokens';
+
+import type { NAV_GATE } from './constants';
 
 export type LayoutUser = {
   authenticated: boolean;
@@ -43,6 +47,10 @@ export type UseAccountMenuOptions = {
 };
 
 export type IdentityLinkLocation = { key: string; search: string };
+
+export type NavGate = (typeof NAV_GATE)[keyof typeof NAV_GATE];
+
+export type NavMeta = { key: string; label: string; icon: ComponentType; gate?: NavGate };
 
 export type NavVisibility = {
   access: AccessCurrent | null;

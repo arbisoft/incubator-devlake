@@ -26,13 +26,13 @@ import { LINKS, PATHS } from '@/config';
 import { NAV_ITEM_KIND, type NavItem } from '@/ui';
 import { findActiveKey, visibleItems } from '@/ui/sidebar-nav/utils';
 
-import { COPY, NAV_KEY } from './constants';
+import { NAV, NAV_DIVIDER_KEY } from './constants';
 import { getNavItems } from './nav';
 
 const ADMIN: AccessCurrent = { enabled: true, role: ACCESS_ROLE.CUSTOMER_ADMIN };
 const MEMBER: AccessCurrent = { enabled: true, role: ACCESS_ROLE.MEMBER };
 
-const SETTINGS_CHILD_KEYS: string[] = [NAV_KEY.USERS, NAV_KEY.AUTHENTICATION, NAV_KEY.ACTIVITY];
+const SETTINGS_CHILD_KEYS: string[] = [NAV.USERS.key, NAV.AUTHENTICATION.key, NAV.ACTIVITY.key];
 
 const flatten = (items: NavItem[]): NavItem[] =>
   items.flatMap((item) =>
@@ -49,15 +49,15 @@ describe('getNavItems', () => {
   it('orders the sidebar as Projects, Connections, Advanced, API Keys, Email History, Settings, Resources, divider, Dashboards', () => {
     const top = visibleItems(getNavItems({ access: ADMIN, copyrightHide: false })).map((item) => item.key);
     expect(top).toEqual([
-      NAV_KEY.PROJECTS,
-      NAV_KEY.CONNECTIONS,
-      NAV_KEY.ADVANCED,
-      NAV_KEY.API_KEYS,
-      NAV_KEY.EMAIL_HISTORY,
-      NAV_KEY.SETTINGS,
-      NAV_KEY.RESOURCES,
-      NAV_KEY.DIVIDER,
-      NAV_KEY.DASHBOARDS,
+      NAV.PROJECTS.key,
+      NAV.CONNECTIONS.key,
+      NAV.ADVANCED.key,
+      NAV.API_KEYS.key,
+      NAV.EMAIL_HISTORY.key,
+      NAV.SETTINGS.key,
+      NAV.RESOURCES.key,
+      NAV_DIVIDER_KEY,
+      NAV.DASHBOARDS.key,
     ]);
   });
 
@@ -67,69 +67,69 @@ describe('getNavItems', () => {
       const group = items.find((item) => item.key === key);
       return group?.kind === NAV_ITEM_KIND.ROUTE ? group.children?.map((child) => child.key) : undefined;
     };
-    expect(childKeys(NAV_KEY.ADVANCED)).toEqual([NAV_KEY.BLUEPRINTS, NAV_KEY.PIPELINES]);
-    expect(childKeys(NAV_KEY.RESOURCES)).toEqual([NAV_KEY.DOCS, NAV_KEY.API, NAV_KEY.GITHUB, NAV_KEY.SLACK]);
+    expect(childKeys(NAV.ADVANCED.key)).toEqual([NAV.BLUEPRINTS.key, NAV.PIPELINES.key]);
+    expect(childKeys(NAV.RESOURCES.key)).toEqual([NAV.DOCS.key, NAV.API.key, NAV.GITHUB.key, NAV.SLACK.key]);
   });
 
   it('shows Settings and Users only to a customer administrator', () => {
-    expect(visibleKeys(ADMIN)).toEqual(expect.arrayContaining([NAV_KEY.SETTINGS, NAV_KEY.USERS]));
+    expect(visibleKeys(ADMIN)).toEqual(expect.arrayContaining([NAV.SETTINGS.key, NAV.USERS.key]));
     [MEMBER, { enabled: false }, null].forEach((access) => {
       const keys = visibleKeys(access);
-      expect(keys).not.toContain(NAV_KEY.SETTINGS);
-      expect(keys).not.toContain(NAV_KEY.USERS);
-      expect(keys).toContain(NAV_KEY.PROJECTS);
+      expect(keys).not.toContain(NAV.SETTINGS.key);
+      expect(keys).not.toContain(NAV.USERS.key);
+      expect(keys).toContain(NAV.PROJECTS.key);
     });
   });
 
   it('shows API Keys to an administrator and when access is disabled, but not to a member or a failed lookup', () => {
-    [ADMIN, { enabled: false }].forEach((access) => expect(visibleKeys(access)).toContain(NAV_KEY.API_KEYS));
-    [MEMBER, null].forEach((access) => expect(visibleKeys(access)).not.toContain(NAV_KEY.API_KEYS));
+    [ADMIN, { enabled: false }].forEach((access) => expect(visibleKeys(access)).toContain(NAV.API_KEYS.key));
+    [MEMBER, null].forEach((access) => expect(visibleKeys(access)).not.toContain(NAV.API_KEYS.key));
   });
 
   it('shows Email History to an administrator and when access is disabled, but not to a member or a failed lookup', () => {
-    [ADMIN, { enabled: false }].forEach((access) => expect(visibleKeys(access)).toContain(NAV_KEY.EMAIL_HISTORY));
-    [MEMBER, null].forEach((access) => expect(visibleKeys(access)).not.toContain(NAV_KEY.EMAIL_HISTORY));
+    [ADMIN, { enabled: false }].forEach((access) => expect(visibleKeys(access)).toContain(NAV.EMAIL_HISTORY.key));
+    [MEMBER, null].forEach((access) => expect(visibleKeys(access)).not.toContain(NAV.EMAIL_HISTORY.key));
   });
 
   it('lists Users, Authentication and Recent Activities under Settings, in that order', () => {
     const items = getNavItems({ access: ADMIN, copyrightHide: false });
-    const settings = items.find((item) => item.key === NAV_KEY.SETTINGS);
+    const settings = items.find((item) => item.key === NAV.SETTINGS.key);
     expect(settings?.kind === NAV_ITEM_KIND.ROUTE && settings.children?.map((child) => child.key)).toEqual([
-      NAV_KEY.USERS,
-      NAV_KEY.AUTHENTICATION,
-      NAV_KEY.ACTIVITY,
+      NAV.USERS.key,
+      NAV.AUTHENTICATION.key,
+      NAV.ACTIVITY.key,
     ]);
     const children = flatten(items).filter((item) => SETTINGS_CHILD_KEYS.includes(item.key));
     expect(children.map((item) => (item.kind === NAV_ITEM_KIND.ROUTE ? item.label : ''))).toEqual([
-      COPY.nav.users,
-      COPY.nav.authentication,
-      COPY.nav.activity,
+      NAV.USERS.label,
+      NAV.AUTHENTICATION.label,
+      NAV.ACTIVITY.label,
     ]);
   });
 
   it('shows Authentication and Recent Activities only to a customer administrator', () => {
-    expect(visibleKeys(ADMIN)).toEqual(expect.arrayContaining([NAV_KEY.AUTHENTICATION, NAV_KEY.ACTIVITY]));
+    expect(visibleKeys(ADMIN)).toEqual(expect.arrayContaining([NAV.AUTHENTICATION.key, NAV.ACTIVITY.key]));
     [MEMBER, { enabled: false }, null].forEach((access) => {
       const keys = visibleKeys(access);
-      expect(keys).not.toContain(NAV_KEY.AUTHENTICATION);
-      expect(keys).not.toContain(NAV_KEY.ACTIVITY);
+      expect(keys).not.toContain(NAV.AUTHENTICATION.key);
+      expect(keys).not.toContain(NAV.ACTIVITY.key);
     });
   });
 
   it('opens the new Settings pages from their paths', () => {
-    expect(activeKey(PATHS.SETTINGS_AUTHENTICATION())).toBe(NAV_KEY.AUTHENTICATION);
-    expect(activeKey(PATHS.SETTINGS_ACTIVITY())).toBe(NAV_KEY.ACTIVITY);
+    expect(activeKey(PATHS.SETTINGS_AUTHENTICATION())).toBe(NAV.AUTHENTICATION.key);
+    expect(activeKey(PATHS.SETTINGS_ACTIVITY())).toBe(NAV.ACTIVITY.key);
   });
 
   it('hides Dashboards, GitHub and Slack, and the divider before them, when the copyright is hidden', () => {
     const keys = visibleKeys(ADMIN, true);
-    [NAV_KEY.DASHBOARDS, NAV_KEY.GITHUB, NAV_KEY.SLACK, NAV_KEY.DIVIDER].forEach((key) =>
+    [NAV.DASHBOARDS.key, NAV.GITHUB.key, NAV.SLACK.key, NAV_DIVIDER_KEY].forEach((key) =>
       expect(keys).not.toContain(key),
     );
-    expect(keys).toEqual(expect.arrayContaining([NAV_KEY.DOCS, NAV_KEY.API, NAV_KEY.RESOURCES]));
+    expect(keys).toEqual(expect.arrayContaining([NAV.DOCS.key, NAV.API.key, NAV.RESOURCES.key]));
   });
 
-  it('uses the configured links, opens external items by href and labels from COPY', () => {
+  it('uses the configured links, opens external items by href and labels from NAV', () => {
     const external = flatten(getNavItems({ access: ADMIN, copyrightHide: false })).filter(
       (item) => item.kind === NAV_ITEM_KIND.EXTERNAL,
     );
@@ -141,31 +141,31 @@ describe('getNavItems', () => {
       PATHS.DASHBOARDS(),
     ]);
     expect(external.map((item) => (item.kind === NAV_ITEM_KIND.EXTERNAL ? item.label : ''))).toEqual([
-      COPY.nav.docs,
-      COPY.nav.api,
-      COPY.nav.github,
-      COPY.nav.slack,
-      COPY.nav.dashboards,
+      NAV.DOCS.label,
+      NAV.API.label,
+      NAV.GITHUB.label,
+      NAV.SLACK.label,
+      NAV.DASHBOARDS.label,
     ]);
   });
 });
 
 describe('active item', () => {
   it.each([
-    [PATHS.PROJECTS(), NAV_KEY.PROJECTS],
-    [PATHS.PROJECT_TAB('my project', 'webhooks'), NAV_KEY.PROJECTS],
-    [PATHS.PROJECT_BLUEPRINT_CONNECTION('x', 'github-1'), NAV_KEY.PROJECTS],
-    [PATHS.CONNECTIONS(), NAV_KEY.CONNECTIONS],
-    [PATHS.CONNECTION('github', 1), NAV_KEY.CONNECTIONS],
-    [PATHS.OTEL(), NAV_KEY.CONNECTIONS],
-    [PATHS.BLUEPRINTS(), NAV_KEY.BLUEPRINTS],
-    [PATHS.BLUEPRINT(3), NAV_KEY.BLUEPRINTS],
-    [PATHS.BLUEPRINT_CONNECTION(3, 'github', 1), NAV_KEY.BLUEPRINTS],
-    [PATHS.PIPELINES(), NAV_KEY.PIPELINES],
-    [PATHS.PIPELINE(3), NAV_KEY.PIPELINES],
-    [PATHS.APIKEYS(), NAV_KEY.API_KEYS],
-    [PATHS.SETTINGS_USERS(), NAV_KEY.USERS],
-    [PATHS.SETTINGS_GRAFANA_USERS(), NAV_KEY.USERS],
+    [PATHS.PROJECTS(), NAV.PROJECTS.key],
+    [PATHS.PROJECT_TAB('my project', 'webhooks'), NAV.PROJECTS.key],
+    [PATHS.PROJECT_BLUEPRINT_CONNECTION('x', 'github-1'), NAV.PROJECTS.key],
+    [PATHS.CONNECTIONS(), NAV.CONNECTIONS.key],
+    [PATHS.CONNECTION('github', 1), NAV.CONNECTIONS.key],
+    [PATHS.OTEL(), NAV.CONNECTIONS.key],
+    [PATHS.BLUEPRINTS(), NAV.BLUEPRINTS.key],
+    [PATHS.BLUEPRINT(3), NAV.BLUEPRINTS.key],
+    [PATHS.BLUEPRINT_CONNECTION(3, 'github', 1), NAV.BLUEPRINTS.key],
+    [PATHS.PIPELINES(), NAV.PIPELINES.key],
+    [PATHS.PIPELINE(3), NAV.PIPELINES.key],
+    [PATHS.APIKEYS(), NAV.API_KEYS.key],
+    [PATHS.SETTINGS_USERS(), NAV.USERS.key],
+    [PATHS.SETTINGS_GRAFANA_USERS(), NAV.USERS.key],
   ])('highlights the right item for %s', (pathname, key) => {
     expect(activeKey(pathname)).toBe(key);
   });

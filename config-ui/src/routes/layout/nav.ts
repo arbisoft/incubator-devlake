@@ -16,179 +16,69 @@
  *
  */
 
-import {
-  ApiOutlined,
-  BarChartOutlined,
-  BookOutlined,
-  BuildOutlined,
-  ExperimentOutlined,
-  GithubOutlined,
-  HistoryOutlined,
-  KeyOutlined,
-  LockOutlined,
-  MailOutlined,
-  PartitionOutlined,
-  ProjectOutlined,
-  SettingOutlined,
-  SlackOutlined,
-  TeamOutlined,
-} from '@ant-design/icons';
 import { createElement } from 'react';
 
 import { LINKS, PATHS } from '@/config';
 import { canManageAccess, canManageAdminFeatures } from '@/routes/settings/guard';
 import { NAV_ITEM_KIND, type NavItem } from '@/ui';
 
-import { ACCESS_NAV_KEYS, ADMIN_NAV_KEYS, COPY, COPYRIGHT_HIDDEN_NAV_KEYS, NAV_KEY } from './constants';
-import type { NavVisibility } from './types';
+import { NAV, NAV_DIVIDER_KEY, NAV_GATE } from './constants';
+import type { NavMeta, NavVisibility } from './types';
 
-const isNavKeyVisible = (key: string, { access, copyrightHide }: NavVisibility) => {
-  if (ACCESS_NAV_KEYS.includes(key)) return canManageAccess(access);
-  if (ADMIN_NAV_KEYS.includes(key)) return canManageAdminFeatures(access);
-  return !(copyrightHide && COPYRIGHT_HIDDEN_NAV_KEYS.includes(key));
+const isVisible = ({ gate }: NavMeta, { access, copyrightHide }: NavVisibility) => {
+  switch (gate) {
+    case NAV_GATE.ACCESS:
+      return canManageAccess(access);
+    case NAV_GATE.ADMIN:
+      return canManageAdminFeatures(access);
+    case NAV_GATE.COPYRIGHT:
+      return !copyrightHide;
+    default:
+      return true;
+  }
 };
 
 export const getNavItems = (visibility: NavVisibility): NavItem[] => {
-  const visible = (key: string) => isNavKeyVisible(key, visibility);
+  const meta = (item: NavMeta) => {
+    const { key, label, icon } = item;
+    return { key, label, icon: createElement(icon), visible: isVisible(item, visibility) };
+  };
+  const route = (item: NavMeta, path: string, more: { matchPaths?: string[]; children?: NavItem[] } = {}): NavItem => ({
+    kind: NAV_ITEM_KIND.ROUTE,
+    ...meta(item),
+    path,
+    ...more,
+  });
+  const external = (item: NavMeta, href: string): NavItem => ({ kind: NAV_ITEM_KIND.EXTERNAL, ...meta(item), href });
 
   return [
-    {
-      kind: NAV_ITEM_KIND.ROUTE,
-      key: NAV_KEY.PROJECTS,
-      label: COPY.nav.projects,
-      icon: createElement(ProjectOutlined),
-      path: PATHS.PROJECTS(),
-    },
-    {
-      kind: NAV_ITEM_KIND.ROUTE,
-      key: NAV_KEY.CONNECTIONS,
-      label: COPY.nav.connections,
-      icon: createElement(ApiOutlined),
-      path: PATHS.CONNECTIONS(),
-      matchPaths: [PATHS.OTEL()],
-    },
-    {
-      kind: NAV_ITEM_KIND.ROUTE,
-      key: NAV_KEY.ADVANCED,
-      label: COPY.nav.advanced,
-      icon: createElement(ExperimentOutlined),
-      path: PATHS.BLUEPRINTS(),
+    route(NAV.PROJECTS, PATHS.PROJECTS()),
+    route(NAV.CONNECTIONS, PATHS.CONNECTIONS(), { matchPaths: [PATHS.OTEL()] }),
+    route(NAV.ADVANCED, PATHS.BLUEPRINTS(), {
       children: [
-        {
-          kind: NAV_ITEM_KIND.ROUTE,
-          key: NAV_KEY.BLUEPRINTS,
-          label: COPY.nav.blueprints,
-          icon: createElement(BuildOutlined),
-          path: PATHS.BLUEPRINTS(),
-        },
-        {
-          kind: NAV_ITEM_KIND.ROUTE,
-          key: NAV_KEY.PIPELINES,
-          label: COPY.nav.pipelines,
-          icon: createElement(PartitionOutlined),
-          path: PATHS.PIPELINES(),
-          // The empty id leaves a trailing slash, so any pipeline id matches by prefix.
-          matchPaths: [PATHS.PIPELINE('')],
-        },
+        route(NAV.BLUEPRINTS, PATHS.BLUEPRINTS()),
+        // The empty id leaves a trailing slash, so any pipeline id matches by prefix.
+        route(NAV.PIPELINES, PATHS.PIPELINES(), { matchPaths: [PATHS.PIPELINE('')] }),
       ],
-    },
-    {
-      kind: NAV_ITEM_KIND.ROUTE,
-      key: NAV_KEY.API_KEYS,
-      label: COPY.nav.apiKeys,
-      icon: createElement(KeyOutlined),
-      path: PATHS.APIKEYS(),
-      visible: visible(NAV_KEY.API_KEYS),
-    },
-    {
-      kind: NAV_ITEM_KIND.ROUTE,
-      key: NAV_KEY.EMAIL_HISTORY,
-      label: COPY.nav.emailHistory,
-      icon: createElement(MailOutlined),
-      path: PATHS.EMAIL_HISTORY(),
-      visible: visible(NAV_KEY.EMAIL_HISTORY),
-    },
-    {
-      kind: NAV_ITEM_KIND.ROUTE,
-      key: NAV_KEY.SETTINGS,
-      label: COPY.nav.settings,
-      icon: createElement(SettingOutlined),
-      path: PATHS.SETTINGS_USERS(),
-      visible: visible(NAV_KEY.SETTINGS),
+    }),
+    route(NAV.API_KEYS, PATHS.APIKEYS()),
+    route(NAV.EMAIL_HISTORY, PATHS.EMAIL_HISTORY()),
+    route(NAV.SETTINGS, PATHS.SETTINGS_USERS(), {
       children: [
-        {
-          kind: NAV_ITEM_KIND.ROUTE,
-          key: NAV_KEY.USERS,
-          label: COPY.nav.users,
-          icon: createElement(TeamOutlined),
-          path: PATHS.SETTINGS_USERS(),
-          visible: visible(NAV_KEY.USERS),
-        },
-        {
-          kind: NAV_ITEM_KIND.ROUTE,
-          key: NAV_KEY.AUTHENTICATION,
-          label: COPY.nav.authentication,
-          icon: createElement(LockOutlined),
-          path: PATHS.SETTINGS_AUTHENTICATION(),
-          visible: visible(NAV_KEY.AUTHENTICATION),
-        },
-        {
-          kind: NAV_ITEM_KIND.ROUTE,
-          key: NAV_KEY.ACTIVITY,
-          label: COPY.nav.activity,
-          icon: createElement(HistoryOutlined),
-          path: PATHS.SETTINGS_ACTIVITY(),
-          visible: visible(NAV_KEY.ACTIVITY),
-        },
+        route(NAV.USERS, PATHS.SETTINGS_USERS()),
+        route(NAV.AUTHENTICATION, PATHS.SETTINGS_AUTHENTICATION()),
+        route(NAV.ACTIVITY, PATHS.SETTINGS_ACTIVITY()),
       ],
-    },
-    {
-      kind: NAV_ITEM_KIND.ROUTE,
-      key: NAV_KEY.RESOURCES,
-      label: COPY.nav.resources,
-      icon: createElement(BookOutlined),
-      path: PATHS.ROOT(),
+    }),
+    route(NAV.RESOURCES, PATHS.ROOT(), {
       children: [
-        {
-          kind: NAV_ITEM_KIND.EXTERNAL,
-          key: NAV_KEY.DOCS,
-          label: COPY.nav.docs,
-          icon: createElement(BookOutlined),
-          href: LINKS.DOCS,
-        },
-        {
-          kind: NAV_ITEM_KIND.EXTERNAL,
-          key: NAV_KEY.API,
-          label: COPY.nav.api,
-          icon: createElement(ApiOutlined),
-          href: LINKS.API,
-        },
-        {
-          kind: NAV_ITEM_KIND.EXTERNAL,
-          key: NAV_KEY.GITHUB,
-          label: COPY.nav.github,
-          icon: createElement(GithubOutlined),
-          href: LINKS.GITHUB,
-          visible: visible(NAV_KEY.GITHUB),
-        },
-        {
-          kind: NAV_ITEM_KIND.EXTERNAL,
-          key: NAV_KEY.SLACK,
-          label: COPY.nav.slack,
-          icon: createElement(SlackOutlined),
-          href: LINKS.SLACK,
-          visible: visible(NAV_KEY.SLACK),
-        },
+        external(NAV.DOCS, LINKS.DOCS),
+        external(NAV.API, LINKS.API),
+        external(NAV.GITHUB, LINKS.GITHUB),
+        external(NAV.SLACK, LINKS.SLACK),
       ],
-    },
-    { kind: NAV_ITEM_KIND.DIVIDER, key: NAV_KEY.DIVIDER },
-    {
-      kind: NAV_ITEM_KIND.EXTERNAL,
-      key: NAV_KEY.DASHBOARDS,
-      label: COPY.nav.dashboards,
-      icon: createElement(BarChartOutlined),
-      href: PATHS.DASHBOARDS(),
-      visible: visible(NAV_KEY.DASHBOARDS),
-    },
+    }),
+    { kind: NAV_ITEM_KIND.DIVIDER, key: NAV_DIVIDER_KEY },
+    external(NAV.DASHBOARDS, PATHS.DASHBOARDS()),
   ];
 };
