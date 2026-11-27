@@ -52,6 +52,7 @@ type fakeSMTP struct {
 	rejects   map[string]string // reply to RCPT TO for single addresses, checked after rcptReply
 	quitReply string            // reply to QUIT; empty means "221 bye"
 	rsetReply string            // reply to RSET; empty means "250 OK"
+	ended     chan struct{}     // gets a value each time a session ends
 	wg        sync.WaitGroup
 
 	mu       sync.Mutex // guards the fields below
@@ -67,7 +68,7 @@ func startFakeSMTP(t *testing.T, tlsConfig *tls.Config, rcptReply string) *fakeS
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	s := &fakeSMTP{t: t, ln: ln, tlsConfig: tlsConfig, rcptReply: rcptReply}
+	s := &fakeSMTP{t: t, ln: ln, tlsConfig: tlsConfig, rcptReply: rcptReply, ended: make(chan struct{}, 16)}
 	s.wg.Add(1)
 	go s.serve()
 	t.Cleanup(func() {
@@ -91,6 +92,10 @@ func (s *fakeSMTP) serve() {
 			defer s.wg.Done()
 			defer conn.Close()
 			s.session(conn)
+			select {
+			case s.ended <- struct{}{}:
+			default:
+			}
 		}()
 	}
 }
@@ -337,6 +342,43 @@ func TestSMTPMailerClassifiesFailures(t *testing.T) {
 			require.NotNil(t, sendErr)
 			assert.Equal(t, tc.permanent, IsPermanent(sendErr), sendErr.Error())
 			assert.NotContains(t, sendErr.Error(), fakePassword)
+		})
+	}
+}
+
+func TestSMTPMailerSettingsTheServerCantMeetArePermanentAndCloseTheConnection(t *testing.T) {
+	serverTLS, clientTLS := selfSignedTLS(t)
+	cases := []struct {
+		name      string
+		serverTLS *tls.Config
+		clientTLS *tls.Config
+		security  string
+		auth      string
+	}{
+		{"auth mechanism not offered", nil, clientTLS, SecurityNone, AuthCramMD5},
+		{"STARTTLS not offered", nil, clientTLS, SecurityStartTLS, AuthNone},
+		{"untrusted certificate", serverTLS, &tls.Config{ServerName: "127.0.0.1", MinVersion: tls.VersionTLS12}, SecurityStartTLS, AuthNone},
+		{"wrong password", serverTLS, clientTLS, SecurityStartTLS, AuthPlain},
+		{"implicit TLS on a plain port", nil, clientTLS, SecurityTLS, AuthNone},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := startFakeSMTP(t, tc.serverTLS, "")
+			m, err := NewSMTPMailer(SMTPConfig{
+				Host: "127.0.0.1", Port: srv.port(), Username: fakeUser, Password: "wrong",
+				Security: tc.security, Auth: tc.auth, Timeout: 5 * time.Second,
+			}, WithTLSConfig(tc.clientTLS))
+			require.Nil(t, err)
+
+			_, sendErr := m.Send(context.Background(), testMessage())
+
+			require.NotNil(t, sendErr)
+			assert.True(t, IsPermanent(sendErr), sendErr.Error())
+			select {
+			case <-srv.ended:
+			case <-time.After(2 * time.Second):
+				t.Fatal("the connection was left open after the failed dial")
+			}
 		})
 	}
 }

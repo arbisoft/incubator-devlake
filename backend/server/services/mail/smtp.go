@@ -20,8 +20,10 @@ package mail
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	goerrors "errors"
 	"fmt"
+	"net"
 	"net/textproto"
 	"strings"
 
@@ -32,6 +34,23 @@ import (
 
 // smtpPermanentCode is the first SMTP reply code that means "don't retry" (RFC 5321 §4.2.1).
 const smtpPermanentCode = 500
+
+// authNotSupported are go-mail's errors for a server that doesn't offer the SMTP_AUTH mechanism.
+var authNotSupported = []error{
+	gomail.ErrPlainAuthNotSupported,
+	gomail.ErrLoginAuthNotSupported,
+	gomail.ErrCramMD5AuthNotSupported,
+	gomail.ErrXOauth2AuthNotSupported,
+	gomail.ErrSCRAMSHA1AuthNotSupported,
+	gomail.ErrSCRAMSHA1PLUSAuthNotSupported,
+	gomail.ErrSCRAMSHA256AuthNotSupported,
+	gomail.ErrSCRAMSHA256PLUSAuthNotSupported,
+	gomail.ErrNoSupportedAuthDiscovered,
+}
+
+// startTLSNotSupported is in go-mail's error for a server that doesn't offer STARTTLS while
+// SMTP_SECURITY is starttls. go-mail has no sentinel error for it.
+const startTLSNotSupported = "does not support STARTTLS"
 
 // smtpAuthTypes maps SMTP_AUTH values to go-mail's auth types. AuthNone sends no AUTH command.
 var smtpAuthTypes = map[string]gomail.SMTPAuthType{
@@ -46,6 +65,7 @@ var smtpAuthTypes = map[string]gomail.SMTPAuthType{
 type SMTPMailer struct {
 	options []gomail.Option
 	host    string
+	dial    gomail.DialContextFunc
 }
 
 var _ Mailer = (*SMTPMailer)(nil)
@@ -97,7 +117,13 @@ func NewSMTPMailer(cfg SMTPConfig, opts ...SMTPOption) (*SMTPMailer, errors.Erro
 	if _, err := gomail.NewClient(cfg.Host, options...); err != nil {
 		return nil, errors.BadInput.Wrap(err, "smtp mailer: invalid settings")
 	}
-	return &SMTPMailer{options: options, host: cfg.Host}, nil
+	// go-mail uses its own dialer only when none is given, so implicit TLS is dialed here too
+	netDialer := &net.Dialer{}
+	dial := netDialer.DialContext
+	if cfg.Security == SecurityTLS {
+		dial = (&tls.Dialer{NetDialer: netDialer, Config: settings.tlsConfig}).DialContext
+	}
+	return &SMTPMailer{options: options, host: cfg.Host, dial: dial}, nil
 }
 
 // Send delivers msg in one SMTP session and returns its Message-ID. Each recipient gets their own
@@ -124,12 +150,24 @@ func (m *SMTPMailer) Send(ctx context.Context, msg *Message) (string, errors.Err
 		return "", errors.Default.Wrap(Permanent(goerrors.New("no recipients")), "build message: no recipients")
 	}
 	// a client per send keeps Send safe for concurrent use; go-mail clients hold connection state
-	client, err := gomail.NewClient(m.host, m.options...)
+	var conn net.Conn
+	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		c, err := m.dial(ctx, network, addr)
+		if err == nil {
+			conn = c
+		}
+		return c, err
+	}
+	client, err := gomail.NewClient(m.host, append(m.options, gomail.WithDialContextFunc(dial))...)
 	if err != nil {
 		return "", errors.Default.Wrap(Permanent(err), "create smtp client: "+err.Error())
 	}
 	session, err := client.DialToSMTPClientWithContext(ctx)
 	if err != nil {
+		// go-mail doesn't close the connection when EHLO, STARTTLS or AUTH fails, so it is closed here
+		if conn != nil {
+			_ = conn.Close()
+		}
 		return "", errors.Default.Wrap(classify(ctx, err), "send through "+m.host+": dial failed: "+err.Error())
 	}
 	sendErr := client.SendWithSMTPClient(session, copies...)
@@ -199,7 +237,9 @@ func buildMsg(msg *Message, to string) (*gomail.Msg, error) {
 }
 
 // classify marks errors that retrying can't fix. Cancellation, timeouts, network errors and 4xx
-// replies stay temporary; 5xx replies (including failed authentication, 535) are permanent.
+// replies stay temporary. 5xx replies (including failed authentication, 535) are permanent, and so are
+// settings the server can't meet: an SMTP_AUTH mechanism it doesn't offer, STARTTLS it doesn't offer,
+// implicit TLS on a plain port, or a certificate that doesn't verify.
 func classify(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
 		return err
@@ -213,7 +253,21 @@ func classify(ctx context.Context, err error) error {
 	if goerrors.As(err, &protoErr) && protoErr.Code >= smtpPermanentCode {
 		return Permanent(err)
 	}
-	if goerrors.Is(err, gomail.ErrPlainAuthNotSupported) {
+	for _, notSupported := range authNotSupported {
+		if goerrors.Is(err, notSupported) {
+			return Permanent(err)
+		}
+	}
+	if strings.Contains(err.Error(), startTLSNotSupported) {
+		return Permanent(err)
+	}
+	var recordErr tls.RecordHeaderError
+	var verifyErr *tls.CertificateVerificationError
+	var authorityErr x509.UnknownAuthorityError
+	var hostnameErr x509.HostnameError
+	var invalidErr x509.CertificateInvalidError
+	if goerrors.As(err, &recordErr) || goerrors.As(err, &verifyErr) || goerrors.As(err, &authorityErr) ||
+		goerrors.As(err, &hostnameErr) || goerrors.As(err, &invalidErr) {
 		return Permanent(err)
 	}
 	return err
