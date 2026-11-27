@@ -23,7 +23,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { getColumns } from './columns';
-import { COPY, HISTORY_COLUMN } from './constants';
+import { COPY, EMAIL_STATUS, HISTORY_COLUMN } from './constants';
 import type { EmailHistoryItem } from './types';
 
 const EMAIL: EmailHistoryItem = {
@@ -88,7 +88,7 @@ describe('Email history columns', () => {
 
   it('labels the status', () => {
     renderCell(HISTORY_COLUMN.STATUS, EMAIL);
-    expect(screen.getByText(COPY.statusLabels.FAILED)).toBeTruthy();
+    expect(screen.getByText(EMAIL_STATUS.FAILED.label)).toBeTruthy();
   });
 
   it('opens the email from its subject', () => {

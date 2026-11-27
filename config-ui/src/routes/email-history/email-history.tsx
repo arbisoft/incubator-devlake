@@ -37,14 +37,14 @@ import { operator } from '@/utils';
 
 import { getColumns } from './columns';
 import { EmailDrawer, MailStatusBanner } from './components';
-import { COPY, DEFAULT_FILTERS, EMAIL_STATUS, FILTER_PARAM, PROJECT_OPTIONS_LIMIT, TEMPLATES } from './constants';
+import { COPY, DEFAULT_FILTERS, EMAIL_STATUS, EMAIL_TEMPLATE, FILTER_PARAM, PROJECT_OPTIONS_LIMIT } from './constants';
 import { FilterSelect, ProjectSelect } from './styled';
 import type { EmailHistoryItem, HistoryFilters, HistorySortKey } from './types';
 import { useQueuedPoll } from './use-queued-poll';
-import { buildHistoryQuery, buildProjectOptions, getStatusLabel, getTemplateLabel, toDateRange } from './utils';
+import { buildHistoryQuery, buildProjectOptions, toDateRange } from './utils';
 
-const statusOptions = Object.values(EMAIL_STATUS).map((value) => ({ value, label: getStatusLabel(value) }));
-const templateOptions = TEMPLATES.map((value) => ({ value, label: getTemplateLabel(value) }));
+const statusOptions = Object.values(EMAIL_STATUS).map(({ value, label }) => ({ value, label }));
+const templateOptions = Object.values(EMAIL_TEMPLATE).map(({ value, label }) => ({ value, label }));
 
 export const EmailHistory = () => {
   const list = useListState<HistorySortKey, HistoryFilters>({ filters: DEFAULT_FILTERS });

@@ -22,7 +22,7 @@ import type { HistoryParams } from '@/api/mail';
 import { STATUS_TONE, type ListQuery } from '@/ui';
 import type { StatusTone } from '@/ui/types';
 
-import { COPY, DRIVER_LOG, EMAIL_STATUS, RECIPIENTS_SHOWN, STATUS_TONES } from './constants';
+import { COPY, DRIVER_LOG, EMAIL_STATUS, EMAIL_TEMPLATE, RECIPIENTS_SHOWN } from './constants';
 import type { EmailHistoryItem, EmailStatus, HistoryFilters, HistorySortKey, MailStatus } from './types';
 
 const orUndefined = (value: string) => (value === '' ? undefined : value);
@@ -41,11 +41,15 @@ export const buildHistoryQuery = (query: ListQuery<HistorySortKey>, filters: His
   to: orUndefined(filters.to),
 });
 
-export const getStatusTone = (status: string): StatusTone => STATUS_TONES[status as EmailStatus] ?? STATUS_TONE.NEUTRAL;
+const statusMeta = (status: string) =>
+  Object.hasOwn(EMAIL_STATUS, status) ? EMAIL_STATUS[status as EmailStatus] : undefined;
 
-export const getStatusLabel = (status: string) => COPY.statusLabels[status as EmailStatus] ?? status;
+export const getStatusTone = (status: string): StatusTone => statusMeta(status)?.tone ?? STATUS_TONE.NEUTRAL;
 
-export const getTemplateLabel = (template: string) => COPY.templateLabels[template] ?? template;
+export const getStatusLabel = (status: string) => statusMeta(status)?.label ?? status;
+
+export const getTemplateLabel = (template: string) =>
+  Object.hasOwn(EMAIL_TEMPLATE, template) ? EMAIL_TEMPLATE[template as keyof typeof EMAIL_TEMPLATE].label : template;
 
 // summarizeRecipients shows the first few addresses and counts the rest.
 export const summarizeRecipients = (recipients: string[]) => ({
@@ -86,13 +90,13 @@ export const queuedChanged = (shown: HistoryPage, fresh: HistoryPage) => {
   if (fresh.count !== shown.count) return true;
   const freshById = new Map(fresh.items.map((item) => [item.id, item]));
   return shown.items.some((item) => {
-    if (item.status !== EMAIL_STATUS.QUEUED) return false;
+    if (item.status !== EMAIL_STATUS.QUEUED.value) return false;
     const now = freshById.get(item.id);
     return !now || now.status !== item.status || now.updatedAt !== item.updatedAt;
   });
 };
 
-export const hasQueued = (items: EmailHistoryItem[]) => items.some((item) => item.status === EMAIL_STATUS.QUEUED);
+export const hasQueued = (items: EmailHistoryItem[]) => items.some((item) => item.status === EMAIL_STATUS.QUEUED.value);
 
 // buildProjectOptions lists the projects the server found for the typed text, keeping the selected
 // project first when the search didn't return it, so the select still shows its name.

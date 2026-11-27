@@ -66,7 +66,7 @@ export const EmailDrawer = ({ open, emailId, onClose }: EmailDrawerProps) => {
           if (controller.signal.aborted) return;
           setLoaded(detail);
           setFailure(undefined);
-          if (detail.status === EMAIL_STATUS.QUEUED) timer = window.setTimeout(load, QUEUED_POLL_MS);
+          if (detail.status === EMAIL_STATUS.QUEUED.value) timer = window.setTimeout(load, QUEUED_POLL_MS);
         })
         .catch((err: unknown) => {
           if (!controller.signal.aborted) setFailure({ id: emailId, error: err });
@@ -102,7 +102,7 @@ export const EmailDrawer = ({ open, emailId, onClose }: EmailDrawerProps) => {
         <Content>
           {email.errorMessage && (
             <Alert
-              type={email.status === EMAIL_STATUS.FAILED ? 'error' : 'warning'}
+              type={email.status === EMAIL_STATUS.FAILED.value ? 'error' : 'warning'}
               showIcon
               title={COPY.drawer.error}
               description={email.errorMessage}

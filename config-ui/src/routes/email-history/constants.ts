@@ -40,18 +40,19 @@ export const FILTER_PARAM = {
 
 export const DEFAULT_FILTERS: HistoryFilters = { status: '', template: '', projectName: '', from: '', to: '' };
 
-export const EMAIL_STATUS = { QUEUED: 'QUEUED', SENT: 'SENT', FAILED: 'FAILED' } as const satisfies Record<
-  EmailStatus,
-  EmailStatus
->;
+// EMAIL_STATUS is each email status with its badge tone and label. Keys are the API's values.
+export const EMAIL_STATUS = {
+  QUEUED: { value: 'QUEUED', tone: STATUS_TONE.INFO, label: 'Queued' },
+  SENT: { value: 'SENT', tone: STATUS_TONE.SUCCESS, label: 'Sent' },
+  FAILED: { value: 'FAILED', tone: STATUS_TONE.ERROR, label: 'Failed' },
+} as const satisfies { [S in EmailStatus]: { value: S; tone: StatusTone; label: string } };
 
-export const STATUS_TONES: Record<EmailStatus, StatusTone> = {
-  QUEUED: STATUS_TONE.INFO,
-  SENT: STATUS_TONE.SUCCESS,
-  FAILED: STATUS_TONE.ERROR,
-};
-
-export const TEMPLATES = ['alert', 'report', 'project_invite'] as const;
+// EMAIL_TEMPLATE is each mail template with its label. Keys are the API's template names.
+export const EMAIL_TEMPLATE = {
+  alert: { value: 'alert', label: 'Alert' },
+  report: { value: 'report', label: 'Report' },
+  project_invite: { value: 'project_invite', label: 'Project invite' },
+} as const satisfies Record<string, { value: string; label: string }>;
 
 // The mail driver that logs emails instead of sending them.
 export const DRIVER_LOG = 'log';
@@ -83,8 +84,6 @@ export const COPY = {
     status: 'Status',
     sentBy: 'Sent By',
   },
-  statusLabels: { QUEUED: 'Queued', SENT: 'Sent', FAILED: 'Failed' } as Record<EmailStatus, string>,
-  templateLabels: { alert: 'Alert', report: 'Report', project_invite: 'Project invite' } as Record<string, string>,
   filters: {
     status: 'Status',
     template: 'Template',
