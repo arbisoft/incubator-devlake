@@ -28,17 +28,20 @@ import type { EmailHistoryItem, EmailStatus, HistoryFilters, HistorySortKey, Mai
 const orUndefined = (value: string) => (value === '' ? undefined : value);
 
 // buildHistoryQuery maps the list state to GET /mail/history params; the search box is the API's search.
-export const buildHistoryQuery = (query: ListQuery<HistorySortKey>, filters: HistoryFilters): HistoryParams => ({
-  page: query.page,
-  pageSize: query.pageSize,
-  sortBy: query.sortBy,
-  sortOrder: query.sortOrder,
-  search: query.keyword,
-  status: orUndefined(filters.status) as EmailStatus | undefined,
-  template: orUndefined(filters.template),
-  projectName: orUndefined(filters.projectName),
-  from: orUndefined(filters.from),
-  to: orUndefined(filters.to),
+export const buildHistoryQuery = (
+  { page, pageSize, sortBy, sortOrder, keyword }: ListQuery<HistorySortKey>,
+  { status, template, projectName, from, to }: HistoryFilters,
+): HistoryParams => ({
+  page,
+  pageSize,
+  sortBy,
+  sortOrder,
+  search: keyword,
+  status: orUndefined(status) as EmailStatus | undefined,
+  template: orUndefined(template),
+  projectName: orUndefined(projectName),
+  from: orUndefined(from),
+  to: orUndefined(to),
 });
 
 const statusMeta = (status: string) =>
