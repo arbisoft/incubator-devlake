@@ -51,6 +51,7 @@ type fakeSMTP struct {
 	rcptReply string            // reply to RCPT TO; empty means "250 OK"
 	rejects   map[string]string // reply to RCPT TO for single addresses, checked after rcptReply
 	quitReply string            // reply to QUIT; empty means "221 bye"
+	rsetReply string            // reply to RSET; empty means "250 OK"
 	wg        sync.WaitGroup
 
 	mu       sync.Mutex // guards the fields below
@@ -142,7 +143,13 @@ func (s *fakeSMTP) session(conn net.Conn) {
 			s.authUser, s.authPass = fields[1], fields[2]
 			s.mu.Unlock()
 			reply("235 2.7.0 Accepted")
-		case "MAIL", "RSET", "NOOP":
+		case "RSET":
+			if s.rsetReply != "" {
+				reply(s.rsetReply)
+				continue
+			}
+			reply("250 OK")
+		case "MAIL", "NOOP":
 			reply("250 OK")
 		case "RCPT":
 			if s.rcptReply != "" {
@@ -275,6 +282,27 @@ func TestSMTPMailerAFailedQuitAfterDeliveryIsASuccess(t *testing.T) {
 			messageID, sendErr := m.Send(context.Background(), msg)
 
 			require.Nil(t, sendErr, "every copy was accepted, so a failed QUIT must not fail or retry the send")
+			assert.NotEmpty(t, messageID)
+			srv.mu.Lock()
+			defer srv.mu.Unlock()
+			assert.Len(t, srv.datas, 2)
+		})
+	}
+}
+
+func TestSMTPMailerAFailedResetAfterDeliveryIsASuccess(t *testing.T) {
+	for _, rset := range []string{"554 5.0.0 reset failed", "421 4.4.2 timeout"} {
+		t.Run(rset, func(t *testing.T) {
+			srv := startFakeSMTP(t, nil, "")
+			srv.rsetReply = rset
+			m, err := NewSMTPMailer(SMTPConfig{Host: "127.0.0.1", Port: srv.port(), Security: SecurityNone, Auth: AuthNone, Timeout: 5 * time.Second})
+			require.Nil(t, err)
+			msg := testMessage()
+			msg.To = []string{"a@arbisoft.com", "b@arbisoft.com"}
+
+			messageID, sendErr := m.Send(context.Background(), msg)
+
+			require.Nil(t, sendErr, "the server accepted every copy, so a failed RSET after each must not fail or retry the send")
 			assert.NotEmpty(t, messageID)
 			srv.mu.Lock()
 			defer srv.mu.Unlock()

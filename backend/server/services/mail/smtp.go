@@ -139,10 +139,18 @@ func (m *SMTPMailer) Send(ctx context.Context, msg *Message) (string, errors.Err
 	if sendErr == nil {
 		return messageID, nil
 	}
+	// go-mail sends RSET after each accepted copy and records a failed RSET as that copy's error, so a
+	// copy counts as failed only when the server didn't accept it. Sending an accepted copy again would
+	// duplicate it.
 	var failed []string
 	var reasons []string
+	delivered := 0
 	allPermanent := true
 	for i, gm := range copies {
+		if gm.IsDelivered() {
+			delivered++
+			continue
+		}
 		if !gm.HasSendError() {
 			continue
 		}
@@ -152,10 +160,12 @@ func (m *SMTPMailer) Send(ctx context.Context, msg *Message) (string, errors.Err
 		allPermanent = allPermanent && IsPermanent(classify(ctx, copyErr))
 	}
 	switch {
+	case delivered == len(copies):
+		return messageID, nil
 	case len(failed) == 0:
 		// the session failed before any copy was tried: the connection check after dialing
 		return "", errors.Default.Wrap(classify(ctx, sendErr), "send through "+m.host+": "+sendErr.Error())
-	case len(failed) < len(copies):
+	case delivered > 0:
 		return messageID, errors.Default.Wrap(Partial(sendErr), fmt.Sprintf("not delivered to %d of %d recipients through %s: %s",
 			len(failed), len(copies), m.host, strings.Join(reasons, "; ")))
 	case allPermanent:

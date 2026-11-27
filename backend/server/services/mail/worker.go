@@ -233,6 +233,9 @@ func (w *Worker) process(ctx context.Context, row *models.EmailHistory) errors.E
 		w.logger.Debug("mail worker: another worker claimed email id=%d", row.ID)
 		return nil
 	}
+	// A send that times out or loses its connection after the message's last line was written is
+	// retried like any temporary error, although the server may have accepted the message: the driver
+	// can't tell, and retrying can send the email twice. Delivery is at least once, never at most once.
 	sendCtx, cancel := context.WithTimeout(ctx, w.sendTimeout)
 	messageID, sendErr := w.mailer.Send(sendCtx, w.message(row))
 	cancel()
