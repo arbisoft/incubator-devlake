@@ -72,6 +72,10 @@ func TestParseConfigInvalidTurnsMailOff(t *testing.T) {
 		{"negative retries", envMaxRetries, "-1", "MAIL_MAX_RETRIES must be between 0 and 10"},
 		{"bad domain", envAllowedDomains, "localhost", `invalid domain "localhost"`},
 		{"missing host", envSMTPHost, "", "SMTP_HOST is required"},
+		{"host with a port", envSMTPHost, "smtp.gmail.com:587", "SMTP_HOST must be a host name or IP address only"},
+		{"host with a scheme", envSMTPHost, "smtp://smtp.gmail.com", "SMTP_HOST must be a host name or IP address only"},
+		{"host with a path", envSMTPHost, "smtp.gmail.com/mail", "SMTP_HOST must be a host name or IP address only"},
+		{"host with a space", envSMTPHost, "smtp gmail.com", "SMTP_HOST must be a host name or IP address only"},
 		{"port too high", envSMTPPort, "70000", "SMTP_PORT must be between 1 and 65535"},
 		{"port not a number", envSMTPPort, "587a", "SMTP_PORT must be a whole number"},
 		{"retries not a number", envMaxRetries, "three", "MAIL_MAX_RETRIES must be a whole number"},
@@ -91,6 +95,17 @@ func TestParseConfigInvalidTurnsMailOff(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.want)
 			assert.NotContains(t, err.Error(), "app-password-secret")
 			assert.False(t, cfg.Enabled, "invalid config must turn mail off")
+		})
+	}
+}
+
+func TestParseConfigAcceptsHostNamesAndIPs(t *testing.T) {
+	for _, host := range []string{"smtp.gmail.com", "127.0.0.1", "::1", "mailhog"} {
+		t.Run(host, func(t *testing.T) {
+			cfg, err := ParseConfig(validSMTPSource().with(envSMTPHost, host))
+
+			require.Nil(t, err)
+			assert.Equal(t, host, cfg.SMTP.Host)
 		})
 	}
 }

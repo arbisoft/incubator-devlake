@@ -21,6 +21,7 @@ package mail
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -211,6 +212,8 @@ func (s SMTPConfig) problems() []string {
 	var out []string
 	if s.Host == "" {
 		out = append(out, envSMTPHost+" is required")
+	} else if !isSMTPHost(s.Host) {
+		out = append(out, envSMTPHost+" must be a host name or IP address only, without a scheme, port or path, for example smtp.gmail.com")
 	}
 	if s.Port < 1 || s.Port > maxPort {
 		out = append(out, fmt.Sprintf("%s must be between 1 and %d", envSMTPPort, maxPort))
@@ -229,6 +232,18 @@ func (s SMTPConfig) problems() []string {
 		out = append(out, envSMTPAuth+" must be none when "+envSMTPSecurity+"=none")
 	}
 	return out
+}
+
+// isSMTPHost reports whether host looks like a bare host name or IP address. It does no lookup. A
+// port, scheme, path or user info would otherwise pass startup and make every send fail.
+func isSMTPHost(host string) bool {
+	if strings.ContainsAny(host, " \t\r\n/@[]") {
+		return false
+	}
+	if _, _, err := net.SplitHostPort(host); err == nil {
+		return false // "smtp.gmail.com:587": the port belongs in SMTP_PORT
+	}
+	return true
 }
 
 // isLinkBaseURL reports whether raw can prefix the links in emails: an absolute http or https URL with a host,
