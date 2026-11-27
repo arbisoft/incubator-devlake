@@ -273,13 +273,15 @@ func (w *Worker) saveOutcome(row *models.EmailHistory) errors.Error {
 
 // attemptsUsedMessage is the reason kept on a QUEUED row that has no attempts left. Either its last attempt was
 // interrupted before the result was saved, or MAIL_MAX_RETRIES was lowered while it waited for a retry. The row
-// doesn't say which, so the message names both.
+// doesn't say which, so the message names both. In the first case the email may have been delivered, and the
+// message says so, because the row is marked FAILED either way.
 const attemptsUsedMessage = "no attempts left (MAIL_MAX_RETRIES): the last attempt was interrupted before its result " +
-	"was saved, or the retry limit was lowered; not sent again"
+	"was saved, so the email may have been delivered, or the retry limit was lowered; not sent again"
 
 // failAttemptsUsed marks a row FAILED without sending. It is reached when the process stopped during the
-// last allowed attempt, so the email may or may not have been delivered, or when MAIL_MAX_RETRIES was
-// lowered below the attempts a waiting row already made.
+// last allowed attempt, or its outcome couldn't be saved, so the email may or may not have been delivered,
+// or when MAIL_MAX_RETRIES was lowered below the attempts a waiting row already made. Nothing on the row
+// records whether the server accepted the email, so FAILED here means "not confirmed", not "not delivered".
 func (w *Worker) failAttemptsUsed(row *models.EmailHistory) errors.Error {
 	msg := attemptsUsedMessage
 	row.Status = models.EmailStatusFailed
