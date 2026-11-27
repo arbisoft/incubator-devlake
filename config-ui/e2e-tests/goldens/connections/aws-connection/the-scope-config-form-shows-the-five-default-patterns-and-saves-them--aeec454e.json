@@ -1,0 +1,18 @@
+{
+  "titlePath": ["the scope config form shows the five default patterns and saves them"],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/plugins/aws/connections/:id/scope-configs",
+      "body": {
+        "deploymentPattern": "(?i)(deploy|release)",
+        "entities": ["CICD"],
+        "name": "e2e-*",
+        "productionPattern": "(?i)(^|[^a-z])prod(uction)?([^a-z]|$)",
+        "rollbackPattern": "(?i)(rolling .* back|rolled back|rollback)",
+        "smokeTestPattern": "(?i)smoke test (passed|failed)",
+        "trivyTotalsPattern": "Total: (\\d+) \\((.*)\\)"
+      }
+    }
+  ]
+}

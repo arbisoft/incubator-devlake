@@ -20,6 +20,7 @@ import type { ReactNode } from 'react';
 
 import { ArgoCDTransformation } from '@/plugins/register/argocd';
 import { AsanaTransformation } from '@/plugins/register/asana';
+import { AwsTransformation } from '@/plugins/register/aws';
 import { AzureTransformation } from '@/plugins/register/azure';
 import { BambooTransformation } from '@/plugins/register/bamboo';
 import { BitbucketTransformation } from '@/plugins/register/bitbucket';
@@ -58,6 +59,7 @@ const getRenderers = (): Record<string, TransformationComponent> => ({
   jenkins: JenkinsTransformation,
   jira: JiraTransformation,
   asana: AsanaTransformation,
+  aws: AwsTransformation,
   tapd: TapdRenderer,
   youtrack: YoutrackTransformation,
 });

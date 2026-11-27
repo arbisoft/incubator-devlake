@@ -1,0 +1,3 @@
+connection_id,arn,region,name,pipeline_type,execution_mode,version,url
+1,arn:aws:codepipeline:us-east-2:111122223333:acme-ci-checks-pipeline,us-east-2,acme-ci-checks-pipeline,V2,SUPERSEDED,1,https://us-east-2.console.aws.amazon.com/codesuite/codepipeline/pipelines/acme-ci-checks-pipeline/view?region=us-east-2
+1,arn:aws:codepipeline:us-east-2:111122223333:acme-prod-backend-pipeline,us-east-2,acme-prod-backend-pipeline,V2,QUEUED,3,https://us-east-2.console.aws.amazon.com/codesuite/codepipeline/pipelines/acme-prod-backend-pipeline/view?region=us-east-2

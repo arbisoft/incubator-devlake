@@ -209,3 +209,68 @@ describe('ConnectionForm defaults', () => {
     expect(testOld.mock.calls[0][1]).toMatchObject({ endpoint: mocks.defaultEndpoint });
   });
 });
+
+describe('ConnectionForm test result renderer', () => {
+  const renderResult = (result: { message: string }) => <p>{`Result: ${result.message}`}</p>;
+
+  beforeEach(() => {
+    resetConnectionFormMocks();
+  });
+
+  const clickTest = () => fireEvent.click(screen.getByRole('button', { name: COPY.test.label }));
+
+  it('shows nothing extra for a plugin without a renderer', async () => {
+    testOld.mockResolvedValue({ success: true, message: mocks.successMessage });
+    renderCreate();
+    clickTest();
+
+    await waitFor(() => expect(messageMock.success).toHaveBeenCalled());
+    expect(screen.queryByText(`Result: ${mocks.successMessage}`)).toBeNull();
+  });
+
+  it('renders the result after a passing test', async () => {
+    setPluginConfig(false, renderResult);
+    testOld.mockResolvedValue({ success: true, message: mocks.successMessage });
+    renderCreate();
+    clickTest();
+
+    expect(await screen.findByText(`Result: ${mocks.successMessage}`)).toBeTruthy();
+  });
+
+  it('renders the result after a failing test that still returns a body', async () => {
+    setPluginConfig(false, renderResult);
+    testOld.mockResolvedValue({ success: false, message: 'Check failed' });
+    renderCreate();
+    clickTest();
+
+    expect(await screen.findByText('Result: Check failed')).toBeTruthy();
+    await waitFor(() => expect(messageMock.error).toHaveBeenCalled());
+  });
+
+  it('hides the result once a value changes', async () => {
+    setPluginConfig(false, renderResult);
+    testOld.mockResolvedValue({ success: true, message: mocks.successMessage });
+    renderCreate();
+    clickTest();
+    await screen.findByText(`Result: ${mocks.successMessage}`);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change endpoint' }));
+
+    await waitFor(() => expect(screen.queryByText(`Result: ${mocks.successMessage}`)).toBeNull());
+  });
+
+  it('shows no result when the request fails without a body', async () => {
+    setPluginConfig(false, renderResult);
+    testOld
+      .mockResolvedValueOnce({ success: true, message: mocks.successMessage })
+      .mockRejectedValueOnce({ response: { status: 400, data: { message: 'Enter the role ARN, then test.' } } });
+    renderCreate();
+    clickTest();
+    await screen.findByText(`Result: ${mocks.successMessage}`);
+
+    await clickTestWhenReady();
+
+    await waitFor(() => expect(messageMock.error).toHaveBeenCalledWith('Enter the role ARN, then test.'));
+    expect(screen.queryByText(`Result: ${mocks.successMessage}`)).toBeNull();
+  });
+});

@@ -1,0 +1,20 @@
+{
+  "titlePath": ["AWS connection through the UI", "create an access-key connection"],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/plugins/aws/connections",
+      "body": {
+        "accessKeyId": "AKIAE2EFAKEKEY000001",
+        "authType": "ACCESS_KEY",
+        "name": "e2e-*",
+        "rateLimitPerHour": 10000,
+        "regions": ["us-east-2"],
+        "roleArn": "",
+        "secretAccessKey": "e2e-*",
+        "sessionToken": "",
+        "useCostExplorer": false
+      }
+    }
+  ]
+}

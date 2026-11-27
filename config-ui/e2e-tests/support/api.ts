@@ -154,7 +154,7 @@ export async function deleteConnection(api: APIRequestContext, plugin: string, i
   if (scopesRes.ok()) {
     const { scopes } = (await scopesRes.json()) as ApiScopeList;
     for (const { scope } of scopes ?? []) {
-      const scopeId = scope.githubId ?? scope.id;
+      const scopeId = (scope.githubId ?? scope.id ?? scope.arn) as string | number | undefined;
       if (scopeId !== undefined) {
         await deleteScope(api, plugin, id, scopeId);
       }
@@ -215,6 +215,17 @@ export async function putGithubScope(
     },
   });
   expect(res.ok(), `put github scope failed with ${res.status()}`).toBe(true);
+}
+
+export async function putAwsPipelineScope(
+  api: APIRequestContext,
+  connectionId: number,
+  pipeline: { arn: string; name: string; region: string },
+): Promise<void> {
+  const res = await api.put(`/plugins/aws/connections/${connectionId}/scopes`, {
+    data: { data: [{ connectionId, ...pipeline, pipelineType: 'V2' }] },
+  });
+  expect(res.ok(), `put aws scope failed with ${res.status()}`).toBe(true);
 }
 
 export interface ApiProject {

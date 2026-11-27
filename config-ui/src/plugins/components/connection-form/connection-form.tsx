@@ -52,6 +52,7 @@ import type {
   OldTestPayload,
   TestPayload,
 } from './types';
+import { useTestResult } from './use-test-result';
 
 export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFormProps) => {
   const [type, setType] = useState<ConnectionFormType>(CONNECTION_FORM_TYPE.CREATE);
@@ -61,6 +62,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
   const [saving, setSaving] = useState(false);
   const [failedTestValues, setFailedTestValues] = useState<ConnectionFormValues>();
   const [connectionDetail, setConnectionDetail] = useState<IConnectionAPI>();
+  const testResult = useTestResult(values);
 
   const dispatch = useAppDispatch();
   const connection = useAppSelector((state) => selectConnection(state, `${plugin}-${connectionId}`));
@@ -95,6 +97,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
   const pluginConfig = getPluginConfig(plugin);
   const name = pluginConfig?.name;
   const { docLink = '', fields = [], initialValues = {}, showTestResultMessage } = pluginConfig?.connection ?? {};
+  const renderTestResult = pluginConfig?.connection.renderTestResult;
 
   const disabled = useMemo(() => {
     return Object.values(errors).some((value) => value);
@@ -114,6 +117,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
   const handleTest = async () => {
     if (detailsBlocked) return;
 
+    testResult.clear();
     const [success, res] = await operator(
       async () => {
         const result =
@@ -127,6 +131,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
                 plugin,
                 buildNewTestPayload(initialValues, values, customHeaders) as OldTestPayload,
               );
+        if (renderTestResult) testResult.capture(result, values);
         if (result.success === false) {
           throw Object.assign(new Error(CONNECTION_COPY.testFailed.fallback), {
             response: { status: CONNECTION_HTTP_STATUS.BAD_REQUEST, data: { message: result.message } },
@@ -217,6 +222,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
           setErrors={setErrors}
         />
       </div>
+      {renderTestResult && testResult.result && renderTestResult(testResult.result)}
       <Actions>
         <Button
           htmlType="button"

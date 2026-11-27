@@ -17,6 +17,7 @@
  */
 
 import ArgocdLogoUrl from '@/images/connector-logos/argocd.svg?url';
+import AwsLogo from '@/images/connector-logos/aws.svg?react';
 import AzureLogoUrl from '@/images/connector-logos/azure.svg?url';
 import BambooLogo from '@/images/connector-logos/bamboo.svg?react';
 import BitbucketLogoUrl from '@/images/connector-logos/bitbucket.svg?url';
@@ -57,6 +58,7 @@ const CONNECTOR_LOGOS: Record<string, ConnectorLogo> = {
   claude_otel: { src: ClaudeLogoUrl, kind: LOGO },
   webhook: { Svg: WebhookLogo, kind: MONO },
   argocd: { src: ArgocdLogoUrl, kind: LOGO },
+  aws: { Svg: AwsLogo, kind: MONO },
   grafana_irm: { src: GrafanaIrmLogoUrl, kind: LOGO },
   youtrack: { src: YoutrackLogoUrl, kind: LOGO },
   clickup: { src: ClickupLogoUrl, kind: LOGO },

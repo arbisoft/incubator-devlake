@@ -52,6 +52,13 @@
       "skips": 1,
       "fixmes": 0
     },
+    "connections/aws-connection.spec.ts": {
+      "tests": 5,
+      "expects": 25,
+      "backend": 9,
+      "skips": 0,
+      "fixmes": 0
+    },
     "connections/catalog.spec.ts": {
       "tests": 8,
       "expects": 32,

@@ -217,3 +217,10 @@ export function deleteReadinessSeed(token: string): void {
     DELETE FROM ai_activities WHERE id LIKE '${like}';
   `);
 }
+
+// Length of the stored (encrypted) secret access key of an AWS connection, so a spec can check it is still set without reading it.
+export function awsStoredSecretLength(connectionId: number): number {
+  return Number(
+    runSql(`SELECT LENGTH(secret_access_key) FROM _tool_aws_connections WHERE id = ${connectionId};`).trim(),
+  );
+}

@@ -41,6 +41,7 @@ const EXPECTED_KINDS: Record<string, string> = {
   claude_otel: 'logo',
   webhook: 'mono',
   argocd: 'logo',
+  aws: 'mono',
   grafana_irm: 'logo',
   youtrack: 'logo',
   clickup: 'logo',

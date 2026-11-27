@@ -74,6 +74,13 @@ export const test = (
       | 'apiVersion'
       | 'workspaceSlug'
       | 'customHeaders'
+      | 'authType'
+      | 'accessKeyId'
+      | 'secretAccessKey'
+      | 'sessionToken'
+      | 'roleArn'
+      | 'regions'
+      | 'useCostExplorer'
     >
   >,
   timeout?: number,
@@ -109,5 +116,11 @@ export const testOld = (
     | 'apiVersion'
     | 'workspaceSlug'
     | 'customHeaders'
-  >,
+  > &
+    Partial<
+      Pick<
+        IConnectionAPI,
+        'authType' | 'accessKeyId' | 'secretAccessKey' | 'sessionToken' | 'roleArn' | 'regions' | 'useCostExplorer'
+      >
+    >,
 ): Promise<IConnectionOldTestResult> => request(`/plugins/${plugin}/test`, { method: 'post', data: payload });

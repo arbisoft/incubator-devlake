@@ -1,0 +1,4 @@
+connection_id,name,arn,environment_type,compute_type,image,timeout_in_minutes,queued_timeout_in_minutes
+1,acme-ci-tests,arn:aws:codebuild:us-east-2:111122223333:project/acme-ci-tests,LINUX_CONTAINER,BUILD_GENERAL1_MEDIUM,aws/codebuild/standard:7.0,60,30
+1,acme-prod-build,arn:aws:codebuild:us-east-2:111122223333:project/acme-prod-build,LINUX_CONTAINER,BUILD_GENERAL1_MEDIUM,aws/codebuild/standard:7.0,60,30
+1,acme-prod-deploy,arn:aws:codebuild:us-east-2:111122223333:project/acme-prod-deploy,LINUX_CONTAINER,BUILD_GENERAL1_MEDIUM,aws/codebuild/standard:7.0,60,30

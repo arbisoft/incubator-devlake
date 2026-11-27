@@ -51,6 +51,7 @@ export const PLUGINS = {
   claudeCode: { name: 'Claude Code', key: 'claude_code' },
   azureDevops: { name: 'Azure DevOps', key: 'azuredevops' },
   webhook: { name: 'Webhook', key: 'webhook' },
+  aws: { name: 'AWS', key: 'aws' },
 } satisfies Record<string, PluginRef>;
 
 const manageTitle = (plugin: PluginRef) => CONNECTION_MODAL_COPY.title(plugin.name);
