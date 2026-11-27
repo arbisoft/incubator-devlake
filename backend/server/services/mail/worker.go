@@ -254,7 +254,9 @@ func (w *Worker) process(ctx context.Context, row *models.EmailHistory) errors.E
 
 // saveOutcome records a send's result, trying a few times so a short database outage doesn't lose it.
 // The claim's lease keeps the row from being sent again while these tries run. If every try fails,
-// the row is sent again once the lease ends, within the attempt limit.
+// the row stays QUEUED and is sent again once the lease ends, within the attempt limit, even when
+// this send succeeded. So a database outage longer than these tries can send an email twice without
+// the process stopping, the same as a crash between the send and the save.
 func (w *Worker) saveOutcome(row *models.EmailHistory) errors.Error {
 	var err errors.Error
 	for try := 1; try <= outcomeSaveTries; try++ {
