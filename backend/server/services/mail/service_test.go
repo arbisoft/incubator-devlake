@@ -134,6 +134,7 @@ func TestSendRefusesWithoutRecording(t *testing.T) {
 			errors.BadInput, "no valid recipients: 1 invalid, 1 outside the allowed domains"},
 		{"no template", enabledConfig(), func(r *SendRequest) { r.Template = "" }, errors.BadInput, "template is required"},
 		{"unknown template", enabledConfig(), func(r *SendRequest) { r.Template = "digest" }, errors.BadInput, "unknown mail template digest"},
+		{"template too long", enabledConfig(), func(r *SendRequest) { r.Template = strings.Repeat("t", 51) }, errors.BadInput, "template must be at most 50 characters"},
 		{"source too long", enabledConfig(), func(r *SendRequest) { r.Source = strings.Repeat("s", 101) }, errors.BadInput, "source must be at most 100 characters"},
 		{"project too long", enabledConfig(), func(r *SendRequest) { r.ProjectName = strings.Repeat("p", 256) }, errors.BadInput, "projectName must be at most 255 characters"},
 	}

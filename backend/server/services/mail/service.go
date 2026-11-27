@@ -29,6 +29,7 @@ import (
 
 // Column sizes of _devlake_email_history that request values must fit.
 const (
+	maxTemplateLen    = 50
 	maxSourceLen      = 100
 	maxSourceIDLen    = 255
 	maxProjectNameLen = 255
@@ -186,6 +187,7 @@ func validateRequest(req SendRequest) errors.Error {
 		field, value string
 		max          int
 	}{
+		{"template", req.Template, maxTemplateLen},
 		{"projectName", req.ProjectName, maxProjectNameLen},
 		{"source", req.Source, maxSourceLen},
 		{"sourceId", req.SourceID, maxSourceIDLen},
