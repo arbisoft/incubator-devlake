@@ -72,14 +72,15 @@ export const toDateRange = (start?: Date | null, end?: Date | null) => ({
 export const getBanner = (status: MailStatus | undefined, failed: boolean): { tone: StatusTone; message: string } => {
   if (failed) return { tone: STATUS_TONE.ERROR, message: COPY.banner.failed };
   if (!status) return { tone: STATUS_TONE.NEUTRAL, message: '' };
-  if (!status.enabled) {
-    return status.disabledReason
-      ? { tone: STATUS_TONE.WARNING, message: COPY.banner.offReason(status.disabledReason) }
+  const { enabled, disabledReason, driver, host, port } = status;
+  if (!enabled) {
+    return disabledReason
+      ? { tone: STATUS_TONE.WARNING, message: COPY.banner.offReason(disabledReason) }
       : { tone: STATUS_TONE.NEUTRAL, message: COPY.banner.off };
   }
-  if (status.driver === DRIVER_LOG) return { tone: STATUS_TONE.INFO, message: COPY.banner.onLog };
-  const host = status.port ? `${status.host}:${status.port}` : (status.host ?? status.driver);
-  return { tone: STATUS_TONE.SUCCESS, message: COPY.banner.on(host) };
+  if (driver === DRIVER_LOG) return { tone: STATUS_TONE.INFO, message: COPY.banner.onLog };
+  const address = port ? `${host}:${port}` : (host ?? driver);
+  return { tone: STATUS_TONE.SUCCESS, message: COPY.banner.on(address) };
 };
 
 type HistoryPage = { items: EmailHistoryItem[]; count: number };
