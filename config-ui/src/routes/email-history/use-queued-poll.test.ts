@@ -42,11 +42,11 @@ describe('useQueuedPoll', () => {
   });
 
   it('skips ticks while the last check is still running', async () => {
-    let finish: (value: typeof page) => void = () => undefined;
+    const pending: Array<(value: typeof page) => void> = [];
     const history = vi.spyOn(API.mail, 'history').mockImplementation(
       () =>
         new Promise((resolve) => {
-          finish = resolve;
+          pending.push(resolve);
         }),
     );
     renderHook(() => useQueuedPoll(page, query, () => undefined));
@@ -54,7 +54,7 @@ describe('useQueuedPoll', () => {
     await vi.advanceTimersByTimeAsync(QUEUED_POLL_MS * 3);
     expect(history).toHaveBeenCalledTimes(1);
 
-    finish(page);
+    pending[0](page);
     await vi.advanceTimersByTimeAsync(QUEUED_POLL_MS);
     expect(history).toHaveBeenCalledTimes(2);
   });

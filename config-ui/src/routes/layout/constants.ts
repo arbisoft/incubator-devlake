@@ -33,7 +33,6 @@ import {
   SlackOutlined,
   TeamOutlined,
 } from '@ant-design/icons';
-
 import type { ComponentType } from 'react';
 
 import { THEME_MODE } from '@/theme/constants';
