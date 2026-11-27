@@ -1,0 +1,2 @@
+connection_id,issue_key,project_key,severity,type,status
+1,impact-issue-1,impact-project,MAJOR,CODE_SMELL,OPEN

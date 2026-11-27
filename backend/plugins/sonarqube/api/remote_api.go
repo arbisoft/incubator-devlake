@@ -63,6 +63,7 @@ func querySonarqubeProjects(
 	q := url.Values{
 		"p":  {fmt.Sprintf("%v", page.Page)},
 		"ps": {fmt.Sprintf("%v", page.PageSize)},
+		"f":  {"analysisDate"},
 	}
 	keyword = strings.TrimSpace(keyword)
 	if keyword != "" {

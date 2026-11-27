@@ -1,0 +1,2 @@
+connection_id,issue_key,software_quality,severity
+1,impact-issue-1,MAINTAINABILITY,MEDIUM

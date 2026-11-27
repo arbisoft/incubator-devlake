@@ -138,8 +138,8 @@
         "kind": "Panel",
         "spec": {
           "id": 11,
-          "title": "Sonar Bugs",
-          "description": "Open SonarQube bugs (not closed or resolved) in the mapped projects.",
+          "title": "Sonar Reliability issues",
+          "description": "Open SonarQube issues (not closed or resolved) with a Reliability impact in the mapped projects.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -159,7 +159,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_cq AS (\n  SELECT DISTINCT pm.row_id AS cq_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cq_projects' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nSELECT COUNT(DISTINCT ci.id) AS value\nFROM cq_issues ci\nWHERE ci.project_key IN (SELECT cq_id FROM scoped_cq)\n  AND ci.type = 'BUG' AND COALESCE(ci.status, '') NOT IN ('CLOSED', 'RESOLVED')"
+                        "rawSql": "WITH\nscoped_cq AS (\n  SELECT DISTINCT pm.row_id AS cq_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cq_projects' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nSELECT COUNT(DISTINCT ci.id) AS value\nFROM cq_issues ci\nJOIN cq_issue_impacts ii ON ii.cq_issue_id = ci.id AND ii.software_quality = 'RELIABILITY'\nWHERE ci.project_key IN (SELECT cq_id FROM scoped_cq)\n  AND COALESCE(ci.status, '') NOT IN ('CLOSED', 'RESOLVED')"
                       }
                     },
                     "refId": "A",
@@ -223,8 +223,8 @@
         "kind": "Panel",
         "spec": {
           "id": 12,
-          "title": "Sonar Vulnerabilities / hotspots unreviewed",
-          "description": "Open vulnerabilities, then the security hotspots still to be reviewed.",
+          "title": "Sonar Security issues / hotspots to review",
+          "description": "Open issues with a Security impact, then the security hotspots still to review.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -244,7 +244,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_cq AS (\n  SELECT DISTINCT pm.row_id AS cq_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cq_projects' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nSELECT CONCAT(\n  (SELECT COUNT(DISTINCT ci.id) FROM cq_issues ci\n   WHERE ci.project_key IN (SELECT cq_id FROM scoped_cq)\n     AND ci.type = 'VULNERABILITY' AND COALESCE(ci.status, '') NOT IN ('CLOSED', 'RESOLVED')),\n  ' / ',\n  COALESCE(ROUND((SELECT SUM(fm.security_hotspots) FROM cq_file_metrics fm\n   WHERE fm.project_key IN (SELECT cq_id FROM scoped_cq))), 0)) AS value"
+                        "rawSql": "WITH\nscoped_cq AS (\n  SELECT DISTINCT pm.row_id AS cq_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cq_projects' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nSELECT CONCAT(\n  (SELECT COUNT(DISTINCT ci.id) FROM cq_issues ci\n   JOIN cq_issue_impacts ii ON ii.cq_issue_id = ci.id AND ii.software_quality = 'SECURITY'\n   WHERE ci.project_key IN (SELECT cq_id FROM scoped_cq)\n     AND COALESCE(ci.status, '') NOT IN ('CLOSED', 'RESOLVED')),\n  ' / ',\n  COALESCE((SELECT COUNT(DISTINCT ci.id) FROM cq_issues ci\n   WHERE ci.project_key IN (SELECT cq_id FROM scoped_cq)\n     AND ci.type = 'HOTSPOTS' AND ci.status = 'TO_REVIEW'), 0)) AS value"
                       }
                     },
                     "refId": "A",
@@ -307,7 +307,7 @@
         "spec": {
           "id": 13,
           "title": "Tech Debt (d)",
-          "description": "Technical debt in days: the SQALE index summed over files, at 8 hours a day.",
+          "description": "Remediation effort of open maintainability issues in days, at 8 hours a day.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -327,7 +327,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_cq AS (\n  SELECT DISTINCT pm.row_id AS cq_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cq_projects' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nSELECT ROUND(SUM(fm.sqale_index) / 480, 1) AS value\nFROM cq_file_metrics fm\nWHERE fm.project_key IN (SELECT cq_id FROM scoped_cq)"
+                        "rawSql": "WITH\nscoped_cq AS (\n  SELECT DISTINCT pm.row_id AS cq_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cq_projects' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nSELECT ROUND(COALESCE(SUM(ci.debt), 0) / 480, 1) AS value\nFROM cq_issues ci\nJOIN cq_issue_impacts ii ON ii.cq_issue_id = ci.id AND ii.software_quality = 'MAINTAINABILITY'\nWHERE ci.project_key IN (SELECT cq_id FROM scoped_cq)\n  AND COALESCE(ci.status, '') NOT IN ('CLOSED', 'RESOLVED')"
                       }
                     },
                     "refId": "A",
@@ -412,7 +412,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "WITH\nscoped_cq AS (\n  SELECT DISTINCT pm.row_id AS cq_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cq_projects' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, files AS (\n  SELECT fm.project_key,\n    100 * (1 - SUM(fm.uncovered_lines) / NULLIF(SUM(fm.lines_to_cover), 0)) AS coverage,\n    SUM(fm.security_hotspots) AS hotspots,\n    SUM(fm.sqale_index) / 480 AS debt\n  FROM cq_file_metrics fm\n  WHERE fm.project_key IN (SELECT cq_id FROM scoped_cq)\n  GROUP BY fm.project_key\n),\nopen_issues AS (\n  SELECT ci.project_key,\n    COUNT(DISTINCT CASE WHEN ci.type = 'BUG' THEN ci.id END) AS bugs,\n    COUNT(DISTINCT CASE WHEN ci.type = 'VULNERABILITY' THEN ci.id END) AS vulns\n  FROM cq_issues ci\n  WHERE ci.project_key IN (SELECT cq_id FROM scoped_cq)\n    AND ci.type IN ('BUG', 'VULNERABILITY') AND COALESCE(ci.status, '') NOT IN ('CLOSED', 'RESOLVED')\n  GROUP BY ci.project_key\n)\nSELECT cp.name AS Project,\n  ROUND(f.coverage, 1) AS \"Coverage %\",\n  COALESCE(oi.bugs, 0) AS Bugs,\n  COALESCE(oi.vulns, 0) AS Vulns,\n  ROUND(f.hotspots) AS \"Hotspots unreviewed\",\n  ROUND(f.debt, 1) AS \"Debt (d)\",\n  cp.last_analysis_date AS \"Last analysis\"\nFROM cq_projects cp\nJOIN scoped_cq sc ON sc.cq_id = cp.id\nLEFT JOIN files f ON f.project_key = cp.id\nLEFT JOIN open_issues oi ON oi.project_key = cp.id\nORDER BY cp.name"
+                        "rawSql": "WITH\nscoped_cq AS (\n  SELECT DISTINCT pm.row_id AS cq_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cq_projects' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, files AS (\n  SELECT fm.project_key,\n    100 * (1 - SUM(fm.uncovered_lines) / NULLIF(SUM(fm.lines_to_cover), 0)) AS coverage\n  FROM cq_file_metrics fm\n  WHERE fm.project_key IN (SELECT cq_id FROM scoped_cq)\n  GROUP BY fm.project_key\n),\nopen_issues AS (\n  SELECT ci.project_key,\n    COUNT(DISTINCT CASE WHEN ii.software_quality = 'RELIABILITY' THEN ci.id END) AS reliability,\n    COUNT(DISTINCT CASE WHEN ii.software_quality = 'SECURITY' THEN ci.id END) AS security,\n    SUM(CASE WHEN ii.software_quality = 'MAINTAINABILITY' THEN ci.debt END) / 480 AS debt\n  FROM cq_issues ci\n  JOIN cq_issue_impacts ii ON ii.cq_issue_id = ci.id\n  WHERE ci.project_key IN (SELECT cq_id FROM scoped_cq)\n    AND COALESCE(ci.status, '') NOT IN ('CLOSED', 'RESOLVED')\n  GROUP BY ci.project_key\n),\nhotspots AS (\n  SELECT ci.project_key, COUNT(DISTINCT ci.id) AS hotspots\n  FROM cq_issues ci\n  WHERE ci.project_key IN (SELECT cq_id FROM scoped_cq)\n    AND ci.type = 'HOTSPOTS' AND ci.status = 'TO_REVIEW'\n  GROUP BY ci.project_key\n)\nSELECT cp.name AS Project,\n  ROUND(f.coverage, 1) AS \"Coverage %\",\n  COALESCE(oi.reliability, 0) AS Reliability,\n  COALESCE(oi.security, 0) AS Security,\n  COALESCE(h.hotspots, 0) AS \"Hotspots to review\",\n  ROUND(COALESCE(oi.debt, 0), 1) AS \"Debt (d)\",\n  cp.last_analysis_date AS \"Last analysis\"\nFROM cq_projects cp\nJOIN scoped_cq sc ON sc.cq_id = cp.id\nLEFT JOIN files f ON f.project_key = cp.id\nLEFT JOIN open_issues oi ON oi.project_key = cp.id\nLEFT JOIN hotspots h ON h.project_key = cp.id\nORDER BY cp.name"
                       }
                     },
                     "refId": "A",
@@ -526,7 +526,7 @@
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Bugs"
+                      "options": "Reliability"
                     },
                     "properties": [
                       {
@@ -538,7 +538,7 @@
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Vulns"
+                      "options": "Security"
                     },
                     "properties": [
                       {
@@ -550,7 +550,7 @@
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Hotspots unreviewed"
+                      "options": "Hotspots to review"
                     },
                     "properties": [
                       {

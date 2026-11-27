@@ -63,17 +63,22 @@ type SonarqubeApiProject struct {
 	Qualifier        string              `json:"qualifier"`
 	Visibility       string              `json:"visibility"`
 	LastAnalysisDate *common.Iso8601Time `json:"lastAnalysisDate"`
+	AnalysisDate     *common.Iso8601Time `json:"analysisDate"`
 	Revision         string              `json:"revision"`
 }
 
 // Convert the API response to our DB model instance
 func (sonarqubeApiProject *SonarqubeApiProject) ConvertApiScope() *SonarqubeProject {
+	lastAnalysisDate := sonarqubeApiProject.LastAnalysisDate
+	if lastAnalysisDate == nil {
+		lastAnalysisDate = sonarqubeApiProject.AnalysisDate
+	}
 	return &SonarqubeProject{
 		ProjectKey:       sonarqubeApiProject.ProjectKey,
 		Name:             sonarqubeApiProject.Name,
 		Qualifier:        sonarqubeApiProject.Qualifier,
 		Visibility:       sonarqubeApiProject.Visibility,
-		LastAnalysisDate: sonarqubeApiProject.LastAnalysisDate,
+		LastAnalysisDate: lastAnalysisDate,
 		Revision:         sonarqubeApiProject.Revision,
 	}
 }

@@ -41,6 +41,7 @@ func ConvertIssueImpacts(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	rawDataSubTaskArgs, data := CreateRawDataSubTaskArgs(taskCtx, RAW_ISSUES_TABLE)
 	cursor, err := db.Cursor(
+		dal.Select("p.*"),
 		dal.From("_tool_sonarqube_issue_impacts p"),
 		dal.Join("LEFT JOIN _tool_sonarqube_issues i ON (i.connection_id = p.connection_id AND i.issue_key = p.issue_key)"),
 		dal.Where("i.connection_id = ? AND i.project_key = ?", data.Options.ConnectionId, data.Options.ProjectKey))

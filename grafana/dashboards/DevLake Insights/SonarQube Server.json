@@ -109,7 +109,7 @@
               }
             ]
           },
-          "unit": "bugs"
+          "unit": "issues"
         },
         "overrides": []
       },
@@ -152,7 +152,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  count(distinct id) as 'Bugs'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and type = 'BUG'\n  and severity in (${severity})",
+          "rawSql": "SELECT\n  COUNT(DISTINCT i.id) AS 'Reliability issues'\nFROM cq_issues i\nJOIN cq_issue_impacts ii ON ii.cq_issue_id = i.id AND ii.software_quality = 'RELIABILITY'\nWHERE\n  i.project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and COALESCE(i.status, '') NOT IN ('CLOSED', 'RESOLVED')\n  and ii.severity in (${severity})",
           "refId": "A",
           "sql": {
             "columns": [
@@ -174,7 +174,8 @@
         }
       ],
       "title": "Reliability",
-      "type": "stat"
+      "type": "stat",
+      "description": "Open issues (not closed or resolved) with a Reliability impact, as SonarQube counts them."
     },
     {
       "datasource": "mysql",
@@ -197,7 +198,7 @@
               }
             ]
           },
-          "unit": "vulnerabilities"
+          "unit": "issues"
         },
         "overrides": []
       },
@@ -240,7 +241,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  count(distinct id) as 'Vulnerabilities'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and type = 'VULNERABILITY'\n  and severity in (${severity})",
+          "rawSql": "SELECT\n  COUNT(DISTINCT i.id) AS 'Security issues'\nFROM cq_issues i\nJOIN cq_issue_impacts ii ON ii.cq_issue_id = i.id AND ii.software_quality = 'SECURITY'\nWHERE\n  i.project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and COALESCE(i.status, '') NOT IN ('CLOSED', 'RESOLVED')\n  and ii.severity in (${severity})",
           "refId": "A",
           "sql": {
             "columns": [
@@ -262,11 +263,12 @@
         }
       ],
       "title": "Security",
-      "type": "stat"
+      "type": "stat",
+      "description": "Open issues (not closed or resolved) with a Security impact, as SonarQube counts them."
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Security hotspots still to review.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -329,7 +331,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  COUNT(distinct id) AS 'Security Hotspots'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and type = 'HOTSPOTS'\n  and severity in (${severity})\n",
+          "rawSql": "SELECT\n  COUNT(distinct id) AS 'Security Hotspots'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and type = 'HOTSPOTS'\n  and status = 'TO_REVIEW'\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -417,7 +419,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  CONCAT(ROUND(COUNT(IF(status != 'TO_REVIEW', id, NULL)) / COUNT(distinct id) * 100, 2), '%') AS 'Reviewed'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and type = 'HOTSPOTS'\n  and severity in (${severity})",
+          "rawSql": "SELECT\n  CONCAT(ROUND(COUNT(IF(status != 'TO_REVIEW', id, NULL)) / COUNT(distinct id) * 100, 2), '%') AS 'Reviewed'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and type = 'HOTSPOTS'",
           "refId": "A",
           "sql": {
             "columns": [
@@ -557,7 +559,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Remediation effort of open maintainability issues.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -620,7 +622,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  concat(FLOOR(SUM(debt)/8/60), \" day(s) \", FLOOR((SUM(debt)%480)/60), \" hour(s) \") AS 'Debt'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and type = 'CODE_SMELL'\n  and severity in (${severity})",
+          "rawSql": "SELECT\n  concat(FLOOR(SUM(i.debt)/8/60), \" day(s) \", FLOOR((SUM(i.debt)%480)/60), \" hour(s) \") AS 'Debt'\nFROM cq_issues i\nJOIN cq_issue_impacts ii ON ii.cq_issue_id = i.id AND ii.software_quality = 'MAINTAINABILITY'\nWHERE\n  i.project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and COALESCE(i.status, '') NOT IN ('CLOSED', 'RESOLVED')\n  and ii.severity in (${severity})",
           "refId": "A",
           "sql": {
             "columns": [
@@ -646,7 +648,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Open issues (not closed or resolved) with a Maintainability impact, as SonarQube counts them.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -666,7 +668,7 @@
               }
             ]
           },
-          "unit": "code smells"
+          "unit": "issues"
         },
         "overrides": []
       },
@@ -709,7 +711,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n\tCOUNT(distinct id) as 'Code Smells'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and type = 'CODE_SMELL'\n  and severity in (${severity})",
+          "rawSql": "SELECT\n  COUNT(DISTINCT i.id) AS 'Maintainability issues'\nFROM cq_issues i\nJOIN cq_issue_impacts ii ON ii.cq_issue_id = i.id AND ii.software_quality = 'MAINTAINABILITY'\nWHERE\n  i.project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n  and COALESCE(i.status, '') NOT IN ('CLOSED', 'RESOLVED')\n  and ii.severity in (${severity})",
           "refId": "A",
           "sql": {
             "columns": [
@@ -730,7 +732,7 @@
           }
         }
       ],
-      "title": "Maintainability - Code Smells",
+      "title": "Maintainability - Issues",
       "type": "stat"
     },
     {
@@ -1095,14 +1097,14 @@
           ]
         },
         "datasource": "mysql",
-        "definition": "SELECT x.severity AS __text, x.severity AS __value FROM (\nselect distinct severity from cq_issues where id like 'sonar%' and project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n) x\nUNION ALL\nSELECT '(no severities)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect distinct severity from cq_issues where id like 'sonar%' and project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n)\nORDER BY __text",
+        "definition": "SELECT x.severity AS __text, x.severity AS __value FROM (\nselect distinct ii.severity from cq_issue_impacts ii join cq_issues i on i.id = ii.cq_issue_id where i.id like 'sonar%' and i.project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n) x\nUNION ALL\nSELECT '(no severities)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect distinct ii.severity from cq_issue_impacts ii join cq_issues i on i.id = ii.cq_issue_id where i.id like 'sonar%' and i.project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n)\nORDER BY __text",
         "hide": 0,
         "includeAll": true,
         "label": "Severity",
         "multi": true,
         "name": "severity",
         "options": [],
-        "query": "SELECT x.severity AS __text, x.severity AS __value FROM (\nselect distinct severity from cq_issues where id like 'sonar%' and project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n) x\nUNION ALL\nSELECT '(no severities)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect distinct severity from cq_issues where id like 'sonar%' and project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n)\nORDER BY __text",
+        "query": "SELECT x.severity AS __text, x.severity AS __value FROM (\nselect distinct ii.severity from cq_issue_impacts ii join cq_issues i on i.id = ii.cq_issue_id where i.id like 'sonar%' and i.project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n) x\nUNION ALL\nSELECT '(no severities)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect distinct ii.severity from cq_issue_impacts ii join cq_issues i on i.id = ii.cq_issue_id where i.id like 'sonar%' and i.project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}) AND pm_g.project_name IN (${project}))\n)\nORDER BY __text",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
