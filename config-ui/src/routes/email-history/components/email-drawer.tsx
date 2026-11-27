@@ -30,22 +30,37 @@ import { getStatusLabel, getStatusTone, getTemplateLabel } from '../utils';
 
 const time = (value: string | null) => (value ? formatTime(value, DATE_FORMAT) : '-');
 
-const fields = (email: EmailHistoryDetail) => {
-  const f = COPY.drawer.fields;
+const fields = ({
+  subject,
+  sender,
+  recipients,
+  template,
+  projectName,
+  source,
+  sourceId,
+  sentBy,
+  createdAt,
+  sentOn,
+  attempts,
+  nextAttemptAt,
+  provider,
+  providerMessageId,
+}: EmailHistoryDetail) => {
+  const { fields: labels } = COPY.drawer;
   return [
-    { label: f.subject, value: email.subject },
-    { label: f.from, value: email.sender },
-    { label: f.recipients, value: email.recipients.join(', ') },
-    { label: f.template, value: getTemplateLabel(email.template) },
-    { label: f.project, value: email.projectName ?? '-' },
-    { label: f.source, value: email.source ? [email.source, email.sourceId].filter(Boolean).join(' / ') : '-' },
-    { label: f.sentBy, value: email.sentBy },
-    { label: f.created, value: time(email.createdAt) },
-    { label: f.sentOn, value: time(email.sentOn) },
-    { label: f.attempts, value: String(email.attempts) },
-    { label: f.nextAttempt, value: time(email.nextAttemptAt) },
-    { label: f.provider, value: email.provider },
-    { label: f.messageId, value: email.providerMessageId ?? '-' },
+    { label: labels.subject, value: subject },
+    { label: labels.from, value: sender },
+    { label: labels.recipients, value: recipients.join(', ') },
+    { label: labels.template, value: getTemplateLabel(template) },
+    { label: labels.project, value: projectName ?? '-' },
+    { label: labels.source, value: source ? [source, sourceId].filter(Boolean).join(' / ') : '-' },
+    { label: labels.sentBy, value: sentBy },
+    { label: labels.created, value: time(createdAt) },
+    { label: labels.sentOn, value: time(sentOn) },
+    { label: labels.attempts, value: String(attempts) },
+    { label: labels.nextAttempt, value: time(nextAttemptAt) },
+    { label: labels.provider, value: provider },
+    { label: labels.messageId, value: providerMessageId ?? '-' },
   ];
 };
 
