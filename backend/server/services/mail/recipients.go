@@ -37,11 +37,11 @@ type recipientFilter struct {
 }
 
 // filterRecipients keeps the candidates that are valid addresses inside allowedDomains (all domains
-// when it is empty), lowercased and de-duplicated. It does no I/O.
+// when it is empty), lowercased and de-duplicated. allowedDomains may be in any case. It does no I/O.
 func filterRecipients(candidates []string, allowedDomains []string) recipientFilter {
 	allowed := make(map[string]bool, len(allowedDomains))
 	for _, d := range allowedDomains {
-		allowed[d] = true
+		allowed[strings.ToLower(strings.TrimSpace(d))] = true
 	}
 	out := recipientFilter{Valid: make([]string, 0, len(candidates))}
 	seen := make(map[string]bool, len(candidates))
@@ -73,8 +73,8 @@ type RecipientResolver struct {
 	logger         log.Logger
 }
 
-// NewRecipientResolver returns a resolver. logins and logger must not be nil; allowedDomains are
-// lowercase and may be empty to allow every domain.
+// NewRecipientResolver returns a resolver. logins and logger must not be nil; allowedDomains may be in
+// any case, and empty to allow every domain.
 func NewRecipientResolver(logins loginLister, allowedDomains []string, logger log.Logger) (*RecipientResolver, errors.Error) {
 	if logins == nil || logger == nil {
 		return nil, errors.Default.New("recipient resolver: nil dependency")

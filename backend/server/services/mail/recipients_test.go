@@ -50,6 +50,8 @@ func TestFilterRecipients(t *testing.T) {
 			recipientFilter{Valid: []string{"a@arbisoft.com"}, Invalid: []string{"legacy", "Name <c@arbisoft.com>"}}},
 		{"applies the allow-list", []string{"a@arbisoft.com", "b@gmail.com", "c@sub.arbisoft.com"}, []string{"arbisoft.com"},
 			recipientFilter{Valid: []string{"a@arbisoft.com"}, OutsideDomains: 2}},
+		{"allow-list in any case", []string{"a@arbisoft.com", "b@gmail.com"}, []string{" Arbisoft.COM "},
+			recipientFilter{Valid: []string{"a@arbisoft.com"}, OutsideDomains: 1}},
 		{"empty allow-list allows all", []string{"b@gmail.com"}, []string{},
 			recipientFilter{Valid: []string{"b@gmail.com"}}},
 	}
