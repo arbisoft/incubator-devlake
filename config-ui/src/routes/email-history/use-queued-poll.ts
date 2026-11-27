@@ -27,6 +27,8 @@ import { hasQueued, queuedChanged } from './utils';
 
 // useQueuedPoll checks the shown page in the background while it has a queued email, and calls
 // onChange once a queued row moves on. Checking quietly keeps the table from flashing every tick.
+// A tick that comes while the last check is still running is skipped, so a slow API gets one
+// request at a time.
 export const useQueuedPoll = (
   page: { items: EmailHistoryItem[]; count: number } | undefined,
   query: HistoryParams,
@@ -35,13 +37,19 @@ export const useQueuedPoll = (
   useEffect(() => {
     if (!page || !hasQueued(page.items)) return;
     const controller = new AbortController();
+    let checking = false;
     const timer = window.setInterval(() => {
+      if (checking) return;
+      checking = true;
       API.mail
         .history(query, controller.signal)
         .then((fresh) => {
           if (!controller.signal.aborted && queuedChanged(page, fresh)) onChange();
         })
-        .catch(() => undefined); // a failed check waits for the next tick
+        .catch(() => undefined) // a failed check waits for the next tick
+        .finally(() => {
+          checking = false;
+        });
     }, QUEUED_POLL_MS);
     return () => {
       window.clearInterval(timer);
